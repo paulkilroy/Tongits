@@ -10,50 +10,225 @@
 body {
   margin: 0;
   min-height: 100dvh;
-  background: radial-gradient(circle at 50% 0%, #0e7a43, #073b22);
+  background: radial-gradient(circle at 50% 0%, #0e7a43, #062b18);
   color: #f4f4f4;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .app {
-  max-width: 480px;
+  max-width: 560px;
   margin: 0 auto;
-  padding: 2rem 1rem env(safe-area-inset-bottom);
-  text-align: center;
+  padding: 1rem 0.75rem calc(1rem + env(safe-area-inset-bottom));
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
 }
 
 h1 {
-  margin: 0.5rem 0 0;
-  font-size: 2.25rem;
+  margin: 0;
+  font-size: 1.5rem;
   letter-spacing: 0.02em;
 }
 
-.tagline {
-  opacity: 0.8;
-  margin-top: 0.25rem;
+.newgame button,
+.actions button,
+.result button {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+}
+.newgame button {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.55rem;
+}
+.actions button:disabled,
+.result button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
+.section-label {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin: 0.5rem 0 0.35rem;
+}
+.section-label em {
+  font-style: normal;
+  opacity: 0.9;
+}
+
+/* Opponents */
+.opponents {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.opp {
+  flex: 1;
+  min-width: 140px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.5rem 0.6rem;
+}
+.opp.turn {
+  border-color: #ffd65a;
+  box-shadow: 0 0 0 1px #ffd65a55;
+}
+.opp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.count {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+/* Stock + discard */
+.center {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 0.9rem 0;
+}
+.pile {
+  width: 84px;
+  height: 116px;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+.pile:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.pile:not(:disabled) {
+  border-color: #ffd65a;
+  box-shadow: 0 0 12px #ffd65a44;
+}
+.pile-label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+.pile-count,
+.pile-top {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.pile.discard .pile-top {
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 8px;
+  padding: 0.15rem 0.5rem;
+}
+
+/* Melds */
+.melds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.meld {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.3rem 0.45rem;
+}
+.meld.active {
+  border-color: #ffd65a;
+  background: #ffd65a22;
+  cursor: pointer;
+}
+
+/* Hand */
 .hand {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  justify-content: center;
-  margin-top: 1.5rem;
 }
-
 .card {
+  font: inherit;
   background: #fff;
-  border-radius: 8px;
-  padding: 0.6rem 0.5rem;
-  min-width: 2.75rem;
-  font-size: 1.1rem;
-  font-weight: 600;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 0.55rem 0.4rem;
+  min-width: 2.9rem;
+  font-size: 1.05rem;
+  font-weight: 700;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
 }
-
+.card:disabled {
+  cursor: default;
+}
 .card.red {
   color: #c0392b;
 }
-
 .card.black {
   color: #1a1a1a;
+}
+.card.selected {
+  border-color: #1f8fff;
+  transform: translateY(-6px);
+}
+.card.dim {
+  opacity: 0.55;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.actions button {
+  flex: 1;
+}
+
+/* Result */
+.result {
+  margin-top: 1rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid #ffd65a55;
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+.result-reason {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin: 0.3rem 0 0.6rem;
+}
+
+/* Log */
+.log {
+  margin-top: 1rem;
+  font-size: 0.78rem;
+  opacity: 0.7;
+  line-height: 1.5;
+  min-height: 4rem;
 }

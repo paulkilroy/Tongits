@@ -7,3 +7,8 @@ dist-ssr
 .env.local
 .vercel
 *.tsbuildinfo
+
+# Secrets — never commit
+recovery-keys.txt
+*.secret
+.secrets/

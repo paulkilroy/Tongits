@@ -11,7 +11,9 @@
       "Bash(npm install *)",
       "Bash(npm test *)",
       "Bash(npm audit *)",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(git check-ignore *)",
+      "WebFetch(domain:tongits-five.vercel.app)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"
