@@ -18,6 +18,7 @@ import {
 } from "./engine/game";
 import { useGame } from "./ui/useGame";
 import { useOnlineMatch } from "./ui/useOnlineMatch";
+import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
 
 /* ----------------------------- card helpers ------------------------------ */
@@ -177,7 +178,7 @@ function RoundReveal({
                 <div className="rp-head">
                   <strong>
                     {i === r.winner ? "👑 " : ""}
-                    {name(i)}
+                    {p.avatar} {name(i)}
                   </strong>
                   <span className="rp-pts">{pts[i]} unmatched</span>
                 </div>
@@ -371,7 +372,7 @@ function Table({
         <span className="sb-label">Games to {target}</span>
         {state.players.map((p, i) => (
           <span key={p.id} className="sb-player">
-            {i === me ? "You" : p.name} <strong>{wins[i]}</strong>
+            {p.avatar} {i === me ? "You" : p.name} <strong>{wins[i]}</strong>
           </span>
         ))}
       </section>
@@ -382,7 +383,9 @@ function Table({
         {opponents.map(({ p, i }) => (
           <div key={p.id} className={`opp ${state.current === i ? "turn" : ""}`}>
             <div className="opp-head">
-              <strong>{p.name}</strong>
+              <strong>
+                {p.avatar} {p.name}
+              </strong>
               <span className="count">{p.hand.length} cards</span>
             </div>
             <div className="melds">
@@ -659,24 +662,32 @@ type Mode =
   | { kind: "online"; code: string; isHost: boolean; me: number };
 
 function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCode?: string }) {
-  const [name, setName] = useState("");
+  const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function update(p: Profile) {
+    setProfile(p);
+    saveProfile(p);
+  }
+  const myName = profile.name || "Player 1";
 
   async function host(withBot: boolean) {
     setBusy(true);
     setError(null);
     try {
       const roomCode = makeCode(Math.floor(Math.random() * 1_000_000_000));
-      const names = withBot ? [name || "Player 1", "Player 2", "Bot"] : [name || "Player 1", "Player 2"];
+      const names = withBot ? [myName, "Player 2", "Bot"] : [myName, "Player 2"];
+      const avatars = withBot ? [profile.avatar, "🙂", "🤖"] : [profile.avatar, "🙂"];
       const ai = withBot ? [false, false, true] : [false, false];
       const game = newRound(
-        { ...STANDARD_RULES, playerCount: (names.length) as 2 | 3 },
+        { ...STANDARD_RULES, playerCount: names.length as 2 | 3 },
         Math.floor(Math.random() * 1_000_000_000),
         names,
         ai,
         0,
+        avatars,
       );
       await createRoom(roomCode, { game, wins: names.map(() => 0), version: 1 });
       onStart({ kind: "online", code: roomCode, isHost: true, me: 0 });
@@ -697,7 +708,8 @@ function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCo
         setBusy(false);
         return;
       }
-      data.game.players[1].name = name || "Player 2";
+      data.game.players[1].name = profile.name || "Player 2";
+      data.game.players[1].avatar = profile.avatar;
       await pushRoom(clean, { ...data, version: data.version + 1 });
       onStart({ kind: "online", code: clean, isHost: false, me: 1 });
     } catch (e) {
@@ -710,20 +722,32 @@ function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCo
     <main className="app center-screen">
       <h1>Tongits</h1>
 
+      <div className="profile">
+        <input
+          placeholder="Your name"
+          value={profile.name}
+          onChange={(e) => update({ ...profile, name: e.target.value })}
+          maxLength={12}
+        />
+        <div className="avatar-grid">
+          {AVATARS.map((a) => (
+            <button
+              key={a}
+              className={`avatar ${profile.avatar === a ? "on" : ""}`}
+              onClick={() => update({ ...profile, avatar: a })}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button className="big" onClick={() => onStart({ kind: "local" })}>
-        Practice vs AI
+        {profile.avatar} Practice vs AI
       </button>
 
       {onlineConfigured ? (
         <div className="lobby-online">
-          <div className="lobby-row">
-            <input
-              placeholder="Your name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={12}
-            />
-          </div>
           <div className="lobby-section">
             <div className="lobby-title">Start a game (you host)</div>
             <div className="lobby-row">

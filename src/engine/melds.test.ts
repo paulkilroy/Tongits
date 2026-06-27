@@ -45,7 +45,7 @@ describe("runs", () => {
     expect(isRun([card("A", "spades"), card("2", "spades"), card("3", "spades")])).toBe(true);
   });
 
-  it("rejects a wrap-around Q-K-A (ace is low by default)", () => {
+  it("rejects an ace-high run Q-K-A (ace is always low)", () => {
     expect(isRun([card("Q", "spades"), card("K", "spades"), card("A", "spades")])).toBe(false);
   });
 
@@ -112,6 +112,18 @@ describe("sapaw / lay-off", () => {
   it("rejects a non-adjacent card or the wrong suit on a run", () => {
     expect(canLayOff(run, card("8", "hearts"))).toBe(false); // gap (skips 7)
     expect(canLayOff(run, card("3", "clubs"))).toBe(false); // wrong suit
+  });
+
+  it("lays an ace onto the low end of a 2-3-4 run (ace low)", () => {
+    const lowRun = classifyMeld([card("2", "diamonds"), card("3", "diamonds"), card("4", "diamonds")])!;
+    expect(canLayOff(lowRun, card("A", "diamonds"))).toBe(true);
+    const grown = layOff(lowRun, card("A", "diamonds"));
+    expect(labels(grown!.cards)).toEqual(["A♦", "2♦", "3♦", "4♦"]);
+  });
+
+  it("does NOT lay an ace onto the high end of a king-run (ace is low)", () => {
+    const kingRun = classifyMeld([card("J", "diamonds"), card("Q", "diamonds"), card("K", "diamonds")])!;
+    expect(canLayOff(kingRun, card("A", "diamonds"))).toBe(false);
   });
 
   it("does not extend a run past the ace-low boundary", () => {

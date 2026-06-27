@@ -2,20 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { STANDARD_RULES } from "../engine/rules";
 import { newRound, currentPlayer, type GameState } from "../engine/game";
 import { takeAITurn } from "../engine/ai";
+import { loadProfile } from "./profile";
 
 function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
 function configFor(botCount: 1 | 2) {
+  const me = loadProfile();
   const names = ["You", "Bot 1", "Bot 2"].slice(0, botCount + 1);
+  const avatars = [me.avatar, "🤖", "🦊"].slice(0, botCount + 1);
   const ai = names.map((_, i) => i !== 0);
-  return { names, ai, playerCount: (botCount + 1) as 2 | 3 };
+  return { names, avatars, ai, playerCount: (botCount + 1) as 2 | 3 };
 }
 
 function deal(botCount: 1 | 2, dealer: number): GameState {
-  const { names, ai, playerCount } = configFor(botCount);
-  return newRound({ ...STANDARD_RULES, playerCount }, randomSeed(), names, ai, dealer);
+  const { names, avatars, ai, playerCount } = configFor(botCount);
+  return newRound({ ...STANDARD_RULES, playerCount }, randomSeed(), names, ai, dealer, avatars);
 }
 
 /**

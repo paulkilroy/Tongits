@@ -93,6 +93,7 @@ export function useOnlineMatch(code: string, isHost: boolean) {
       game.players.map((p) => p.name),
       game.players.map((p) => p.isAI),
       (game.dealer + 1) % game.players.length,
+      game.players.map((p) => p.avatar),
     );
     write(next, wins);
   }, [isHost, game, wins, write]);
@@ -106,6 +107,7 @@ export function useOnlineMatch(code: string, isHost: boolean) {
       game.players.map((p) => p.name),
       game.players.map((p) => p.isAI),
       0,
+      game.players.map((p) => p.avatar),
     );
     write(next, game.players.map(() => 0));
   }, [isHost, game, write]);

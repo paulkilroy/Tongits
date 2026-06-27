@@ -9,6 +9,7 @@ import {
   discard,
   callFight,
   canCallFight,
+  canTakeDiscard,
   currentPlayer,
   type GameState,
 } from "./game";
@@ -179,6 +180,19 @@ describe("taking the discard (must be played)", () => {
     const top = s.discard[s.discard.length - 1];
     s.players[1].hand = s.players[1].hand.filter((c) => c.rank !== top.rank && c.suit !== top.suit);
     expect(draw(s, "discard")).toBe(s);
+  });
+
+  it("a non-dealer (player 1) can take a meldable discard on their turn", () => {
+    let s = twoPlayer();
+    s.current = 1;
+    s.phase = "draw";
+    s.discard = [card("5", "clubs")];
+    s.players[1].hand = [card("5", "hearts"), card("5", "diamonds"), card("K", "spades")];
+    expect(canTakeDiscard(s)).toBe(true);
+    s = draw(s, "discard");
+    expect(s.phase).toBe("action");
+    expect(s.mustPlay).not.toBeNull();
+    expect(s.players[1].hand.some((c) => c.rank === "5" && c.suit === "clubs")).toBe(true);
   });
 
   it("flags the taken card as mustPlay and blocks discarding until it is played", () => {

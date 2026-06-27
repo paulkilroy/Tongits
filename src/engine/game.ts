@@ -23,6 +23,7 @@ export type RoundReason = "tongits" | "showdown" | "stockEmpty";
 export interface Player {
   id: string;
   name: string;
+  avatar: string;
   isAI: boolean;
   hand: Card[];
   melds: Meld[];
@@ -71,17 +72,21 @@ function note(s: GameState, msg: string): void {
 
 /** Deal a fresh round. The dealer gets 13 cards and acts first; in a match the
  *  dealer alternates between games. */
+const DEFAULT_AVATARS = ["🐱", "🤖", "🦊"];
+
 export function newRound(
   rules: RuleSet,
   seed: number,
   names: string[],
   ai: boolean[],
   dealer = 0,
+  avatars: string[] = [],
 ): GameState {
   const deck = shuffledDeck(seed);
   const players: Player[] = names.map((name, i) => ({
     id: `p${i}`,
     name,
+    avatar: avatars[i] ?? DEFAULT_AVATARS[i] ?? "🙂",
     isAI: ai[i] ?? false,
     hand: [],
     melds: [],

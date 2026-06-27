@@ -33,17 +33,18 @@ function candidateRuns(hand: readonly Card[]): Meld[] {
   for (const cards of bySuit.values()) {
     const sorted = [...cards].sort((a, b) => rankOrder(a.rank) - rankOrder(b.rank));
     let run: Card[] = [];
+    const flush = () => {
+      if (run.length >= 3) out.push(classifyMeld(run)!);
+    };
     for (const c of sorted) {
       if (run.length === 0 || rankOrder(c.rank) === rankOrder(run[run.length - 1].rank) + 1) {
         run.push(c);
-      } else if (rankOrder(c.rank) === rankOrder(run[run.length - 1].rank)) {
-        // duplicate rank (can't happen in one deck) — skip
       } else {
-        if (run.length >= 3) out.push(classifyMeld(run)!);
+        flush();
         run = [c];
       }
     }
-    if (run.length >= 3) out.push(classifyMeld(run)!);
+    flush();
   }
   return out;
 }
