@@ -240,6 +240,33 @@ h1 {
   font-size: 0.72rem;
 }
 
+.hand-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+.sort-label {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  margin-right: 0.1rem;
+}
+.hand-controls button {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+.hand-controls button.on {
+  background: #1f8fff33;
+  border-color: #1f8fff;
+}
+
 /* Actions */
 .actions {
   display: flex;
