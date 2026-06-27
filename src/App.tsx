@@ -337,10 +337,30 @@ function Table({
   const inDraw = isMyTurn && state.phase === "draw";
   const mustPlay = state.mustPlay;
   const selectedMeld = classifyMeld(selected);
+
+  // The first meld the single selected card can lay onto (own, or an opponent's
+  // if allowed) — so the Buklad button can sapaw, not just lay new melds.
+  function firstSapawTarget(card: Card): { pi: number; mi: number } | null {
+    for (let pi = 0; pi < state.players.length; pi++) {
+      if (pi !== state.current && !state.rules.allowSapawOnOpponents) continue;
+      const melds = state.players[pi].melds;
+      for (let mi = 0; mi < melds.length; mi++) {
+        if (canLayOff(melds[mi], card)) return { pi, mi };
+      }
+    }
+    return null;
+  }
+  const sapawTarget = inAction && selected.length === 1 ? firstSapawTarget(selected[0]) : null;
+
   const canDiscard = inAction && selected.length === 1 && !mustPlay;
-  const canBaba = inAction && selectedMeld !== null;
+  const canBaba = inAction && (selectedMeld !== null || sapawTarget !== null);
   const canCall = inDraw && canCallFight(state);
   const canTake = inDraw && canTakeDiscard(state);
+
+  function buklad() {
+    if (selectedMeld) act(layMeld(state, selected));
+    else if (sapawTarget) act(sapaw(state, sapawTarget.pi, sapawTarget.mi, selected[0]));
+  }
 
   function takeDiscard() {
     const top = topDiscard(state);
@@ -555,8 +575,8 @@ function Table({
       {notice && <div className="notice">{notice}</div>}
 
       <section className="actions">
-        <button disabled={!canBaba} onClick={() => act(layMeld(state, selected))}>
-          Buklad{selectedMeld ? ` (${selectedMeld.kind})` : ""}
+        <button disabled={!canBaba} onClick={buklad}>
+          {selectedMeld ? `Buklad (${selectedMeld.kind})` : sapawTarget ? "Sapaw" : "Buklad"}
         </button>
         <button disabled={!canDiscard} onClick={() => act(discard(state, selected[0]))}>
           Labyog
