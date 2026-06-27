@@ -33,6 +33,9 @@ export interface RuleSet {
   /** Number of games (rounds) a player must win to take the match. We play to 5. */
   gamesToWin: number;
 
+  /** Play-money stake per game (pesos). Online all-human games settle wallets by this. */
+  stake: number;
+
   /** Include the two jokers as wildcards. Default off. */
   useJokers: boolean;
 }
@@ -47,5 +50,6 @@ export const STANDARD_RULES: RuleSet = {
   challengeAfterTongits: false,
   stockExhaustion: "lowestHandWins",
   gamesToWin: 5,
+  stake: 10,
   useJokers: false,
 };

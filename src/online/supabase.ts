@@ -1,5 +1,7 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { type GameState } from "../engine/game";
+import { getClient } from "./client";
+
+export { onlineConfigured } from "./client";
 
 // Online play uses one Supabase row per game "room". The full match (game state
 // + games won) is mirrored into a jsonb column; because Tongits is turn-based,
@@ -12,24 +14,13 @@ import { type GameState } from "../engine/game";
 export interface RoomData {
   game: GameState;
   wins: number[];
+  /** Identifies the current round, so wallets settle exactly once per game. */
+  gameId: number;
   /** Bumped on every write so clients can ignore their own stale echoes. */
   version: number;
 }
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-/** True when Supabase env vars are present (online play is configured). */
-export const onlineConfigured = Boolean(url && anonKey);
-
-let client: SupabaseClient | null = null;
-function supabase(): SupabaseClient {
-  if (!client) {
-    if (!onlineConfigured) throw new Error("Supabase is not configured");
-    client = createClient(url!, anonKey!, { realtime: { params: { eventsPerSecond: 5 } } });
-  }
-  return client;
-}
+const supabase = getClient;
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no easily-confused chars
 

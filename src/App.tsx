@@ -1,4 +1,10 @@
-import { useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./engine/cards";
 import { classifyMeld, canLayOff, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -18,6 +24,9 @@ import {
 } from "./engine/game";
 import { useGame } from "./ui/useGame";
 import { useOnlineMatch } from "./ui/useOnlineMatch";
+import { useAccount } from "./ui/useAccount";
+import { addBalance, type Account } from "./online/auth";
+import { settlementDelta } from "./engine/wallet";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
 import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
@@ -126,6 +135,7 @@ function RoundReveal({
   target,
   matchOver,
   canControlMatch,
+  moneyDelta,
   onNext,
   onNewMatch,
 }: {
@@ -135,6 +145,7 @@ function RoundReveal({
   target: number;
   matchOver: boolean;
   canControlMatch: boolean;
+  moneyDelta?: number | null;
   onNext: () => void;
   onNewMatch: () => void;
 }) {
@@ -218,6 +229,12 @@ function RoundReveal({
 
         <div className="reveal-verdict">{verdict}</div>
 
+        {moneyDelta != null && moneyDelta !== 0 && (
+          <div className={`reveal-money ${moneyDelta > 0 ? "up" : "down"}`}>
+            {moneyDelta > 0 ? `+₱${moneyDelta}` : `−₱${Math.abs(moneyDelta)}`}
+          </div>
+        )}
+
         <div className="reveal-score">
           {state.players.map((p, i) => (
             <span key={p.id} className={i === champion ? "sb-player champ" : "sb-player"}>
@@ -267,6 +284,8 @@ function Table({
   headerExtra,
   statusNote,
   banner,
+  balance,
+  moneyDelta,
 }: {
   state: GameState;
   me: number;
@@ -280,6 +299,8 @@ function Table({
   headerExtra?: ReactNode;
   statusNote?: string;
   banner?: ReactNode;
+  balance?: number;
+  moneyDelta?: number | null;
 }) {
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
@@ -388,6 +409,7 @@ function Table({
             {p.avatar} {i === me ? "You" : p.name} <strong>{wins[i]}</strong>
           </span>
         ))}
+        {balance != null && <span className="sb-money">₱{balance}</span>}
       </section>
 
       {banner}
@@ -526,6 +548,7 @@ function Table({
           target={target}
           matchOver={matchOver}
           canControlMatch={canControlMatch}
+          moneyDelta={moneyDelta}
           onNext={onNext}
           onNewMatch={onNewMatch}
         />
@@ -610,8 +633,61 @@ function ShareControls({ code, big }: { code: string; big?: boolean }) {
 
 /* ------------------------------ online game ------------------------------ */
 
-function OnlineGame({ code, isHost, me, onExit }: { code: string; isHost: boolean; me: number; onExit: () => void }) {
-  const { game, wins, target, matchOver, connected, dispatch, nextGame, newMatch } = useOnlineMatch(code, isHost);
+// Settle a wallet at most once per game, surviving reloads.
+function settleKey(code: string, gameId: number): string {
+  return `${code}:${gameId}`;
+}
+function alreadySettled(key: string): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem("tongits.settled") ?? "[]") as string[]).includes(key);
+  } catch {
+    return false;
+  }
+}
+function markSettled(key: string): void {
+  try {
+    const a = JSON.parse(localStorage.getItem("tongits.settled") ?? "[]") as string[];
+    a.push(key);
+    localStorage.setItem("tongits.settled", JSON.stringify(a.slice(-300)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function OnlineGame({
+  code,
+  isHost,
+  me,
+  account,
+  onBalance,
+  onExit,
+}: {
+  code: string;
+  isHost: boolean;
+  me: number;
+  account: Account | null;
+  onBalance: (b: number) => void;
+  onExit: () => void;
+}) {
+  const { game, wins, gameId, target, matchOver, connected, dispatch, nextGame, newMatch } =
+    useOnlineMatch(code, isHost);
+  const [moneyDelta, setMoneyDelta] = useState<number | null>(null);
+
+  // When a round ends, settle this seat's wallet exactly once.
+  const result = game?.result;
+  useEffect(() => {
+    if (!result || !game) {
+      setMoneyDelta(null);
+      return;
+    }
+    const key = settleKey(code, gameId);
+    if (alreadySettled(key)) return;
+    markSettled(key);
+    const delta = settlementDelta(game, me);
+    setMoneyDelta(delta || null);
+    if (delta !== 0) void addBalance(delta).then((b) => b != null && onBalance(b));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, gameId]);
 
   if (!game) {
     return (
@@ -644,6 +720,8 @@ function OnlineGame({ code, isHost, me, onExit }: { code: string; isHost: boolea
       onNewMatch={newMatch}
       canControlMatch={isHost}
       statusNote={waiting}
+      balance={account?.balance}
+      moneyDelta={moneyDelta}
       banner={
         waitingForGuest ? (
           <section className="invite">
@@ -777,19 +855,41 @@ function RulesEditor({ onBack }: { onBack: () => void }) {
   );
 }
 
-function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCode?: string }) {
+function Lobby({
+  onStart,
+  initialCode,
+  account,
+  onUpdateProfile,
+}: {
+  onStart: (m: Mode) => void;
+  initialCode?: string;
+  account: Account | null;
+  onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
+}) {
   const [screen, setScreen] = useState<"main" | "rules">("main");
   if (screen === "rules") return <RulesEditor onBack={() => setScreen("main")} />;
-  return <LobbyMain onStart={onStart} initialCode={initialCode} onRules={() => setScreen("rules")} />;
+  return (
+    <LobbyMain
+      onStart={onStart}
+      initialCode={initialCode}
+      account={account}
+      onUpdateProfile={onUpdateProfile}
+      onRules={() => setScreen("rules")}
+    />
+  );
 }
 
 function LobbyMain({
   onStart,
   initialCode,
+  account,
+  onUpdateProfile,
   onRules,
 }: {
   onStart: (m: Mode) => void;
   initialCode?: string;
+  account: Account | null;
+  onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
   onRules: () => void;
 }) {
   const [profile, setProfile] = useState<Profile>(loadProfile);
@@ -797,7 +897,12 @@ function LobbyMain({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function update(p: Profile) {
+  // Keep the editor in sync once the account loads (it may arrive after mount).
+  useEffect(() => {
+    if (account) setProfile({ name: account.name, avatar: account.avatar });
+  }, [account]);
+
+  function localUpdate(p: Profile) {
     setProfile(p);
     saveProfile(p);
   }
@@ -819,7 +924,7 @@ function LobbyMain({
         0,
         avatars,
       );
-      await createRoom(roomCode, { game, wins: names.map(() => 0), version: 1 });
+      await createRoom(roomCode, { game, wins: names.map(() => 0), gameId: 1, version: 1 });
       onStart({ kind: "online", code: roomCode, isHost: true, me: 0 });
     } catch (e) {
       setError(String((e as Error).message ?? e));
@@ -856,7 +961,8 @@ function LobbyMain({
         <input
           placeholder="Your name"
           value={profile.name}
-          onChange={(e) => update({ ...profile, name: e.target.value })}
+          onChange={(e) => localUpdate({ ...profile, name: e.target.value })}
+          onBlur={() => onUpdateProfile({ name: profile.name })}
           maxLength={12}
         />
         <div className="avatar-grid">
@@ -864,12 +970,16 @@ function LobbyMain({
             <button
               key={a}
               className={`avatar ${profile.avatar === a ? "on" : ""}`}
-              onClick={() => update({ ...profile, avatar: a })}
+              onClick={() => {
+                localUpdate({ ...profile, avatar: a });
+                onUpdateProfile({ avatar: a });
+              }}
             >
               {a}
             </button>
           ))}
         </div>
+        {account && <div className="wallet">Wallet: ₱{account.balance}</div>}
       </div>
 
       <button className="big" onClick={() => onStart({ kind: "local" })}>
@@ -921,15 +1031,19 @@ function LobbyMain({
 
 export function App() {
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
+  const { account, update, setBalance } = useAccount();
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
 
-  if (mode.kind === "lobby") return <Lobby onStart={setMode} initialCode={joinCode} />;
+  if (mode.kind === "lobby")
+    return <Lobby onStart={setMode} initialCode={joinCode} account={account} onUpdateProfile={update} />;
   if (mode.kind === "local") return <LocalGame onExit={() => setMode({ kind: "lobby" })} />;
   return (
     <OnlineGame
       code={mode.code}
       isHost={mode.isHost}
       me={mode.me}
+      account={account}
+      onBalance={setBalance}
       onExit={() => setMode({ kind: "lobby" })}
     />
   );

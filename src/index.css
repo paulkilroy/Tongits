@@ -345,6 +345,28 @@ h1 {
 .sb-player.champ {
   color: #ffd65a;
 }
+.sb-money {
+  margin-left: auto;
+  font-weight: 700;
+  color: #36c46a;
+}
+.wallet {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #36c46a;
+  text-align: center;
+}
+.reveal-money {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+}
+.reveal-money.up {
+  color: #36c46a;
+}
+.reveal-money.down {
+  color: #ff7a7a;
+}
 
 .section-label {
   font-size: 0.8rem;
