@@ -96,3 +96,55 @@ Supabase → **Authentication → Sign In / Providers** → turn on **Anonymous 
 ### 3. That's it
 No new keys. On next load each device gets ₱1000; online all-human games stake
 ₱10 (a TONGITS! win pays double). Practice-vs-AI games never touch the wallet.
+
+---
+
+# Friends & challenges
+
+Add friends by code, see who's online, and challenge them straight into a game.
+Run this SQL (SQL Editor → New query → Run). No new keys; presence needs no table.
+
+```sql
+-- Friendships (directed rows; 'accepted' = mutual friends)
+create table friendships (
+  id         uuid primary key default gen_random_uuid(),
+  requester  uuid not null references profiles(id) on delete cascade,
+  addressee  uuid not null references profiles(id) on delete cascade,
+  status     text not null default 'pending',   -- 'pending' | 'accepted'
+  created_at timestamptz not null default now(),
+  unique (requester, addressee)
+);
+alter table friendships enable row level security;
+create policy "see own friendships" on friendships for select to authenticated
+  using (auth.uid() = requester or auth.uid() = addressee);
+create policy "send request" on friendships for insert to authenticated
+  with check (auth.uid() = requester);
+create policy "respond friendship" on friendships for update to authenticated
+  using (auth.uid() = requester or auth.uid() = addressee)
+  with check (auth.uid() = requester or auth.uid() = addressee);
+create policy "remove friendship" on friendships for delete to authenticated
+  using (auth.uid() = requester or auth.uid() = addressee);
+alter publication supabase_realtime add table friendships;
+
+-- Challenges (invite a friend into a room you're hosting)
+create table challenges (
+  id         uuid primary key default gen_random_uuid(),
+  from_id    uuid not null references profiles(id) on delete cascade,
+  to_id      uuid not null references profiles(id) on delete cascade,
+  room_code  text not null,
+  status     text not null default 'pending',   -- pending|accepted|declined|cancelled
+  created_at timestamptz not null default now()
+);
+alter table challenges enable row level security;
+create policy "see own challenges" on challenges for select to authenticated
+  using (auth.uid() = from_id or auth.uid() = to_id);
+create policy "create challenge" on challenges for insert to authenticated
+  with check (auth.uid() = from_id);
+create policy "respond challenge" on challenges for update to authenticated
+  using (auth.uid() = from_id or auth.uid() = to_id)
+  with check (auth.uid() = from_id or auth.uid() = to_id);
+alter publication supabase_realtime add table challenges;
+```
+
+Then: Lobby → **👥 Friends** → share your code, add friends, and **Challenge**
+online friends straight into a game. "Online" means "in the lobby, ready to play".

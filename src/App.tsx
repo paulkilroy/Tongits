@@ -25,7 +25,9 @@ import {
 import { useGame } from "./ui/useGame";
 import { useOnlineMatch } from "./ui/useOnlineMatch";
 import { useAccount } from "./ui/useAccount";
+import { useFriends } from "./ui/useFriends";
 import { addBalance, type Account } from "./online/auth";
+import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
 import { settlementDelta } from "./engine/wallet";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
@@ -689,6 +691,20 @@ function OnlineGame({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, gameId]);
 
+  // Warn before a refresh / tab-close / back-navigation drops you out of the game.
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  function leave() {
+    if (window.confirm("Leave this game? The game stays open — you can rejoin with the code.")) onExit();
+  }
+
   if (!game) {
     return (
       <main className="app center-screen">
@@ -697,7 +713,7 @@ function OnlineGame({
         <p className="code-line">
           Game code: <strong>{code}</strong>
         </p>
-        <button onClick={onExit}>Leave</button>
+        <button onClick={leave}>Leave</button>
       </main>
     );
   }
@@ -738,7 +754,7 @@ function OnlineGame({
             Code <strong>{code}</strong>
           </span>
           <ShareControls code={code} />
-          <button onClick={onExit}>Leave</button>
+          <button onClick={leave}>Leave</button>
         </>
       }
     />
@@ -855,6 +871,190 @@ function RulesEditor({ onBack }: { onBack: () => void }) {
   );
 }
 
+// Room helpers shared by host/join, challenge, and challenge-accept.
+async function hostRoom(profile: Profile, withBot: boolean): Promise<string> {
+  const roomCode = makeCode(Math.floor(Math.random() * 1_000_000_000));
+  const myName = profile.name || "Player 1";
+  const names = withBot ? [myName, "Player 2", "Bot"] : [myName, "Player 2"];
+  const avatars = withBot ? [profile.avatar, "🙂", "🤖"] : [profile.avatar, "🙂"];
+  const ai = withBot ? [false, false, true] : [false, false];
+  const game = newRound(
+    { ...loadRules(), playerCount: names.length as 2 | 3 },
+    Math.floor(Math.random() * 1_000_000_000),
+    names,
+    ai,
+    0,
+    avatars,
+  );
+  await createRoom(roomCode, { game, wins: names.map(() => 0), gameId: 1, version: 1 });
+  return roomCode;
+}
+
+async function joinRoomAs(code: string, profile: Profile): Promise<boolean> {
+  const data = await fetchRoom(code);
+  if (!data) return false;
+  data.game.players[1].name = profile.name || "Player 2";
+  data.game.players[1].avatar = profile.avatar;
+  await pushRoom(code, { ...data, version: data.version + 1 });
+  return true;
+}
+
+type FriendsHook = ReturnType<typeof useFriends>;
+
+function ChallengePrompt({
+  name,
+  avatar,
+  onAccept,
+  onDecline,
+}: {
+  name: string;
+  avatar: string;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <div className="reveal-backdrop">
+      <div className="reveal" style={{ maxWidth: 340 }}>
+        <h2 className="reveal-title">Challenge!</h2>
+        <p className="reveal-sub">
+          {avatar} {name} wants to play Tongits
+        </p>
+        <div className="lobby-row">
+          <button className="big" onClick={onAccept}>
+            Accept
+          </button>
+          <button onClick={onDecline}>Decline</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FriendsScreen({
+  account,
+  fr,
+  busy,
+  onBack,
+  onChallenge,
+}: {
+  account: Account | null;
+  fr: FriendsHook;
+  busy: boolean;
+  onBack: () => void;
+  onChallenge: (friendId: string) => void;
+}) {
+  const [addCode, setAddCode] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function add() {
+    setMsg(null);
+    const found = await findByCode(addCode);
+    if (!found) {
+      setMsg("No player with that code.");
+      return;
+    }
+    const res = await addFriend(found.id);
+    setMsg(
+      res === "self"
+        ? "That's your own code 🙂"
+        : res === "accepted"
+          ? `You're now friends with ${found.name}!`
+          : res === "exists"
+            ? `Already linked with ${found.name}.`
+            : `Request sent to ${found.name}.`,
+    );
+    setAddCode("");
+    fr.refresh();
+  }
+
+  const onlineCount = fr.friends.filter((f) => f.online).length;
+
+  return (
+    <main className="app center-screen">
+      <h1>Friends</h1>
+
+      {account && (
+        <div className="lobby-section narrow">
+          <div className="lobby-title">Your friend code</div>
+          <div className="invite-code">{account.friendCode}</div>
+          <button
+            onClick={() => {
+              void navigator.clipboard?.writeText(account.friendCode);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+          >
+            {copied ? "Copied!" : "Copy code"}
+          </button>
+        </div>
+      )}
+
+      <div className="lobby-section narrow">
+        <div className="lobby-title">Add a friend by code</div>
+        <div className="lobby-row">
+          <input
+            placeholder="Friend code"
+            value={addCode}
+            onChange={(e) => setAddCode(e.target.value)}
+            maxLength={6}
+            style={{ textTransform: "uppercase" }}
+          />
+          <button disabled={addCode.trim().length < 4} onClick={add}>
+            Add
+          </button>
+        </div>
+        {msg && <p className="muted">{msg}</p>}
+      </div>
+
+      {fr.incoming.length > 0 && (
+        <div className="lobby-section narrow">
+          <div className="lobby-title">Friend requests</div>
+          {fr.incoming.map(({ friendship, profile }) => (
+            <div className="friend-row" key={friendship.id}>
+              <span>
+                {profile.avatar} {profile.name}
+              </span>
+              <button
+                onClick={async () => {
+                  await acceptFriend(friendship.id);
+                  fr.refresh();
+                }}
+              >
+                Accept
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="lobby-section narrow">
+        <div className="lobby-title">
+          Friends{fr.friends.length > 0 ? ` · ${onlineCount} online` : ""}
+        </div>
+        {fr.friends.length === 0 ? (
+          <p className="muted">No friends yet — share your code above.</p>
+        ) : (
+          fr.friends.map(({ friendship, profile, online }) => (
+            <div className="friend-row" key={friendship.id}>
+              <span>
+                <span className={`dot ${online ? "on" : ""}`} /> {profile.avatar} {profile.name}
+              </span>
+              <button disabled={!online || busy} onClick={() => onChallenge(profile.id)}>
+                {online ? "Challenge" : "Offline"}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button className="link-btn" onClick={onBack}>
+        ← Back
+      </button>
+    </main>
+  );
+}
+
 function Lobby({
   onStart,
   initialCode,
@@ -866,38 +1066,13 @@ function Lobby({
   account: Account | null;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
-  const [screen, setScreen] = useState<"main" | "rules">("main");
-  if (screen === "rules") return <RulesEditor onBack={() => setScreen("main")} />;
-  return (
-    <LobbyMain
-      onStart={onStart}
-      initialCode={initialCode}
-      account={account}
-      onUpdateProfile={onUpdateProfile}
-      onRules={() => setScreen("rules")}
-    />
-  );
-}
-
-function LobbyMain({
-  onStart,
-  initialCode,
-  account,
-  onUpdateProfile,
-  onRules,
-}: {
-  onStart: (m: Mode) => void;
-  initialCode?: string;
-  account: Account | null;
-  onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
-  onRules: () => void;
-}) {
+  const [screen, setScreen] = useState<"main" | "rules" | "friends">("main");
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fr = useFriends(account);
 
-  // Keep the editor in sync once the account loads (it may arrive after mount).
   useEffect(() => {
     if (account) setProfile({ name: account.name, avatar: account.avatar });
   }, [account]);
@@ -906,26 +1081,12 @@ function LobbyMain({
     setProfile(p);
     saveProfile(p);
   }
-  const myName = profile.name || "Player 1";
 
   async function host(withBot: boolean) {
     setBusy(true);
     setError(null);
     try {
-      const roomCode = makeCode(Math.floor(Math.random() * 1_000_000_000));
-      const names = withBot ? [myName, "Player 2", "Bot"] : [myName, "Player 2"];
-      const avatars = withBot ? [profile.avatar, "🙂", "🤖"] : [profile.avatar, "🙂"];
-      const ai = withBot ? [false, false, true] : [false, false];
-      const game = newRound(
-        { ...loadRules(), playerCount: names.length as 2 | 3 },
-        Math.floor(Math.random() * 1_000_000_000),
-        names,
-        ai,
-        0,
-        avatars,
-      );
-      await createRoom(roomCode, { game, wins: names.map(() => 0), gameId: 1, version: 1 });
-      onStart({ kind: "online", code: roomCode, isHost: true, me: 0 });
+      onStart({ kind: "online", code: await hostRoom(profile, withBot), isHost: true, me: 0 });
     } catch (e) {
       setError(String((e as Error).message ?? e));
       setBusy(false);
@@ -937,24 +1098,77 @@ function LobbyMain({
     setError(null);
     try {
       const clean = code.trim().toUpperCase();
-      const data = await fetchRoom(clean);
-      if (!data) {
+      if (await joinRoomAs(clean, profile)) {
+        onStart({ kind: "online", code: clean, isHost: false, me: 1 });
+      } else {
         setError("No game found with that code.");
         setBusy(false);
-        return;
       }
-      data.game.players[1].name = profile.name || "Player 2";
-      data.game.players[1].avatar = profile.avatar;
-      await pushRoom(clean, { ...data, version: data.version + 1 });
-      onStart({ kind: "online", code: clean, isHost: false, me: 1 });
     } catch (e) {
       setError(String((e as Error).message ?? e));
       setBusy(false);
     }
   }
 
+  async function challenge(friendId: string) {
+    setBusy(true);
+    try {
+      const roomCode = await hostRoom(profile, false);
+      await createChallenge(friendId, roomCode);
+      onStart({ kind: "online", code: roomCode, isHost: true, me: 0 });
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+      setBusy(false);
+    }
+  }
+
+  async function acceptChallenge() {
+    const ch = fr.challenge;
+    if (!ch) return;
+    fr.clearChallenge();
+    if (await joinRoomAs(ch.room_code, profile)) {
+      await respondChallenge(ch.id, "accepted");
+      onStart({ kind: "online", code: ch.room_code, isHost: false, me: 1 });
+    } else {
+      await respondChallenge(ch.id, "declined");
+    }
+  }
+
+  const challenger = fr.challenge
+    ? fr.friends.find((f) => f.profile.id === fr.challenge!.from_id)?.profile
+    : null;
+  const prompt = fr.challenge ? (
+    <ChallengePrompt
+      name={challenger?.name ?? "A friend"}
+      avatar={challenger?.avatar ?? "👤"}
+      onAccept={acceptChallenge}
+      onDecline={() => {
+        void respondChallenge(fr.challenge!.id, "declined");
+        fr.clearChallenge();
+      }}
+    />
+  ) : null;
+
+  if (screen === "rules")
+    return (
+      <>
+        {prompt}
+        <RulesEditor onBack={() => setScreen("main")} />
+      </>
+    );
+  if (screen === "friends")
+    return (
+      <>
+        {prompt}
+        <FriendsScreen account={account} fr={fr} busy={busy} onBack={() => setScreen("main")} onChallenge={challenge} />
+      </>
+    );
+
+  const onlineFriends = fr.friends.filter((f) => f.online).length;
+
   return (
     <main className="app center-screen">
+      {prompt}
       <h1>Tongits</h1>
 
       <div className="profile">
@@ -986,9 +1200,16 @@ function LobbyMain({
         {profile.avatar} Practice vs AI
       </button>
 
-      <button className="link-btn" onClick={onRules}>
-        ⚙ House Rules
-      </button>
+      <div className="lobby-links">
+        <button className="link-btn" onClick={() => setScreen("rules")}>
+          ⚙ House Rules
+        </button>
+        {onlineConfigured && (
+          <button className="link-btn" onClick={() => setScreen("friends")}>
+            👥 Friends{onlineFriends > 0 ? ` (${onlineFriends} online)` : ""}
+          </button>
+        )}
+      </div>
 
       {onlineConfigured ? (
         <div className="lobby-online">

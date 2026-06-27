@@ -98,6 +98,52 @@ h1 {
   text-decoration: underline;
   cursor: pointer;
 }
+.lobby-links {
+  display: flex;
+  gap: 1.2rem;
+}
+
+.lobby-section.narrow {
+  width: 100%;
+  max-width: 340px;
+}
+.friend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.92rem;
+}
+.friend-row + .friend-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.friend-row button {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+.friend-row button:disabled {
+  opacity: 0.4;
+}
+.dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #666;
+  margin-right: 0.2rem;
+}
+.dot.on {
+  background: #36c46a;
+  box-shadow: 0 0 6px #36c46a;
+}
 
 /* House rules */
 .rules-list {
