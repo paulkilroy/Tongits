@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { STANDARD_RULES } from "../engine/rules";
 import { newRound, currentPlayer, type GameState } from "../engine/game";
 import { takeAITurn } from "../engine/ai";
 import { loadProfile } from "./profile";
+import { loadRules } from "./rulesStore";
 
 function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
@@ -18,7 +18,7 @@ function configFor(botCount: 1 | 2) {
 
 function deal(botCount: 1 | 2, dealer: number): GameState {
   const { names, avatars, ai, playerCount } = configFor(botCount);
-  return newRound({ ...STANDARD_RULES, playerCount }, randomSeed(), names, ai, dealer, avatars);
+  return newRound({ ...loadRules(), playerCount }, randomSeed(), names, ai, dealer, avatars);
 }
 
 /**

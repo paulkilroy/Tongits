@@ -3,7 +3,7 @@ import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./eng
 import { classifyMeld, canLayOff, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
-import { STANDARD_RULES } from "./engine/rules";
+import { type RuleSet, type StockExhaustionRule } from "./engine/rules";
 import {
   newRound,
   topDiscard,
@@ -19,6 +19,7 @@ import {
 import { useGame } from "./ui/useGame";
 import { useOnlineMatch } from "./ui/useOnlineMatch";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
+import { loadRules, saveRules } from "./ui/rulesStore";
 import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
 
 /* ----------------------------- card helpers ------------------------------ */
@@ -661,7 +662,124 @@ type Mode =
   | { kind: "local" }
   | { kind: "online"; code: string; isHost: boolean; me: number };
 
+/* ------------------------------ house rules ------------------------------ */
+
+function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="rule-row">
+      <span>{label}</span>
+      <button className={`switch ${value ? "on" : ""}`} onClick={() => onChange(!value)}>
+        {value ? "On" : "Off"}
+      </button>
+    </div>
+  );
+}
+
+function Stepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="rule-row">
+      <span>{label}</span>
+      <span className="stepper">
+        <button onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>
+          −
+        </button>
+        <strong>{value}</strong>
+        <button onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>
+          +
+        </button>
+      </span>
+    </div>
+  );
+}
+
+function RulesEditor({ onBack }: { onBack: () => void }) {
+  const [rules, setRules] = useState<RuleSet>(loadRules);
+  function update(patch: Partial<RuleSet>) {
+    const r = { ...rules, ...patch };
+    setRules(r);
+    saveRules(r);
+  }
+  const stockOpts: [StockExhaustionRule, string][] = [
+    ["lowestHandWins", "Lowest hand wins"],
+    ["lastDrawerLoses", "Last drawer loses"],
+  ];
+
+  return (
+    <main className="app center-screen">
+      <h1>House Rules</h1>
+      <div className="rules-list">
+        <Stepper
+          label="Games to win the match"
+          value={rules.gamesToWin}
+          min={1}
+          max={11}
+          onChange={(v) => update({ gamesToWin: v })}
+        />
+        <Toggle
+          label="Laban (call a fight)"
+          value={rules.enableLaban}
+          onChange={(v) => update({ enableLaban: v })}
+        />
+        <Toggle
+          label="Need a meld down to call Laban"
+          value={rules.mustHaveMeldToCall}
+          onChange={(v) => update({ mustHaveMeldToCall: v })}
+        />
+        <Toggle
+          label="Sapaw on opponents' melds"
+          value={rules.allowSapawOnOpponents}
+          onChange={(v) => update({ allowSapawOnOpponents: v })}
+        />
+        <div className="rule-row col">
+          <span>When the stock runs out</span>
+          <div className="segmented">
+            {stockOpts.map(([val, text]) => (
+              <button
+                key={val}
+                className={rules.stockExhaustion === val ? "on" : ""}
+                onClick={() => update({ stockExhaustion: val })}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="muted">Applies to games you host (and your practice games).</p>
+      <button className="big" onClick={onBack}>
+        Done
+      </button>
+    </main>
+  );
+}
+
 function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCode?: string }) {
+  const [screen, setScreen] = useState<"main" | "rules">("main");
+  if (screen === "rules") return <RulesEditor onBack={() => setScreen("main")} />;
+  return <LobbyMain onStart={onStart} initialCode={initialCode} onRules={() => setScreen("rules")} />;
+}
+
+function LobbyMain({
+  onStart,
+  initialCode,
+  onRules,
+}: {
+  onStart: (m: Mode) => void;
+  initialCode?: string;
+  onRules: () => void;
+}) {
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
@@ -682,7 +800,7 @@ function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCo
       const avatars = withBot ? [profile.avatar, "🙂", "🤖"] : [profile.avatar, "🙂"];
       const ai = withBot ? [false, false, true] : [false, false];
       const game = newRound(
-        { ...STANDARD_RULES, playerCount: names.length as 2 | 3 },
+        { ...loadRules(), playerCount: names.length as 2 | 3 },
         Math.floor(Math.random() * 1_000_000_000),
         names,
         ai,
@@ -744,6 +862,10 @@ function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCo
 
       <button className="big" onClick={() => onStart({ kind: "local" })}>
         {profile.avatar} Practice vs AI
+      </button>
+
+      <button className="link-btn" onClick={onRules}>
+        ⚙ House Rules
       </button>
 
       {onlineConfigured ? (

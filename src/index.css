@@ -88,6 +88,96 @@ h1 {
   flex-direction: column;
   gap: 0.5rem;
 }
+.link-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  color: #fff;
+  background: none;
+  border: none;
+  opacity: 0.85;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* House rules */
+.rules-list {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.rule-row.col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.switch {
+  font: inherit;
+  font-weight: 700;
+  min-width: 3.2rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+.switch.on {
+  background: #36c46a;
+  border-color: #36c46a;
+  color: #06240f;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.stepper button {
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  width: 2rem;
+  height: 2rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.stepper button:disabled {
+  opacity: 0.35;
+}
+.segmented {
+  display: flex;
+  gap: 0.4rem;
+}
+.segmented button {
+  flex: 1;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 9px;
+  padding: 0.45rem;
+  cursor: pointer;
+}
+.segmented button.on {
+  background: #1f8fff33;
+  border-color: #1f8fff;
+}
 .profile input {
   font: inherit;
   padding: 0.55rem 0.7rem;
