@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -version)",
+      "Bash(mkdir -p Engine/Sources/TongitsEngine/Model Engine/Sources/TongitsEngine/Rules Engine/Tests/TongitsEngineTests && echo \"created dirs\")",
+      "Bash(swift test *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(p['path'] for p in d.get\\('tree',[]\\)[:80]\\)\\) if 'tree' in d else print\\(d\\)\")",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npm test *)",
+      "Bash(npm audit *)",
+      "Bash(git commit -q -m ' *)"
+    ],
+    "additionalDirectories": [
+      "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"
+    ]
+  }
+}
