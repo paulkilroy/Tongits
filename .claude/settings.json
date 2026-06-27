@@ -20,7 +20,8 @@
       "Bash(git commit -q -m 'Invite/share for online games: native share sheet + copy + deep link *)",
       "Bash(perl -0pi -e 's/\\(game\\\\.players\\\\.map\\\\\\(\\\\\\(p\\\\\\) => p\\\\.isAI\\\\\\),\\\\n\\\\s*\\\\\\(game\\\\.dealer \\\\+ 1\\\\\\) % game\\\\.players\\\\.length,\\\\n\\)\\(\\\\s*\\\\\\);\\)/$1      game.players.map\\(\\(p\\) => p.avatar\\),\\\\n$2/g; s/\\(game\\\\.players\\\\.map\\\\\\(\\\\\\(p\\\\\\) => p\\\\.isAI\\\\\\),\\\\n\\\\s*0,\\\\n\\)\\(\\\\s*\\\\\\);\\)/$1      game.players.map\\(\\(p\\) => p.avatar\\),\\\\n$2/g' src/ui/useOnlineMatch.ts)",
       "Bash(git commit -q -m 'Player profiles \\(name + avatar, persisted\\) + ace-low lay-off robustness *)",
-      "Bash(git commit -q -m 'House Rules screen \\(configurable, persisted\\) *)"
+      "Bash(git commit -q -m 'House Rules screen \\(configurable, persisted\\) *)",
+      "Bash(git commit -q -m 'Waray-waray localization: buttons + round-outcome splash + Tupong *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"

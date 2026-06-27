@@ -164,6 +164,13 @@ function RoundReveal({
         ? `${winnerName} ${verb} by Tongits 🎉`
         : `${winnerName} ${verb} with ${pts[r.winner]} pts`;
 
+  // Per-player splash word over each avatar.
+  const badge = (i: number): string | null => {
+    if (i === r.winner) return r.reason === "tongits" ? "TONGITS!" : r.tupong ? "TUPONG" : "DAGO";
+    if (r.winner < 0) return null;
+    return state.players[i].melds.length === 0 ? "SUNOG" : "LUPIG"; // no meld down = burned
+  };
+
   return (
     <div className="reveal-backdrop">
       <div className="reveal">
@@ -181,7 +188,12 @@ function RoundReveal({
                     {i === r.winner ? "👑 " : ""}
                     {p.avatar} {name(i)}
                   </strong>
-                  <span className="rp-pts">{pts[i]} unmatched</span>
+                  <span className="rp-right">
+                    {badge(i) && (
+                      <span className={`outcome ${i === r.winner ? "win" : "lose"}`}>{badge(i)}</span>
+                    )}
+                    <span className="rp-pts">{pts[i]} unmatched</span>
+                  </span>
                 </div>
                 {p.melds.length > 0 && (
                   <div className="melds">
@@ -312,13 +324,13 @@ function Table({
     ? statusNote ?? `Waiting for ${state.players[state.current].name}…`
     : inDraw
       ? state.labanBlocked
-        ? "Your turn — Laban is locked (your meld was sapawed). Draw, or take the discard to baba it."
-        : "Your turn — draw, take the discard to baba it, or call Laban."
+        ? "Imo turno — Laban is locked (sapaw'd). Bulit (draw), or Kawat the pile to Buklad it."
+        : "Imo turno — Bulit (draw), Kawat the pile to Buklad (meld), or Laban!"
       : mustPlay
-        ? `You took ${cardLabel(mustPlay)} — baba it (meld or sapaw) before discarding.`
+        ? `You took ${cardLabel(mustPlay)} — Buklad it (meld or sapaw) before you Labyog.`
         : state.lastDrawn
-          ? `You drew ${cardLabel(state.lastDrawn)}. Baba what you can, then discard.`
-          : "Baba what you can, then discard one card.";
+          ? `You drew ${cardLabel(state.lastDrawn)}. Buklad what you can, then Labyog.`
+          : "Buklad what you can, then Labyog one card.";
 
   const meldIds = meldCardIds(meP.hand);
   const handOrder = customOrder ? applyCustomOrder(meP.hand, customOrder) : sortHand(meP.hand, sortMode);
@@ -410,12 +422,12 @@ function Table({
           disabled={!inDraw}
           onClick={() => act(draw(state, "stock"))}
         >
-          <span className="pile-label">Stock</span>
+          <span className="pile-label">Bulit</span>
           <span className="pile-count">{state.stock.length}</span>
         </button>
 
         <button type="button" className="pile discard" disabled={!canTake} onClick={() => act(draw(state, "discard"))}>
-          <span className="pile-label">{canTake ? "Take" : "Discard"}</span>
+          <span className="pile-label">Kawat</span>
           {topDiscard(state) ? (
             <span
               className={`pile-top ${
@@ -496,13 +508,13 @@ function Table({
 
       <section className="actions">
         <button disabled={!canBaba} onClick={() => act(layMeld(state, selected))}>
-          Baba{selectedMeld ? ` (${selectedMeld.kind})` : ""}
+          Buklad{selectedMeld ? ` (${selectedMeld.kind})` : ""}
         </button>
         <button disabled={!canDiscard} onClick={() => act(discard(state, selected[0]))}>
-          Discard
+          Labyog
         </button>
-        <button disabled={!canCall} onClick={() => act(callFight(state))}>
-          Laban
+        <button className="laban" disabled={!canCall} onClick={() => act(callFight(state))}>
+          Laban!
         </button>
       </section>
 

@@ -38,6 +38,7 @@ export interface RoundResult {
   winner: number; // index into players; -1 if a tie went unbroken
   handPoints: number[]; // each player's remaining hand points
   caller?: number; // who called the fight, for showdowns
+  tupong?: boolean; // true if a showdown tie was broken in the caller's favour
 }
 
 export interface GameState {
@@ -320,6 +321,20 @@ function lowestHand(points: number[]): number {
   return tie ? -1 : winner;
 }
 
+/** Lowest hand wins; a showdown tie (Tupong) is broken toward the caller. */
+function resolveShowdown(
+  points: number[],
+  caller: number,
+  count: number,
+): { winner: number; tupong: boolean } {
+  const min = Math.min(...points);
+  const tied = points.map((p, i) => (p === min ? i : -1)).filter((i) => i >= 0);
+  if (tied.length === 1) return { winner: tied[0], tupong: false };
+  // Closest to the caller wins — the caller themselves is distance 0.
+  tied.sort((a, b) => ((a - caller + count) % count) - ((b - caller + count) % count));
+  return { winner: tied[0], tupong: true };
+}
+
 function finish(
   s: GameState,
   reason: RoundReason,
@@ -327,8 +342,16 @@ function finish(
   caller?: number,
 ): GameState {
   const points = s.players.map((p) => scoreHand(p.hand));
-  const resolvedWinner = reason === "showdown" || reason === "stockEmpty" ? lowestHand(points) : winner;
-  s.result = { reason, winner: resolvedWinner, handPoints: points, caller };
+  let resolvedWinner = winner;
+  let tupong = false;
+  if (reason === "showdown") {
+    const r = resolveShowdown(points, caller ?? s.current, s.players.length);
+    resolvedWinner = r.winner;
+    tupong = r.tupong;
+  } else if (reason === "stockEmpty") {
+    resolvedWinner = lowestHand(points);
+  }
+  s.result = { reason, winner: resolvedWinner, handPoints: points, caller, tupong };
   const w = s.players[resolvedWinner];
   note(s, w ? `${w.name} wins the round (${reason}).` : `Round tied (${reason}).`);
   return s;

@@ -635,9 +635,37 @@ h1 {
   align-items: baseline;
   margin-bottom: 0.35rem;
 }
+.rp-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .rp-pts {
   font-size: 0.8rem;
   opacity: 0.85;
+}
+.outcome {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border-radius: 6px;
+  padding: 0.12rem 0.4rem;
+}
+.outcome.win {
+  background: #ffd65a;
+  color: #062b18;
+}
+.outcome.lose {
+  background: rgba(255, 90, 90, 0.25);
+  color: #ff9a9a;
+}
+.actions button.laban {
+  background: #c0392b;
+  border-color: #e05a4a;
+}
+.actions button.laban:disabled {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 .rp-hand {
   display: flex;
