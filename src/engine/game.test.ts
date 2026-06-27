@@ -90,8 +90,9 @@ describe("melding and winning", () => {
 });
 
 describe("fight / laban", () => {
-  it("the lower hand wins a called showdown", () => {
+  it("the lower hand wins a showdown called at the start of a turn", () => {
     let s = twoPlayer();
+    s.phase = "draw"; // Laban is only legal before drawing
     s.players[0].hand = [card("A", "clubs"), card("2", "hearts")]; // 3 points
     s.players[0].melds = [
       { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
@@ -103,10 +104,71 @@ describe("fight / laban", () => {
     expect(s.result?.handPoints).toEqual([3, 20]);
   });
 
+  it("cannot call Laban after drawing (mid-turn)", () => {
+    let s = twoPlayer();
+    s.phase = "action"; // already drew
+    s.players[0].melds = [
+      { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
+    ];
+    expect(callFight(s)).toBe(s);
+  });
+
   it("cannot call without a meld when the rule requires one", () => {
     let s = twoPlayer();
+    s.phase = "draw";
     s.players[0].melds = [];
-    const blocked = callFight(s);
-    expect(blocked).toBe(s);
+    expect(callFight(s)).toBe(s);
+  });
+
+  it("scores only unmatched cards — a secret meld in hand does not count", () => {
+    let s = twoPlayer();
+    s.phase = "draw";
+    s.players[0].melds = [
+      { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
+    ];
+    // Hand holds a secret set of 5s plus a lone 2 → only the 2 should count.
+    s.players[0].hand = [card("5", "clubs"), card("5", "diamonds"), card("5", "hearts"), card("2", "spades")];
+    s.players[1].hand = [card("K", "clubs"), card("Q", "hearts")]; // 20
+    s = callFight(s);
+    expect(s.result?.handPoints).toEqual([2, 20]);
+    expect(s.result?.winner).toBe(0);
+  });
+});
+
+describe("taking the discard (must be played)", () => {
+  function atDrawWithDiscard(): GameState {
+    let s = twoPlayer();
+    s = discard(s, currentPlayer(s).hand[0]); // dealer discards → player 1 to draw
+    return s; // player 1, phase "draw", one card on the discard pile
+  }
+
+  it("rejects taking the discard when it cannot be played", () => {
+    let s = atDrawWithDiscard();
+    // Give player 1 a hand with nothing matching the discard top.
+    const top = s.discard[s.discard.length - 1];
+    s.players[1].hand = s.players[1].hand.filter((c) => c.rank !== top.rank && c.suit !== top.suit);
+    expect(draw(s, "discard")).toBe(s);
+  });
+
+  it("flags the taken card as mustPlay and blocks discarding until it is played", () => {
+    let s = twoPlayer();
+    s.current = 1;
+    s.phase = "draw";
+    s.discard = [card("7", "clubs")];
+    s.players[1].hand = [
+      card("7", "hearts"),
+      card("7", "spades"),
+      card("K", "spades"),
+      card("2", "diamonds"),
+    ];
+    s = draw(s, "discard"); // takes 7♣ → mustPlay
+    expect(s.mustPlay).not.toBeNull();
+    // can't discard while the taken card is unplayed
+    expect(discard(s, card("2", "diamonds"))).toBe(s);
+    // play it as a set → mustPlay clears, discarding now works
+    s = layMeld(s, [card("7", "clubs"), card("7", "hearts"), card("7", "spades")]);
+    expect(s.mustPlay).toBeNull();
+    s = discard(s, card("K", "spades"));
+    expect(s.current).toBe(0);
   });
 });

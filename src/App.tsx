@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { type Card, cardId, cardLabel } from "./engine/cards";
+import { type Card, cardId, cardLabel, compareCards } from "./engine/cards";
 import { classifyMeld, canLayOff, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
-import { deadwood } from "./engine/meldFinder";
+import { bestMelds, deadwood } from "./engine/meldFinder";
 import {
   topDiscard,
   draw,
@@ -10,32 +10,49 @@ import {
   sapaw,
   discard,
   callFight,
+  canCallFight,
+  canTakeDiscard,
   type GameState,
 } from "./engine/game";
 import { useGame } from "./ui/useGame";
 
 const HUMAN = 0;
 
+/** Order a hand so meld cards are grouped first (with their ids flagged for
+ *  tinting), then the loose "deadwood" sorted by suit and rank. */
+function arrangeHand(hand: readonly Card[]): { ordered: Card[]; meldIds: Set<string> } {
+  const melds = bestMelds(hand);
+  const meldIds = new Set(melds.flatMap((m) => m.cards.map(cardId)));
+  const loose = [...deadwood(hand)].sort(compareCards);
+  return { ordered: [...melds.flatMap((m) => [...m.cards]), ...loose], meldIds };
+}
+
 function CardView({
   card,
   selected,
-  dim,
+  inMeld,
+  isNew,
+  mustPlay,
   onClick,
 }: {
   card: Card;
   selected?: boolean;
-  dim?: boolean;
+  inMeld?: boolean;
+  isNew?: boolean;
+  mustPlay?: boolean;
   onClick?: () => void;
 }) {
   const red = card.suit === "hearts" || card.suit === "diamonds";
+  const cls = ["card", red ? "red" : "black"];
+  if (selected) cls.push("selected");
+  if (inMeld) cls.push("inmeld");
+  if (isNew) cls.push("new");
+  if (mustPlay) cls.push("mustplay");
   return (
-    <button
-      type="button"
-      className={`card ${red ? "red" : "black"} ${selected ? "selected" : ""} ${dim ? "dim" : ""}`}
-      onClick={onClick}
-      disabled={!onClick}
-    >
+    <button type="button" className={cls.join(" ")} onClick={onClick} disabled={!onClick}>
       {cardLabel(card)}
+      {mustPlay && <span className="tag tag-play">play</span>}
+      {isNew && !mustPlay && <span className="tag tag-new">new</span>}
     </button>
   );
 }
@@ -62,6 +79,75 @@ function MeldChip({
   );
 }
 
+function RoundReveal({ state, onReplay }: { state: GameState; onReplay: () => void }) {
+  const r = state.result!;
+  const pts = r.handPoints;
+  const winnerName = r.winner >= 0 ? state.players[r.winner].name : null;
+
+  const title =
+    r.reason === "tongits" ? "Tongits!" : r.reason === "showdown" ? "Laban!" : "Stock empty";
+  const subtitle =
+    r.reason === "tongits"
+      ? `${winnerName} emptied their hand`
+      : r.reason === "showdown"
+        ? `${state.players[r.caller ?? r.winner].name} called — lowest hand wins`
+        : "Draw pile ran out — lowest hand wins";
+
+  const verdict =
+    r.winner < 0
+      ? "It's a tie."
+      : r.reason === "tongits"
+        ? `${winnerName} wins by Tongits 🎉`
+        : `${winnerName} wins with ${pts[r.winner]} pts`;
+
+  return (
+    <div className="reveal-backdrop">
+      <div className="reveal">
+        <h2 className={`reveal-title ${r.reason}`}>{title}</h2>
+        <p className="reveal-sub">{subtitle}</p>
+
+        <div className="reveal-players">
+          {state.players.map((p, i) => {
+            const { ordered, meldIds } = arrangeHand(p.hand);
+            return (
+              <div key={p.id} className={`rp ${i === r.winner ? "win" : ""}`}>
+                <div className="rp-head">
+                  <strong>
+                    {i === r.winner ? "👑 " : ""}
+                    {p.name}
+                  </strong>
+                  <span className="rp-pts">{pts[i]} unmatched</span>
+                </div>
+                {p.melds.length > 0 && (
+                  <div className="melds">
+                    {p.melds.map((m, mi) => (
+                      <MeldChip key={mi} meld={m} />
+                    ))}
+                  </div>
+                )}
+                <div className="rp-hand">
+                  {p.hand.length === 0 ? (
+                    <span className="rp-empty">— empty hand —</span>
+                  ) : (
+                    ordered.map((c) => (
+                      <CardView key={cardId(c)} card={c} inMeld={meldIds.has(cardId(c))} />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="reveal-verdict">{verdict}</div>
+        <button className="reveal-replay" onClick={onReplay}>
+          Play again
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const { state, setState, reset } = useGame(1);
   const [selected, setSelected] = useState<Card[]>([]);
@@ -84,23 +170,38 @@ export function App() {
     setSelected([]);
   }
 
+  const inAction = isHumanTurn && state.phase === "action";
+  const inDraw = isHumanTurn && state.phase === "draw";
+  const mustPlay = state.mustPlay; // a card taken from the discard, owed a play
   const selectedMeld = classifyMeld(selected);
-  const canDiscard = isHumanTurn && state.phase === "action" && selected.length === 1;
-  const canMeld = isHumanTurn && state.phase === "action" && selectedMeld !== null;
-  const canCall =
-    isHumanTurn &&
-    state.phase === "action" &&
-    state.rules.enableLaban &&
-    (!state.rules.mustHaveMeldToCall || human.melds.length > 0);
+  const canDiscard = inAction && selected.length === 1 && !mustPlay;
+  const canBaba = inAction && selectedMeld !== null;
+  const canCall = inDraw && canCallFight(state);
+  const canTake = inDraw && canTakeDiscard(state);
 
   function onMeldClick(playerIndex: number, meldIndex: number) {
-    if (!isHumanTurn || state.phase !== "action" || selected.length !== 1) return;
+    if (!inAction || selected.length !== 1) return;
     const card = selected[0];
     const meld = state.players[playerIndex].melds[meldIndex];
     if (canLayOff(meld, card)) act(sapaw(state, playerIndex, meldIndex, card));
   }
 
-  const hint = deadwood(human.hand); // cards not part of any meld — discard fodder
+  // Turn instruction shown above the hand.
+  const instruction = !isHumanTurn
+    ? `Waiting for ${state.players[state.current].name}…`
+    : inDraw
+      ? "Your turn — draw from the stock, take the discard to baba it, or call Laban."
+      : mustPlay
+        ? `You took ${cardLabel(mustPlay)} — baba it (meld or sapaw) before discarding.`
+        : state.lastDrawn
+          ? `You drew ${cardLabel(state.lastDrawn)}. Baba what you can, then discard.`
+          : "Baba what you can, then discard one card.";
+
+  const { ordered: handOrder, meldIds } = arrangeHand(human.hand);
+  const unmatched = handPoints(deadwood(human.hand)); // what you'd score at a Laban
+  const isMustPlay = (c: Card) => mustPlay != null && cardId(c) === cardId(mustPlay);
+  const isNew = (c: Card) => state.lastDrawn != null && cardId(c) === cardId(state.lastDrawn);
+  const inMeld = (c: Card) => meldIds.has(cardId(c));
 
   return (
     <main className="app">
@@ -152,10 +253,10 @@ export function App() {
         <button
           type="button"
           className="pile discard"
-          disabled={!(isHumanTurn && state.phase === "draw") || !topDiscard(state)}
+          disabled={!canTake}
           onClick={() => act(draw(state, "discard"))}
         >
-          <span className="pile-label">Discard</span>
+          <span className="pile-label">{canTake ? "Take" : "Discard"}</span>
           <span className="pile-top">{topDiscard(state) ? cardLabel(topDiscard(state)!) : "—"}</span>
         </button>
       </section>
@@ -180,56 +281,41 @@ export function App() {
       {/* Your hand */}
       <section className="hand-area">
         <div className="section-label">
-          Your hand · {handPoints(human.hand)} pts
-          {isHumanTurn ? (
-            <em> · {state.phase === "draw" ? "draw to start" : "your move"}</em>
-          ) : (
-            <em> · waiting…</em>
-          )}
+          Your hand · <strong>{unmatched}</strong> unmatched pts
+          <span className="legend"> · green = forms a meld</span>
         </div>
+        <div className="instruction">{instruction}</div>
         <div className="hand">
-          {[...human.hand]
-            .sort((a, b) => cardId(a).localeCompare(cardId(b)))
-            .map((c) => (
-              <CardView
-                key={cardId(c)}
-                card={c}
-                selected={sel(c)}
-                dim={!hint.some((d) => cardId(d) === cardId(c)) && !sel(c)}
-                onClick={() => toggle(c)}
-              />
-            ))}
+          {handOrder.map((c) => (
+            <CardView
+              key={cardId(c)}
+              card={c}
+              selected={sel(c)}
+              isNew={isNew(c)}
+              mustPlay={isMustPlay(c)}
+              inMeld={inMeld(c)}
+              onClick={() => toggle(c)}
+            />
+          ))}
         </div>
       </section>
 
       {/* Actions */}
       <section className="actions">
-        <button disabled={!canMeld} onClick={() => act(layMeld(state, selected))}>
-          Meld{selectedMeld ? ` (${selectedMeld.kind})` : ""}
+        <button disabled={!canBaba} onClick={() => act(layMeld(state, selected))}>
+          Baba{selectedMeld ? ` (${selectedMeld.kind})` : ""}
         </button>
         <button disabled={!canDiscard} onClick={() => act(discard(state, selected[0]))}>
           Discard
         </button>
         <button disabled={!canCall} onClick={() => act(callFight(state))}>
-          Call fight
+          Laban
         </button>
       </section>
 
-      {/* Result banner */}
+      {/* Round-end reveal */}
       {state.result && (
-        <div className="result">
-          <strong>
-            {state.result.winner === HUMAN
-              ? "You win the round! 🎉"
-              : state.result.winner < 0
-                ? "Round tied."
-                : `${state.players[state.result.winner].name} wins the round.`}
-          </strong>
-          <div className="result-reason">
-            by {state.result.reason} · points {state.result.handPoints.join(" / ")}
-          </div>
-          <button onClick={() => reset((state.players.length - 1) as 1 | 2)}>Play again</button>
-        </div>
+        <RoundReveal state={state} onReplay={() => reset((state.players.length - 1) as 1 | 2)} />
       )}
 
       {/* Log */}

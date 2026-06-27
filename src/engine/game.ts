@@ -1,8 +1,13 @@
-import { type Card, cardId, cardLabel } from "./cards";
+import { type Card, cardId, cardLabel, rankOrder } from "./cards";
 import { shuffledDeck } from "./deck";
 import { type Meld, classifyMeld, canLayOff, layOff } from "./melds";
 import { handPoints } from "./scoring";
+import { deadwood } from "./meldFinder";
 import { type RuleSet } from "./rules";
+
+// At a showdown you're judged only on your UNMATCHED cards — cards that don't
+// form a meld. Melds you hold in hand ("secret" melds) don't count against you.
+const scoreHand = (hand: readonly Card[]): number => handPoints(deadwood(hand));
 
 // The turn state machine for one round of Tongits.
 //
@@ -39,6 +44,11 @@ export interface GameState {
   rules: RuleSet;
   log: string[];
   result: RoundResult | null;
+  /** The card the current player just drew — for highlighting it in the hand. */
+  lastDrawn: Card | null;
+  /** A card taken from the discard pile that MUST be played (melded/sapawed)
+   *  before the player can discard. Null once it's been played. */
+  mustPlay: Card | null;
 }
 
 const clone = (s: GameState): GameState => structuredClone(s);
@@ -84,6 +94,8 @@ export function newRound(
     rules,
     log: [`${players[0].name} deals. ${players[0].name}'s turn.`],
     result: null,
+    lastDrawn: null,
+    mustPlay: null,
   };
   return state;
 }
@@ -95,27 +107,37 @@ function remove(hand: Card[], card: Card): boolean {
   return true;
 }
 
-/** Draw a card from the stock or take the top of the discard pile. */
+/** Draw a card from the stock or take the top of the discard pile.
+ *  Taking the discard is only legal if it can be played this turn, and the
+ *  taken card is then flagged as `mustPlay` until it's melded or sapawed. */
 export function draw(state: GameState, source: "stock" | "discard"): GameState {
   if (state.result || state.phase !== "draw") return state;
-  const s = clone(state);
-  const p = currentPlayer(s);
 
   if (source === "discard") {
-    const card = s.discard.pop();
-    if (!card) return state;
+    if (!canTakeDiscard(state)) return state; // can't take what you can't play
+    const s = clone(state);
+    const p = currentPlayer(s);
+    const card = s.discard.pop()!;
     p.hand.push(card);
-    note(s, `${p.name} takes ${cardLabel(card)} from the pile.`);
-  } else {
-    const card = s.stock.pop();
-    if (!card) {
-      // Stock exhausted: resolve per house rule.
-      return endByStockEmpty(s);
-    }
-    p.hand.push(card);
-    note(s, `${p.name} draws from the stock.`);
+    s.mustPlay = card;
+    s.lastDrawn = card;
+    s.phase = "action";
+    note(s, `${p.name} takes ${cardLabel(card)} from the pile — must play it.`);
+    return s;
   }
+
+  const s = clone(state);
+  const p = currentPlayer(s);
+  const card = s.stock.pop();
+  if (!card) {
+    // Stock exhausted: resolve per house rule.
+    return endByStockEmpty(s);
+  }
+  p.hand.push(card);
+  s.lastDrawn = card;
+  s.mustPlay = null;
   s.phase = "action";
+  note(s, `${p.name} draws from the stock.`);
   return s;
 }
 
@@ -130,6 +152,7 @@ export function layMeld(state: GameState, cards: Card[]): GameState {
     if (!remove(p.hand, c)) return state; // card wasn't in hand — reject whole action
   }
   p.melds.push(meld);
+  if (s.mustPlay && cards.some((c) => cardId(c) === cardId(s.mustPlay!))) s.mustPlay = null;
   note(s, `${p.name} melds ${meld.cards.map(cardLabel).join(" ")}.`);
   return checkEmptyHand(s, p);
 }
@@ -151,6 +174,7 @@ export function sapaw(
   if (!remove(p.hand, card)) return state;
   const grown = layOff(s.players[targetPlayer].melds[meldIndex], card)!;
   s.players[targetPlayer].melds[meldIndex] = grown;
+  if (s.mustPlay && cardId(card) === cardId(s.mustPlay)) s.mustPlay = null;
   note(s, `${p.name} sapaws ${cardLabel(card)} onto ${s.players[targetPlayer].name}'s meld.`);
   return checkEmptyHand(s, p);
 }
@@ -158,6 +182,7 @@ export function sapaw(
 /** Discard a card to end the turn (or win by Tongits if it empties the hand). */
 export function discard(state: GameState, card: Card): GameState {
   if (state.result || state.phase !== "action") return state;
+  if (state.mustPlay) return state; // must play the taken card before discarding
   const s = clone(state);
   const p = currentPlayer(s);
   if (!remove(p.hand, card)) return state;
@@ -171,14 +196,50 @@ export function discard(state: GameState, card: Card): GameState {
   return s;
 }
 
-/** Call a fight (laban): everyone compares hands, lowest points wins the round. */
+/** Laban (call a fight): only at the START of your turn, before drawing.
+ *  Everyone compares hands; the lowest points wins the round. */
 export function callFight(state: GameState): GameState {
-  if (state.result || state.phase !== "action" || !state.rules.enableLaban) return state;
-  const p = currentPlayer(state);
-  if (state.rules.mustHaveMeldToCall && p.melds.length === 0) return state;
+  if (!canCallFight(state)) return state;
   const s = clone(state);
-  note(s, `${p.name} calls a fight!`);
+  note(s, `${currentPlayer(s).name} calls Laban!`);
   return finish(s, "showdown", s.current, s.current);
+}
+
+/** Whether the current player may call Laban right now (start of turn only). */
+export function canCallFight(state: GameState): boolean {
+  if (state.result || state.phase !== "draw" || !state.rules.enableLaban) return false;
+  const p = currentPlayer(state);
+  if (state.rules.mustHaveMeldToCall && p.melds.length === 0) return false;
+  return true;
+}
+
+/** Can the current player take the top discard? Only if they can play it this
+ *  turn — either forming a new meld with hand cards, or sapawing it onto a meld. */
+export function canTakeDiscard(state: GameState): boolean {
+  if (state.result || state.phase !== "draw") return false;
+  const top = topDiscard(state);
+  if (!top) return false;
+  if (discardFormsMeld(top, currentPlayer(state).hand)) return true;
+  return state.players.some(
+    (p, pi) =>
+      (pi === state.current || state.rules.allowSapawOnOpponents) &&
+      p.melds.some((m) => canLayOff(m, top)),
+  );
+}
+
+/** Does the top discard combine with hand cards to make a brand-new meld? */
+export function discardFormsMeld(top: Card, hand: readonly Card[]): boolean {
+  // Set: two or more of the same rank already in hand.
+  if (hand.filter((c) => c.rank === top.rank).length >= 2) return true;
+  // Run: two same-suit neighbours that bracket or extend the discard.
+  const t = rankOrder(top.rank);
+  const present = new Set(hand.filter((c) => c.suit === top.suit).map((c) => rankOrder(c.rank)));
+  const windows = [
+    [t - 2, t - 1],
+    [t - 1, t + 1],
+    [t + 1, t + 2],
+  ];
+  return windows.some(([a, b]) => a >= 1 && b <= 13 && present.has(a) && present.has(b));
 }
 
 // --- internal helpers ---------------------------------------------------------
@@ -186,6 +247,8 @@ export function callFight(state: GameState): GameState {
 function advance(s: GameState): void {
   s.current = (s.current + 1) % s.players.length;
   s.phase = "draw";
+  s.lastDrawn = null;
+  s.mustPlay = null;
   note(s, `${currentPlayer(s).name}'s turn.`);
 }
 
@@ -198,7 +261,7 @@ function checkEmptyHand(s: GameState, p: Player): GameState {
 }
 
 function endByStockEmpty(s: GameState): GameState {
-  const points = s.players.map((p) => handPoints(p.hand));
+  const points = s.players.map((p) => scoreHand(p.hand));
   if (s.rules.stockExhaustion === "lastDrawerLoses") {
     // The current player tried to draw and couldn't: they lose; best of the rest wins.
     const loser = s.current;
@@ -239,7 +302,7 @@ function finish(
   winner: number,
   caller?: number,
 ): GameState {
-  const points = s.players.map((p) => handPoints(p.hand));
+  const points = s.players.map((p) => scoreHand(p.hand));
   const resolvedWinner = reason === "showdown" || reason === "stockEmpty" ? lowestHand(points) : winner;
   s.result = { reason, winner: resolvedWinner, handPoints: points, caller };
   const w = s.players[resolvedWinner];

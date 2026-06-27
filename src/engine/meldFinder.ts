@@ -63,6 +63,30 @@ export function bestMelds(hand: readonly Card[]): Meld[] {
   return chosen;
 }
 
+/** Find a single meld in `hand` that includes `card` (set preferred, else run),
+ *  or null if none exists. Used to play a card taken from the discard, which the
+ *  rules require be melded the same turn. */
+export function meldUsing(hand: readonly Card[], card: Card): Meld | null {
+  const sameRank = hand.filter((c) => c.rank === card.rank);
+  if (sameRank.length >= 3) return classifyMeld(sameRank);
+
+  const suited = hand
+    .filter((c) => c.suit === card.suit)
+    .sort((a, b) => rankOrder(a.rank) - rankOrder(b.rank));
+  let run: Card[] = [];
+  const containsCard = (cards: Card[]) => cards.some((c) => cardId(c) === cardId(card));
+  for (const c of suited) {
+    if (run.length === 0 || rankOrder(c.rank) === rankOrder(run[run.length - 1].rank) + 1) {
+      run.push(c);
+    } else {
+      if (run.length >= 3 && containsCard(run)) return classifyMeld(run);
+      run = [c];
+    }
+  }
+  if (run.length >= 3 && containsCard(run)) return classifyMeld(run);
+  return null;
+}
+
 /** Cards left over after taking out the best melds — your "deadwood". */
 export function deadwood(hand: readonly Card[]): Card[] {
   const melded = new Set<string>();
