@@ -20,6 +20,11 @@ export function getClient(): SupabaseClient {
       realtime: { params: { eventsPerSecond: 5 } },
       auth: { persistSession: true, autoRefreshToken: true },
     });
+    // Keep the Realtime socket authenticated across token refreshes, so RLS-gated
+    // subscriptions keep flowing after the session token rotates (~hourly).
+    client.auth.onAuthStateChange((_event, session) => {
+      if (session) client!.realtime.setAuth(session.access_token);
+    });
   }
   return client;
 }
