@@ -122,10 +122,25 @@ function MeldChip({
   );
 }
 
-function RoundReveal({ state, onReplay }: { state: GameState; onReplay: () => void }) {
+function RoundReveal({
+  state,
+  wins,
+  target,
+  matchOver,
+  onNext,
+  onNewMatch,
+}: {
+  state: GameState;
+  wins: number[];
+  target: number;
+  matchOver: boolean;
+  onNext: () => void;
+  onNewMatch: () => void;
+}) {
   const r = state.result!;
   const pts = r.handPoints;
   const winnerName = r.winner >= 0 ? state.players[r.winner].name : null;
+  const champion = matchOver ? wins.findIndex((w) => w >= target) : -1;
 
   const isYou = r.winner === HUMAN;
   const subj = isYou ? "You" : winnerName;
@@ -188,16 +203,37 @@ function RoundReveal({ state, onReplay }: { state: GameState; onReplay: () => vo
         </div>
 
         <div className="reveal-verdict">{verdict}</div>
-        <button className="reveal-replay" onClick={onReplay}>
-          Play again
-        </button>
+
+        <div className="reveal-score">
+          {state.players.map((p, i) => (
+            <span key={p.id} className={i === champion ? "sb-player champ" : "sb-player"}>
+              {p.name} <strong>{wins[i]}</strong>
+            </span>
+          ))}
+          <span className="sb-label">to {target}</span>
+        </div>
+
+        {matchOver ? (
+          <>
+            <div className="reveal-match">
+              {champion === HUMAN ? "You win the match! 🏆" : `${state.players[champion].name} wins the match.`}
+            </div>
+            <button className="reveal-replay" onClick={onNewMatch}>
+              New match
+            </button>
+          </>
+        ) : (
+          <button className="reveal-replay" onClick={onNext}>
+            Next game
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 export function App() {
-  const { state, setState, reset } = useGame(1);
+  const { state, setState, wins, target, matchOver, nextGame, newMatch } = useGame(1);
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
@@ -297,10 +333,20 @@ export function App() {
       <header className="top">
         <h1>Tongits</h1>
         <div className="newgame">
-          <button onClick={() => reset(1)}>New · 1 bot</button>
-          <button onClick={() => reset(2)}>New · 2 bots</button>
+          <button onClick={() => newMatch(1)}>New · 1 bot</button>
+          <button onClick={() => newMatch(2)}>New · 2 bots</button>
         </div>
       </header>
+
+      {/* Match score — games won, first to target */}
+      <section className="scoreboard">
+        <span className="sb-label">Games to {target}</span>
+        {state.players.map((p, i) => (
+          <span key={p.id} className="sb-player">
+            {p.name} <strong>{wins[i]}</strong>
+          </span>
+        ))}
+      </section>
 
       {/* Opponents */}
       <section className="opponents">
@@ -441,7 +487,14 @@ export function App() {
 
       {/* Round-end reveal */}
       {state.result && (
-        <RoundReveal state={state} onReplay={() => reset((state.players.length - 1) as 1 | 2)} />
+        <RoundReveal
+          state={state}
+          wins={wins}
+          target={target}
+          matchOver={matchOver}
+          onNext={nextGame}
+          onNewMatch={() => newMatch((state.players.length - 1) as 1 | 2)}
+        />
       )}
 
       {/* Log */}

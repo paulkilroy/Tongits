@@ -26,6 +26,10 @@ export interface Player {
   isAI: boolean;
   hand: Card[];
   melds: Meld[];
+  /** Set when someone (anyone, including this player) sapaws onto one of this
+   *  player's melds. It "burns" their right to call Laban on their next turn,
+   *  and is consumed when that turn begins. */
+  meldSapawed: boolean;
 }
 
 export interface RoundResult {
@@ -40,10 +44,15 @@ export interface GameState {
   stock: Card[];
   discard: Card[];
   current: number;
+  /** Who dealt this round (gets 13, acts first). Alternates between games. */
+  dealer: number;
   phase: Phase;
   rules: RuleSet;
   log: string[];
   result: RoundResult | null;
+  /** True when the current player may not call Laban this turn (their meld was
+   *  sapawed). Computed at the start of each turn from the player's flag. */
+  labanBlocked: boolean;
   /** The card the current player just drew — for highlighting it in the hand. */
   lastDrawn: Card | null;
   /** A card taken from the discard pile that MUST be played (melded/sapawed)
@@ -60,12 +69,14 @@ function note(s: GameState, msg: string): void {
   s.log = [...s.log, msg];
 }
 
-/** Deal a fresh round. The dealer (player 0) gets 13 cards and acts first. */
+/** Deal a fresh round. The dealer gets 13 cards and acts first; in a match the
+ *  dealer alternates between games. */
 export function newRound(
   rules: RuleSet,
   seed: number,
   names: string[],
   ai: boolean[],
+  dealer = 0,
 ): GameState {
   const deck = shuffledDeck(seed);
   const players: Player[] = names.map((name, i) => ({
@@ -74,12 +85,13 @@ export function newRound(
     isAI: ai[i] ?? false,
     hand: [],
     melds: [],
+    meldSapawed: false,
   }));
 
-  // Dealer (player 0) gets 13, everyone else 12.
+  // The dealer gets 13, everyone else 12.
   let d = 0;
   for (let i = 0; i < players.length; i++) {
-    const count = i === 0 ? 13 : 12;
+    const count = i === dealer ? 13 : 12;
     players[i].hand = deck.slice(d, d + count);
     d += count;
   }
@@ -89,11 +101,13 @@ export function newRound(
     players,
     stock,
     discard: [],
-    current: 0,
+    current: dealer,
+    dealer,
     phase: "action", // dealer already holds the extra card, so they act first
     rules,
-    log: [`${players[0].name} deals. ${players[0].name}'s turn.`],
+    log: [`${players[dealer].name} deals. ${players[dealer].name}'s turn.`],
     result: null,
+    labanBlocked: false,
     lastDrawn: null,
     mustPlay: null,
   };
@@ -174,6 +188,7 @@ export function sapaw(
   if (!remove(p.hand, card)) return state;
   const grown = layOff(s.players[targetPlayer].melds[meldIndex], card)!;
   s.players[targetPlayer].melds[meldIndex] = grown;
+  s.players[targetPlayer].meldSapawed = true; // burns their Laban next turn
   if (s.mustPlay && cardId(card) === cardId(s.mustPlay)) s.mustPlay = null;
   note(s, `${p.name} sapaws ${cardLabel(card)} onto ${s.players[targetPlayer].name}'s meld.`);
   return checkEmptyHand(s, p);
@@ -208,6 +223,7 @@ export function callFight(state: GameState): GameState {
 /** Whether the current player may call Laban right now (start of turn only). */
 export function canCallFight(state: GameState): boolean {
   if (state.result || state.phase !== "draw" || !state.rules.enableLaban) return false;
+  if (state.labanBlocked) return false; // meld was sapawed — burned this turn
   const p = currentPlayer(state);
   if (state.rules.mustHaveMeldToCall && p.melds.length === 0) return false;
   return true;
@@ -249,6 +265,9 @@ function advance(s: GameState): void {
   s.phase = "draw";
   s.lastDrawn = null;
   s.mustPlay = null;
+  // Consume any sapaw-lock: it applies to this one upcoming turn, then clears.
+  s.labanBlocked = s.players[s.current].meldSapawed;
+  s.players[s.current].meldSapawed = false;
   note(s, `${currentPlayer(s).name}'s turn.`);
 }
 

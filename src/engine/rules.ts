@@ -30,8 +30,8 @@ export interface RuleSet {
   /** What happens when the draw pile is exhausted. */
   stockExhaustion: StockExhaustionRule;
 
-  /** Score a player must reach to win the match (across rounds). */
-  targetScore: number;
+  /** Number of games (rounds) a player must win to take the match. We play to 5. */
+  gamesToWin: number;
 
   /** Include the two jokers as wildcards. Default off. */
   useJokers: boolean;
@@ -46,6 +46,6 @@ export const STANDARD_RULES: RuleSet = {
   tongitsBonus: 0,
   challengeAfterTongits: false,
   stockExhaustion: "lowestHandWins",
-  targetScore: 100,
+  gamesToWin: 5,
   useJokers: false,
 };

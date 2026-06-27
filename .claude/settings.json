@@ -14,7 +14,8 @@
       "Bash(git commit -q -m ' *)",
       "Bash(git check-ignore *)",
       "WebFetch(domain:tongits-five.vercel.app)",
-      "Bash(git commit -q -m 'Color the discard pile top card by suit *)"
+      "Bash(git commit -q -m 'Color the discard pile top card by suit *)",
+      "Bash(git commit -q -m 'Sapaw-lock \\(burned Laban\\) + match play to 5 games *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"

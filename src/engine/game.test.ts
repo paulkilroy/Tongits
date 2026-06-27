@@ -5,8 +5,10 @@ import {
   newRound,
   draw,
   layMeld,
+  sapaw,
   discard,
   callFight,
+  canCallFight,
   currentPlayer,
   type GameState,
 } from "./game";
@@ -132,6 +134,35 @@ describe("fight / laban", () => {
     s = callFight(s);
     expect(s.result?.handPoints).toEqual([2, 20]);
     expect(s.result?.winner).toBe(0);
+  });
+});
+
+describe("sapaw lock (burned Laban)", () => {
+  it("blocks the owner's Laban the next turn after their meld is sapawed, then clears", () => {
+    let s = twoPlayer();
+    s.players[0].melds = [
+      { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
+    ];
+    // Player 1's turn: they sapaw a 9 onto player 0's set.
+    s.current = 1;
+    s.phase = "action";
+    s.players[1].hand = [card("9", "diamonds"), card("2", "clubs"), card("K", "spades")];
+    s = sapaw(s, 0, 0, card("9", "diamonds"));
+    expect(s.players[0].meldSapawed).toBe(true);
+
+    // Back to player 0 → they're burned and cannot call Laban.
+    s = discard(s, card("2", "clubs"));
+    expect(s.current).toBe(0);
+    expect(s.labanBlocked).toBe(true);
+    expect(canCallFight(s)).toBe(false);
+
+    // Player 0 takes their turn; one full lap later the lock is gone.
+    s = draw(s, "stock");
+    s = discard(s, currentPlayer(s).hand[0]); // → player 1
+    s = draw(s, "stock");
+    s = discard(s, currentPlayer(s).hand[0]); // → player 0 again
+    expect(s.labanBlocked).toBe(false);
+    expect(canCallFight(s)).toBe(true);
   });
 });
 

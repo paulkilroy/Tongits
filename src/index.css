@@ -58,6 +58,27 @@ h1 {
   cursor: default;
 }
 
+.scoreboard {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 0.4rem 0.7rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.85rem;
+}
+.sb-label {
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+.sb-player strong {
+  font-size: 1rem;
+}
+.sb-player.champ {
+  color: #ffd65a;
+}
+
 .section-label {
   font-size: 0.8rem;
   opacity: 0.75;
@@ -363,9 +384,23 @@ h1 {
   font-size: 0.85rem;
 }
 .reveal-verdict {
-  margin: 1rem 0 0.8rem;
+  margin: 1rem 0 0.6rem;
   font-size: 1.1rem;
   font-weight: 700;
+}
+.reveal-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.8rem;
+}
+.reveal-match {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffd65a;
+  margin-bottom: 0.7rem;
 }
 .reveal-replay {
   width: 100%;
