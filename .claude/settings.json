@@ -13,7 +13,8 @@
       "Bash(npm audit *)",
       "Bash(git commit -q -m ' *)",
       "Bash(git check-ignore *)",
-      "WebFetch(domain:tongits-five.vercel.app)"
+      "WebFetch(domain:tongits-five.vercel.app)",
+      "Bash(git commit -q -m 'Color the discard pile top card by suit *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"

@@ -346,7 +346,19 @@ export function App() {
           onClick={() => act(draw(state, "discard"))}
         >
           <span className="pile-label">{canTake ? "Take" : "Discard"}</span>
-          <span className="pile-top">{topDiscard(state) ? cardLabel(topDiscard(state)!) : "—"}</span>
+          {topDiscard(state) ? (
+            <span
+              className={`pile-top ${
+                topDiscard(state)!.suit === "hearts" || topDiscard(state)!.suit === "diamonds"
+                  ? "red"
+                  : "black"
+              }`}
+            >
+              {cardLabel(topDiscard(state)!)}
+            </span>
+          ) : (
+            <span className="pile-top empty">—</span>
+          )}
         </button>
       </section>
 

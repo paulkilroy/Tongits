@@ -136,9 +136,18 @@ h1 {
 }
 .pile.discard .pile-top {
   background: #fff;
-  color: #1a1a1a;
   border-radius: 8px;
   padding: 0.15rem 0.5rem;
+}
+.pile.discard .pile-top.red {
+  color: #c0392b;
+}
+.pile.discard .pile-top.black {
+  color: #1a1a1a;
+}
+.pile.discard .pile-top.empty {
+  background: none;
+  color: #fff;
 }
 
 /* Melds */
