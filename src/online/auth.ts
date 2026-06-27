@@ -51,6 +51,10 @@ export async function ensureAccount(defaults: { name: string; avatar: string }):
     }
     sessionData = { session: data.session };
   }
+  // Authenticate the Realtime socket so RLS-filtered subscriptions (challenges,
+  // friendships) are delivered — otherwise the socket is anonymous and those
+  // events get filtered out.
+  sb.realtime.setAuth(sessionData.session!.access_token);
   const uid = sessionData.session!.user.id;
 
   const existing = await sb.from("profiles").select("*").eq("id", uid).maybeSingle();
