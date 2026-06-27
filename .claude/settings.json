@@ -16,7 +16,8 @@
       "WebFetch(domain:tongits-five.vercel.app)",
       "Bash(git commit -q -m 'Color the discard pile top card by suit *)",
       "Bash(git commit -q -m 'Sapaw-lock \\(burned Laban\\) + match play to 5 games *)",
-      "Bash(git commit -q -m 'Online play with Ella via Supabase realtime *)"
+      "Bash(git commit -q -m 'Online play with Ella via Supabase realtime *)",
+      "Bash(git commit -q -m 'Invite/share for online games: native share sheet + copy + deep link *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"

@@ -252,6 +252,7 @@ function Table({
   canControlMatch,
   headerExtra,
   statusNote,
+  banner,
 }: {
   state: GameState;
   me: number;
@@ -264,6 +265,7 @@ function Table({
   canControlMatch: boolean;
   headerExtra?: ReactNode;
   statusNote?: string;
+  banner?: ReactNode;
 }) {
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
@@ -373,6 +375,8 @@ function Table({
           </span>
         ))}
       </section>
+
+      {banner}
 
       <section className="opponents">
         {opponents.map(({ p, i }) => (
@@ -546,6 +550,48 @@ function LocalGame({ onExit }: { onExit: () => void }) {
   );
 }
 
+/* ------------------------------ invite/share ----------------------------- */
+
+function inviteUrl(code: string): string {
+  return `${window.location.origin}${window.location.pathname}?join=${code}`;
+}
+
+function ShareControls({ code, big }: { code: string; big?: boolean }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  async function share() {
+    const url = inviteUrl(code);
+    const text = `Join my Tongits game 🃏  Code: ${code}`;
+    try {
+      // On iPhone this opens the native sheet (WhatsApp, Messenger, Messages…).
+      await navigator.share({ title: "Tongits", text, url });
+    } catch {
+      /* user dismissed the sheet — no-op */
+    }
+  }
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`${inviteUrl(code)}`);
+      setMsg("Copied!");
+    } catch {
+      setMsg("Copy failed");
+    }
+    setTimeout(() => setMsg(null), 1500);
+  }
+
+  return (
+    <span className={`share ${big ? "big" : ""}`}>
+      {canShare && (
+        <button className="primary" onClick={share}>
+          Send invite
+        </button>
+      )}
+      <button onClick={copy}>{msg ?? "Copy link"}</button>
+    </span>
+  );
+}
+
 /* ------------------------------ online game ------------------------------ */
 
 function OnlineGame({ code, isHost, me, onExit }: { code: string; isHost: boolean; me: number; onExit: () => void }) {
@@ -566,6 +612,9 @@ function OnlineGame({ code, isHost, me, onExit }: { code: string; isHost: boolea
 
   const otherName = game.players.find((_, i) => i !== me)?.name ?? "opponent";
   const waiting = `Waiting for ${otherName}…`;
+  // The guest's seat keeps its placeholder name until they actually join.
+  const waitingForGuest =
+    isHost && !!game.players[1] && !game.players[1].isAI && game.players[1].name === "Player 2";
 
   return (
     <Table
@@ -579,11 +628,22 @@ function OnlineGame({ code, isHost, me, onExit }: { code: string; isHost: boolea
       onNewMatch={newMatch}
       canControlMatch={isHost}
       statusNote={waiting}
+      banner={
+        waitingForGuest ? (
+          <section className="invite">
+            <div className="invite-title">Invite your friend</div>
+            <div className="invite-code">{code}</div>
+            <ShareControls code={code} big />
+            <div className="invite-hint">They tap your link, or enter this code → Join.</div>
+          </section>
+        ) : undefined
+      }
       headerExtra={
         <>
           <span className="code-chip">
             Code <strong>{code}</strong>
           </span>
+          <ShareControls code={code} />
           <button onClick={onExit}>Leave</button>
         </>
       }
@@ -598,9 +658,9 @@ type Mode =
   | { kind: "local" }
   | { kind: "online"; code: string; isHost: boolean; me: number };
 
-function Lobby({ onStart }: { onStart: (m: Mode) => void }) {
+function Lobby({ onStart, initialCode }: { onStart: (m: Mode) => void; initialCode?: string }) {
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -703,8 +763,9 @@ function Lobby({ onStart }: { onStart: (m: Mode) => void }) {
 
 export function App() {
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
+  const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
 
-  if (mode.kind === "lobby") return <Lobby onStart={setMode} />;
+  if (mode.kind === "lobby") return <Lobby onStart={setMode} initialCode={joinCode} />;
   if (mode.kind === "local") return <LocalGame onExit={() => setMode({ kind: "lobby" })} />;
   return (
     <OnlineGame
