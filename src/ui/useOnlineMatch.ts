@@ -40,12 +40,19 @@ export function useOnlineMatch(code: string, isHost: boolean) {
     let active = true;
     const unsub = subscribeRoom(code, applyIncoming);
     setConnected(true);
-    void fetchRoom(code).then((d) => {
-      if (active && d) applyIncoming(d);
-    });
+    const pull = () =>
+      void fetchRoom(code).then((d) => {
+        if (active && d) applyIncoming(d);
+      });
+    pull();
+    // Safety net: realtime is the fast path, but a single missed event would
+    // otherwise deadlock both players (each stuck on a different turn). Polling
+    // guarantees both converge to the canonical room state within a few seconds.
+    const poll = setInterval(pull, 2500);
     return () => {
       active = false;
       unsub();
+      clearInterval(poll);
     };
   }, [code, applyIncoming]);
 

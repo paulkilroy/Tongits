@@ -25,7 +25,8 @@
       "Bash(git commit -q -m 'Accounts \\(anonymous\\) + play-money wallet *)",
       "Bash(git commit -q -m 'Friends + presence + challenge, and a leave-game guard *)",
       "Bash(git commit -q -m 'Authenticate Realtime socket so challenge/friend-request events deliver *)",
-      "Bash(git commit -q -m 'Discard UX: auto-select taken card, notice when not takeable *)"
+      "Bash(git commit -q -m 'Discard UX: auto-select taken card, notice when not takeable *)",
+      "Bash(git commit -q -m 'Fix online deadlock: poll room as a sync safety net *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"
