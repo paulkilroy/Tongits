@@ -523,19 +523,35 @@ h1 {
   margin-top: 0.3rem;
 }
 .meld {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #fff;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  padding: 0.3rem 0.45rem;
+  border-radius: 9px;
+  padding: 0.28rem 0.32rem;
 }
 .meld.active {
   border-color: #ffd65a;
-  background: #ffd65a22;
+  background: #ffd65a33;
+  box-shadow: 0 0 10px #ffd65a55;
   cursor: pointer;
+}
+/* Mini cards inside a meld — white background so suit colours read clearly. */
+.mc {
+  background: #fff;
+  border-radius: 5px;
+  padding: 0.16rem 0.38rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.mc.red {
+  color: #c0392b;
+}
+.mc.black {
+  color: #1a1a1a;
 }
 
 /* Hand */

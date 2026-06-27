@@ -123,7 +123,14 @@ function MeldChip({ meld, onClick, active }: { meld: Meld; onClick?: () => void;
       disabled={!onClick}
       title={meld.kind}
     >
-      {meld.cards.map((c) => cardLabel(c)).join(" ")}
+      {meld.cards.map((c) => {
+        const red = c.suit === "hearts" || c.suit === "diamonds";
+        return (
+          <span key={cardId(c)} className={`mc ${red ? "red" : "black"}`}>
+            {cardLabel(c)}
+          </span>
+        );
+      })}
     </button>
   );
 }
