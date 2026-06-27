@@ -307,7 +307,13 @@ function Table({
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+
+  function flash(msg: string) {
+    setNotice(msg);
+    window.setTimeout(() => setNotice((n) => (n === msg ? null : n)), 2800);
+  }
 
   const isMyTurn = !state.result && state.current === me;
   const meP = state.players[me];
@@ -335,6 +341,17 @@ function Table({
   const canBaba = inAction && selectedMeld !== null;
   const canCall = inDraw && canCallFight(state);
   const canTake = inDraw && canTakeDiscard(state);
+
+  function takeDiscard() {
+    const top = topDiscard(state);
+    if (!top) return;
+    if (!canTakeDiscard(state)) {
+      flash("You can only take the discard if it completes a meld (or lays onto one).");
+      return;
+    }
+    onAction(draw(state, "discard"));
+    setSelected([top]); // auto-raise + select the taken card, ready to Buklad/sapaw
+  }
 
   function onMeldClick(playerIndex: number, meldIndex: number) {
     if (!inAction || selected.length !== 1) return;
@@ -450,7 +467,12 @@ function Table({
           <span className="pile-count">{state.stock.length}</span>
         </button>
 
-        <button type="button" className="pile discard" disabled={!canTake} onClick={() => act(draw(state, "discard"))}>
+        <button
+          type="button"
+          className={`pile discard ${canTake ? "takeable" : inDraw ? "notyet" : ""}`}
+          disabled={!(inDraw && !!topDiscard(state))}
+          onClick={takeDiscard}
+        >
           <span className="pile-label">Kawat</span>
           {topDiscard(state) ? (
             <span
@@ -529,6 +551,8 @@ function Table({
           ))}
         </div>
       </section>
+
+      {notice && <div className="notice">{notice}</div>}
 
       <section className="actions">
         <button disabled={!canBaba} onClick={() => act(layMeld(state, selected))}>
