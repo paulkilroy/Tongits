@@ -828,6 +828,19 @@ h1 {
 .reveal.review {
   max-width: 560px;
 }
+.reveal.review,
+.reveal.review * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.review-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.review-actions button {
+  flex: 1;
+}
 .wg-caption {
   font-size: 0.85rem;
   margin-bottom: 0.4rem;

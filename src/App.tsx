@@ -357,9 +357,33 @@ function WinGraph({ series }: { series: WinPoint[] }) {
   );
 }
 
+function reviewToText(result: ReturnType<typeof reviewRound>, series: WinPoint[] | null): string {
+  const out: string[] = ["Tongits — Game Review", ""];
+  if (series && series.length) {
+    out.push("Win odds: " + series.map((p) => `T${p.turn} ${p.pct}%`).join("  "), "");
+  }
+  out.push("Summary:", ...result.summary.map((s) => "- " + s), "");
+  for (const t of result.turns) {
+    out.push(`Turn ${t.turn} — ${t.deadwoodPts} pts`);
+    for (const d of t.draws)
+      out.push(
+        `  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`,
+      );
+    for (const n of t.notes) out.push(`  • ${n.text}`);
+    out.push("");
+  }
+  return out.join("\n");
+}
+
 function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
   const result = useMemo(() => reviewRound(history, me), [history, me]);
   const { progress, series } = useWinOdds(history, me);
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    void navigator.clipboard?.writeText(reviewToText(result, series));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
   return (
     <div className="reveal-backdrop">
       <div className="reveal review">
@@ -425,9 +449,12 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
             </div>
           ))}
         </div>
-        <button className="reveal-replay" onClick={onClose}>
-          Close
-        </button>
+        <div className="review-actions">
+          <button onClick={copy}>{copied ? "Copied!" : "Copy"}</button>
+          <button className="reveal-replay" onClick={onClose}>
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
