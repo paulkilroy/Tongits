@@ -504,12 +504,6 @@ h1 {
   border-radius: 8px;
   padding: 0.15rem 0.5rem;
 }
-.pile.discard .pile-top.red {
-  color: #c0392b;
-}
-.pile.discard .pile-top.black {
-  color: #1a1a1a;
-}
 .pile.discard .pile-top.empty {
   background: none;
   color: #fff;
@@ -547,12 +541,6 @@ h1 {
   font-weight: 800;
   line-height: 1.1;
 }
-.mc.red {
-  color: #c0392b;
-}
-.mc.black {
-  color: #1a1a1a;
-}
 
 /* Hand */
 .hand {
@@ -576,10 +564,17 @@ h1 {
 .card:disabled {
   cursor: default;
 }
-.card.red {
+/* Four-colour deck (applies to hand cards, meld mini-cards, discard top) */
+.s-heart {
   color: #c0392b;
 }
-.card.black {
+.s-diamond {
+  color: #1f6fe0;
+}
+.s-club {
+  color: #1a8f3c;
+}
+.s-spade {
   color: #1a1a1a;
 }
 .card.inmeld {

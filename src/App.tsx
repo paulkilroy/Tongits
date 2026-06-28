@@ -43,6 +43,14 @@ function meldCardIds(hand: readonly Card[]): Set<string> {
 
 const suitIndex = (s: Suit) => SUITS.indexOf(s);
 
+// Four-colour deck for readability: ♥ red, ♦ blue, ♣ green, ♠ black.
+const SUIT_CLASS: Record<Suit, string> = {
+  clubs: "s-club",
+  diamonds: "s-diamond",
+  hearts: "s-heart",
+  spades: "s-spade",
+};
+
 function sortHand(hand: readonly Card[], mode: SortMode): Card[] {
   const cmp =
     mode === "suit"
@@ -90,8 +98,7 @@ function CardView({
   onPointerMove?: (e: ReactPointerEvent) => void;
   onPointerUp?: (e: ReactPointerEvent) => void;
 }) {
-  const red = card.suit === "hearts" || card.suit === "diamonds";
-  const cls = ["card", red ? "red" : "black"];
+  const cls = ["card", SUIT_CLASS[card.suit]];
   if (selected) cls.push("selected");
   if (inMeld) cls.push("inmeld");
   if (isNew) cls.push("new");
@@ -123,14 +130,11 @@ function MeldChip({ meld, onClick, active }: { meld: Meld; onClick?: () => void;
       disabled={!onClick}
       title={meld.kind}
     >
-      {meld.cards.map((c) => {
-        const red = c.suit === "hearts" || c.suit === "diamonds";
-        return (
-          <span key={cardId(c)} className={`mc ${red ? "red" : "black"}`}>
-            {cardLabel(c)}
-          </span>
-        );
-      })}
+      {meld.cards.map((c) => (
+        <span key={cardId(c)} className={`mc ${SUIT_CLASS[c.suit]}`}>
+          {cardLabel(c)}
+        </span>
+      ))}
     </button>
   );
 }
@@ -502,13 +506,7 @@ function Table({
         >
           <span className="pile-label">Kawat</span>
           {topDiscard(state) ? (
-            <span
-              className={`pile-top ${
-                topDiscard(state)!.suit === "hearts" || topDiscard(state)!.suit === "diamonds"
-                  ? "red"
-                  : "black"
-              }`}
-            >
+            <span className={`pile-top ${SUIT_CLASS[topDiscard(state)!.suit]}`}>
               {cardLabel(topDiscard(state)!)}
             </span>
           ) : (
