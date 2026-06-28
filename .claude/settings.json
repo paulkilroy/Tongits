@@ -38,7 +38,8 @@
       "Bash(git commit -q -m 'Add tab favicon \\(SVG card icon\\) + apple-touch-icon *)",
       "Bash(git commit -q -m 'Laban tie goes against the caller \\(you Laban and tie, you lose\\) *)",
       "Bash(git commit -q -m 'Game Review: selectable text + Copy button *)",
-      "Bash(git commit -q -m 'Win-odds v2: infer opponent hands from their discards *)"
+      "Bash(git commit -q -m 'Win-odds v2: infer opponent hands from their discards *)",
+      "Bash(git commit -q -m 'Win-odds: smoother \\(160 samples\\) + opponent context per turn *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"

@@ -322,7 +322,7 @@ function useWinOdds(history: GameState[], seat: number) {
         setProgress(1);
       }
     };
-    worker.postMessage({ history, seat, samples: 60 });
+    worker.postMessage({ history, seat, samples: 160 });
     return () => worker.terminate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -364,7 +364,8 @@ function reviewToText(result: ReturnType<typeof reviewRound>, series: WinPoint[]
   }
   out.push("Summary:", ...result.summary.map((s) => "- " + s), "");
   for (const t of result.turns) {
-    out.push(`Turn ${t.turn} — ${t.deadwoodPts} pts`);
+    const opp = t.opponents.map((o) => `${o.name} ${o.cards}c/${o.melds}m`).join(", ");
+    out.push(`Turn ${t.turn} — ${t.deadwoodPts} pts${opp ? " · " + opp : ""}`);
     for (const d of t.draws)
       out.push(
         `  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`,
@@ -418,6 +419,12 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
             <div className="rv-turn" key={t.turn}>
               <div className="rv-head">
                 Turn {t.turn} · <strong>{t.deadwoodPts}</strong> pts
+                {t.opponents.map((o) => (
+                  <span key={o.name} className="rv-opp">
+                    {" · "}
+                    {o.name} {o.cards}c{o.melds > 0 ? `, ${o.melds} meld${o.melds > 1 ? "s" : ""}` : ""}
+                  </span>
+                ))}
               </div>
               {t.draws.length > 0 && (
                 <div className="rv-draws">

@@ -12,6 +12,8 @@ import { handDraws, isDeadDraw, conflictingCards, type DrawOdds } from "./odds";
 export interface TurnReview {
   turn: number;
   deadwoodPts: number;
+  /** What you could see of each opponent at this point — explains win-% swings. */
+  opponents: { name: string; cards: number; melds: number }[];
   draws: DrawOdds[];
   notes: { level: "warn" | "tip"; text: string }[];
 }
@@ -119,7 +121,12 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
     }
     if (!notes.length) notes.push({ level: "tip", text: "Clean turn — no obvious leaks." });
 
-    turns.push({ turn: n, deadwoodPts: handPoints(dw), draws, notes });
+    const opponents = s.players
+      .map((p, i) => ({ p, i }))
+      .filter(({ i }) => i !== seat)
+      .map(({ p }) => ({ name: p.name, cards: p.hand.length, melds: p.melds.length }));
+
+    turns.push({ turn: n, deadwoodPts: handPoints(dw), opponents, draws, notes });
   }
 
   const summary: string[] = [];
