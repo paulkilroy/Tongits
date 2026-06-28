@@ -34,7 +34,8 @@
       "Bash(git commit -q -m 'Analyzer foundation: equity/outs engine \\(engine/odds.ts\\) *)",
       "Bash(git commit -q -m 'Game Review screen: per-turn odds + strategy notes *)",
       "Bash(git commit -q -m 'Win-odds graph: Monte Carlo eval bar in Game Review *)",
-      "Bash(git commit -q -m 'Show a toast when a sapaw happens \\(incl. Ella on your melds\\) *)"
+      "Bash(git commit -q -m 'Show a toast when a sapaw happens \\(incl. Ella on your melds\\) *)",
+      "Bash(git commit -q -m 'Add tab favicon \\(SVG card icon\\) + apple-touch-icon *)"
     ],
     "additionalDirectories": [
       "/Users/paulkilroy/dev/Tongits/Engine/Sources/TongitsEngine"
