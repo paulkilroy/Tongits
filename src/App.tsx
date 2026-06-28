@@ -470,14 +470,31 @@ function Table({
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [event, setEvent] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const lastLogLen = useRef(state.log.length);
   const history = useGameHistory(state);
 
   function flash(msg: string) {
     setNotice(msg);
     window.setTimeout(() => setNotice((n) => (n === msg ? null : n)), 2800);
   }
+
+  // Surface new sapaw events as an on-screen toast so the burn timing is visible.
+  useEffect(() => {
+    if (state.log.length > lastLogLen.current) {
+      const fresh = state.log.slice(lastLogLen.current);
+      const sapawLine = [...fresh].reverse().find((l) => /sapaw/i.test(l));
+      if (sapawLine) setEvent(sapawLine);
+    }
+    lastLogLen.current = state.log.length;
+  }, [state.log]);
+  useEffect(() => {
+    if (!event) return;
+    const t = window.setTimeout(() => setEvent(null), 4500);
+    return () => window.clearTimeout(t);
+  }, [event]);
 
   const isMyTurn = !state.result && state.current === me;
   const meP = state.players[me];
@@ -601,6 +618,8 @@ function Table({
 
   return (
     <main className="app">
+      {event && <div className="event-toast">🔥 {event}</div>}
+
       <header className="top">
         <h1>Tongits</h1>
         <div className="newgame">{headerExtra}</div>

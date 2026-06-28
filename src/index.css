@@ -620,6 +620,22 @@ h1 {
   padding: 0.45rem 0.6rem;
   margin-bottom: 0.5rem;
 }
+.event-toast {
+  position: fixed;
+  left: 50%;
+  top: calc(0.6rem + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  max-width: 92%;
+  background: #b8860b;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  z-index: 25;
+  text-align: center;
+}
 .notice {
   position: fixed;
   left: 50%;
