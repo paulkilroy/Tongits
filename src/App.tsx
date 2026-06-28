@@ -190,7 +190,7 @@ function RoundReveal({
 
   // Per-player splash word over each avatar.
   const badge = (i: number): string | null => {
-    if (i === r.winner) return r.reason === "tongits" ? "TONGITS!" : r.tupong ? "TUPONG" : "DAGO";
+    if (i === r.winner) return r.reason === "tongits" ? "TONGITS!" : r.tupong ? "TUPONG" : "DAOG";
     if (r.winner < 0) return null;
     return state.players[i].melds.length === 0 ? "SUNOG" : "LUPIG"; // no meld down = burned
   };
