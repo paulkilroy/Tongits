@@ -32,30 +32,38 @@ function sapawAvailable(state: GameState, seat: number, card: Card): boolean {
   );
 }
 
-export function reviewRound(history: readonly GameState[], seat: number): GameReviewResult {
-  // Segment the ply list into turns; keep each turn's first action state (the
-  // decision point, right after drawing) and its last state (end of the turn).
-  const segments: { first?: GameState; last?: GameState }[] = [];
+export interface TurnSegment {
+  first: GameState; // decision point — first action state of the turn (after drawing)
+  last: GameState; // end of the turn
+}
+
+/** Split a recorded round into the seat's turns. Each segment's `first` is the
+ *  decision point (right after drawing). Shared by the review + win-odds graph. */
+export function roundSegments(history: readonly GameState[], seat: number): TurnSegment[] {
+  const segs: { first?: GameState; last?: GameState }[] = [];
   let prevCurrent = -1;
   for (const s of history) {
     if (s.current !== prevCurrent) {
-      segments.push({});
+      segs.push({});
       prevCurrent = s.current;
     }
     if (s.current === seat) {
-      const seg = segments[segments.length - 1];
+      const seg = segs[segs.length - 1];
       if (s.phase === "action" && !seg.first) seg.first = s;
       seg.last = s;
     }
   }
+  return segs.filter((s): s is TurnSegment => !!s.first);
+}
 
+export function reviewRound(history: readonly GameState[], seat: number): GameReviewResult {
+  const segments = roundSegments(history, seat);
   const turns: TurnReview[] = [];
   let deadTurns = 0;
   let missedSapawTurns = 0;
   let n = 0;
 
   for (const seg of segments) {
-    if (!seg.first) continue;
     n++;
     const s = seg.first;
     const draws = handDraws(s, seat);
@@ -71,8 +79,8 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
     const highLoose = dw.filter((c) => cardPoints(c) >= 10 && !liveDrawCards.has(cardId(c)));
 
     // Missed sapaw: deadwood at the END of the turn that could have laid off.
-    const endHand = (seg.last ?? s).players[seat].hand;
-    const missed = deadwood(endHand).filter((c) => sapawAvailable(seg.last ?? s, seat, c));
+    const endHand = seg.last.players[seat].hand;
+    const missed = deadwood(endHand).filter((c) => sapawAvailable(seg.last, seat, c));
 
     const notes: TurnReview["notes"] = [];
     if (dead.length) {

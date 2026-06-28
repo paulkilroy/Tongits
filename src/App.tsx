@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -29,7 +30,8 @@ import { useFriends } from "./ui/useFriends";
 import { addBalance, type Account } from "./online/auth";
 import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
 import { settlementDelta } from "./engine/wallet";
-import { reviewRound, type GameReviewResult } from "./engine/review";
+import { reviewRound } from "./engine/review";
+import { type WinPoint } from "./engine/winodds";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
 import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
@@ -304,11 +306,84 @@ function useGameHistory(state: GameState) {
   return hist;
 }
 
-function GameReview({ result, onClose }: { result: GameReviewResult; onClose: () => void }) {
+// Spin up the worker once when the review opens; report progress + the series.
+function useWinOdds(history: GameState[], seat: number) {
+  const [progress, setProgress] = useState(0);
+  const [series, setSeries] = useState<WinPoint[] | null>(null);
+  useEffect(() => {
+    const worker = new Worker(new URL("./workers/analysis.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    worker.onmessage = (e: MessageEvent) => {
+      const d = e.data;
+      if (d.type === "progress") setProgress(d.fraction);
+      else if (d.type === "done") {
+        setSeries(d.series);
+        setProgress(1);
+      }
+    };
+    worker.postMessage({ history, seat, samples: 60 });
+    return () => worker.terminate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return { progress, series };
+}
+
+function WinGraph({ series }: { series: WinPoint[] }) {
+  const W = 520;
+  const H = 130;
+  const pad = 8;
+  const n = series.length;
+  const x = (i: number) => (n === 1 ? W / 2 : pad + (i / (n - 1)) * (W - 2 * pad));
+  const y = (pct: number) => pad + (1 - pct / 100) * (H - 2 * pad);
+  const line = series.map((p, i) => `${x(i)},${y(p.pct)}`).join(" ");
+  const area =
+    `M ${x(0)},${H - pad} ` + series.map((p, i) => `L ${x(i)},${y(p.pct)}`).join(" ") + ` L ${x(n - 1)},${H - pad} Z`;
+  return (
+    <svg className="wingraph" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label="win odds graph">
+      <line className="wg-mid" x1={pad} x2={W - pad} y1={y(50)} y2={y(50)} />
+      <path className="wg-area" d={area} />
+      <polyline className="wg-line" points={line} />
+      {series.map((p, i) => (
+        <circle
+          key={i}
+          cx={x(i)}
+          cy={y(p.pct)}
+          r={3.2}
+          className={`wg-dot ${i > 0 && p.pct - series[i - 1].pct <= -15 ? "drop" : ""}`}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
+  const result = useMemo(() => reviewRound(history, me), [history, me]);
+  const { progress, series } = useWinOdds(history, me);
   return (
     <div className="reveal-backdrop">
       <div className="reveal review">
         <h2 className="reveal-title">Game Review</h2>
+
+        {series ? (
+          series.length > 0 && (
+            <>
+              <div className="wg-caption">
+                Win odds · {series[0].pct}% → <strong>{series[series.length - 1].pct}%</strong>
+                <span className="wg-legend"> · red dot = odds dropped</span>
+              </div>
+              <WinGraph series={series} />
+            </>
+          )
+        ) : (
+          <div className="wg-progress">
+            <div>Computing win odds… {Math.round(progress * 100)}%</div>
+            <div className="wg-bar">
+              <div className="wg-bar-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+            </div>
+          </div>
+        )}
+
         <div className="review-summary">
           {result.summary.map((s, i) => (
             <div key={i}>{s}</div>
@@ -685,7 +760,7 @@ function Table({
       )}
 
       {reviewing && (
-        <GameReview result={reviewRound(history.current, me)} onClose={() => setReviewing(false)} />
+        <GameReview history={history.current} me={me} onClose={() => setReviewing(false)} />
       )}
 
       <section className="log">
