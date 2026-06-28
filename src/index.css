@@ -804,6 +804,79 @@ h1 {
 .reveal-replay {
   width: 100%;
 }
+.review-link {
+  margin-top: 0.8rem;
+}
+
+/* Game review */
+.reveal.review {
+  max-width: 560px;
+}
+.review-summary {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.review-turns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 55vh;
+  overflow-y: auto;
+  text-align: left;
+}
+.rv-turn {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+}
+.rv-head {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin-bottom: 0.4rem;
+}
+.rv-draws {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+.rv-draw {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.rv-cards {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+.rv-odds {
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+.rv-odds.low {
+  color: #ffb24a;
+}
+.rv-odds.dead {
+  color: #ff7a7a;
+}
+.rv-notes {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.rv-notes li.warn {
+  color: #ffc06a;
+}
+.rv-notes li.tip {
+  color: #cfe9d6;
+}
 
 /* Log */
 .log {

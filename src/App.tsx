@@ -29,6 +29,7 @@ import { useFriends } from "./ui/useFriends";
 import { addBalance, type Account } from "./online/auth";
 import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
 import { settlementDelta } from "./engine/wallet";
+import { reviewRound, type GameReviewResult } from "./engine/review";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
 import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
@@ -151,6 +152,7 @@ function RoundReveal({
   moneyDelta,
   onNext,
   onNewMatch,
+  onReview,
 }: {
   state: GameState;
   me: number;
@@ -161,6 +163,7 @@ function RoundReveal({
   moneyDelta?: number | null;
   onNext: () => void;
   onNewMatch: () => void;
+  onReview: () => void;
 }) {
   const r = state.result!;
   const pts = r.handPoints;
@@ -277,6 +280,79 @@ function RoundReveal({
         ) : (
           <div className="reveal-wait">Waiting for host to deal the next game…</div>
         )}
+
+        <button className="link-btn review-link" onClick={onReview}>
+          📊 Game Review
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------ game review ------------------------------ */
+
+// Accumulate a per-ply snapshot of the round for post-game review. The log grows
+// by one+ line per action, so a longer log = a new ply; a shorter log = new round.
+function useGameHistory(state: GameState) {
+  const hist = useRef<GameState[]>([]);
+  useEffect(() => {
+    const arr = hist.current;
+    const last = arr[arr.length - 1];
+    if (!last || state.log.length < last.log.length) hist.current = [state];
+    else if (state.log.length > last.log.length) arr.push(state);
+  }, [state]);
+  return hist;
+}
+
+function GameReview({ result, onClose }: { result: GameReviewResult; onClose: () => void }) {
+  return (
+    <div className="reveal-backdrop">
+      <div className="reveal review">
+        <h2 className="reveal-title">Game Review</h2>
+        <div className="review-summary">
+          {result.summary.map((s, i) => (
+            <div key={i}>{s}</div>
+          ))}
+        </div>
+        <div className="review-turns">
+          {result.turns.map((t) => (
+            <div className="rv-turn" key={t.turn}>
+              <div className="rv-head">
+                Turn {t.turn} · <strong>{t.deadwoodPts}</strong> pts
+              </div>
+              {t.draws.length > 0 && (
+                <div className="rv-draws">
+                  {t.draws.map((d, i) => (
+                    <div className="rv-draw" key={i}>
+                      <span className="rv-cards">
+                        {d.held.map((c) => (
+                          <span key={cardId(c)} className={`mc ${SUIT_CLASS[c.suit]}`}>
+                            {cardLabel(c)}
+                          </span>
+                        ))}
+                      </span>
+                      <span
+                        className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}
+                      >
+                        {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <ul className="rv-notes">
+                {t.notes.map((n, i) => (
+                  <li key={i} className={n.level}>
+                    {n.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <button className="reveal-replay" onClick={onClose}>
+          Close
+        </button>
       </div>
     </div>
   );
@@ -319,7 +395,9 @@ function Table({
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const history = useGameHistory(state);
 
   function flash(msg: string) {
     setNotice(msg);
@@ -602,7 +680,12 @@ function Table({
           moneyDelta={moneyDelta}
           onNext={onNext}
           onNewMatch={onNewMatch}
+          onReview={() => setReviewing(true)}
         />
+      )}
+
+      {reviewing && (
+        <GameReview result={reviewRound(history.current, me)} onClose={() => setReviewing(false)} />
       )}
 
       <section className="log">
