@@ -32,6 +32,14 @@ import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge 
 import { settlementDelta } from "./engine/wallet";
 import { reviewRound } from "./engine/review";
 import { type WinPoint } from "./engine/winodds";
+import {
+  recordGame,
+  loadCoach,
+  resetCoach,
+  rankedLeaks,
+  tagCount,
+  type CoachStats,
+} from "./ui/coachStore";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
 import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
@@ -379,6 +387,7 @@ function reviewToText(result: ReturnType<typeof reviewRound>, series: WinPoint[]
 function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
   const result = useMemo(() => reviewRound(history, me), [history, me]);
   const { progress, series } = useWinOdds(history, me);
+  const coach = useMemo(() => loadCoach(), []);
   const [copied, setCopied] = useState(false);
   function copy() {
     void navigator.clipboard?.writeText(reviewToText(result, series));
@@ -447,11 +456,15 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
                 </div>
               )}
               <ul className="rv-notes">
-                {t.notes.map((n, i) => (
-                  <li key={i} className={n.level}>
-                    {n.text}
-                  </li>
-                ))}
+                {t.notes.map((n, i) => {
+                  const total = tagCount(coach, n.tag);
+                  return (
+                    <li key={i} className={n.level}>
+                      {n.text}
+                      {total >= 3 && <span className="rv-trend"> · {total}× in your games</span>}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -508,7 +521,20 @@ function Table({
   const [reviewing, setReviewing] = useState(false);
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
   const lastLogLen = useRef(state.log.length);
+  const recorded = useRef(false);
   const history = useGameHistory(state);
+
+  // Record each finished round's leaks into the cross-game coach (once per round).
+  useEffect(() => {
+    if (!state.result) {
+      recorded.current = false;
+      return;
+    }
+    if (recorded.current) return;
+    recorded.current = true;
+    recordGame(reviewRound(history.current, me), state.result.winner === me);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.result, me]);
 
   function flash(msg: string) {
     setNotice(msg);
@@ -1333,6 +1359,67 @@ function FriendsScreen({
   );
 }
 
+function CoachScreen({ onBack }: { onBack: () => void }) {
+  const [stats, setStats] = useState<CoachStats>(loadCoach);
+  const leaks = rankedLeaks(stats);
+  const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
+
+  return (
+    <main className="app center-screen">
+      <h1>Coach</h1>
+      {stats.games === 0 ? (
+        <p className="muted">Play some games — I'll track your recurring leaks here.</p>
+      ) : (
+        <>
+          <div className="coach-head">
+            {stats.games} games · {stats.turns} turns · {winRate}% win rate
+          </div>
+          {leaks.length > 0 ? (
+            <>
+              <div className="coach-headline">
+                Biggest leak: <strong>{leaks[0].title}</strong> — {leaks[0].fix}
+              </div>
+              <div className="rules-list">
+                {leaks.map((l) => (
+                  <div key={l.tag} className="leak-row">
+                    <div className="leak-top">
+                      <span>{l.title}</span>
+                      <span className="leak-rate">{Math.round(l.rate * 100)}% of turns</span>
+                    </div>
+                    <div className="leak-bar">
+                      <div
+                        className="leak-bar-fill"
+                        style={{ width: `${Math.min(100, Math.round(l.rate * 100))}%` }}
+                      />
+                    </div>
+                    <div className="leak-fix">
+                      {l.fix} · {l.count}× total
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="muted">No leaks tracked yet — clean play! 🎉</p>
+          )}
+          <button
+            className="link-btn"
+            onClick={() => {
+              resetCoach();
+              setStats(loadCoach());
+            }}
+          >
+            Reset stats
+          </button>
+        </>
+      )}
+      <button className="big" onClick={onBack}>
+        Done
+      </button>
+    </main>
+  );
+}
+
 function Lobby({
   onStart,
   initialCode,
@@ -1344,7 +1431,7 @@ function Lobby({
   account: Account | null;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
-  const [screen, setScreen] = useState<"main" | "rules" | "friends">("main");
+  const [screen, setScreen] = useState<"main" | "rules" | "friends" | "coach">("main");
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
@@ -1441,6 +1528,13 @@ function Lobby({
         <FriendsScreen account={account} fr={fr} busy={busy} onBack={() => setScreen("main")} onChallenge={challenge} />
       </>
     );
+  if (screen === "coach")
+    return (
+      <>
+        {prompt}
+        <CoachScreen onBack={() => setScreen("main")} />
+      </>
+    );
 
   const onlineFriends = fr.friends.filter((f) => f.online).length;
 
@@ -1481,6 +1575,9 @@ function Lobby({
       <div className="lobby-links">
         <button className="link-btn" onClick={() => setScreen("rules")}>
           ⚙ House Rules
+        </button>
+        <button className="link-btn" onClick={() => setScreen("coach")}>
+          📊 Coach
         </button>
         {onlineConfigured && (
           <button className="link-btn" onClick={() => setScreen("friends")}>

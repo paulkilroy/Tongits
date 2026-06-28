@@ -961,6 +961,56 @@ h1 {
 .rv-notes li.tip {
   color: #cfe9d6;
 }
+.rv-trend {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* Coach */
+.coach-head {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+.coach-headline {
+  max-width: 360px;
+  background: rgba(255, 214, 90, 0.12);
+  border: 1px solid #ffd65a55;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.leak-row {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+}
+.leak-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.leak-rate {
+  opacity: 0.85;
+  font-weight: 700;
+}
+.leak-bar {
+  height: 7px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.35rem 0;
+}
+.leak-bar-fill {
+  height: 100%;
+  background: #ff9a3c;
+}
+.leak-fix {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
 
 /* Log */
 .log {

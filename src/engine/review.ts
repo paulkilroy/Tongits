@@ -9,13 +9,21 @@ import { handDraws, isDeadDraw, conflictingCards, type DrawOdds } from "./odds";
 // for one seat: the odds of each draw they held, plus rule-based lessons drawn
 // from Tongits strategy (dead draws, competing draws, high deadwood, missed sapaw).
 
+export type NoteTag =
+  | "dead-draw"
+  | "long-shot"
+  | "competing"
+  | "high-deadwood"
+  | "missed-sapaw"
+  | "clean";
+
 export interface TurnReview {
   turn: number;
   deadwoodPts: number;
   /** What you could see of each opponent at this point — explains win-% swings. */
   opponents: { name: string; cards: number; melds: number }[];
   draws: DrawOdds[];
-  notes: { level: "warn" | "tip"; text: string }[];
+  notes: { level: "warn" | "tip"; tag: NoteTag; text: string }[];
 }
 
 export interface GameReviewResult {
@@ -89,6 +97,7 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
       deadTurns++;
       notes.push({
         level: "warn",
+        tag: "dead-draw",
         text: `Dead draw — ${dead.map((d) => labels(d.held)).join(", ")} has no outs left. Let it go.`,
       });
     }
@@ -96,6 +105,7 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
       if (d.outsLive > 0 && d.probability < 0.15) {
         notes.push({
           level: "warn",
+          tag: "long-shot",
           text: `Long shot: ${labels(d.held)} is ${d.kind === "run-gutshot" ? "an inside" : d.kind === "run-open" ? "an outside" : "a set"} draw with ${d.outsLive} live out${d.outsLive === 1 ? "" : "s"} (~${pct(d.probability)}%).`,
         });
       }
@@ -103,12 +113,14 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
     if (conflicts.size) {
       notes.push({
         level: "tip",
+        tag: "competing",
         text: `Competing draws share ${[...conflicts].map((id) => cardLabel(hand.find((c) => cardId(c) === id)!)).join(", ")} — they can't both pay off; commit to the better one.`,
       });
     }
     if (highLoose.length) {
       notes.push({
         level: "warn",
+        tag: "high-deadwood",
         text: `High deadwood: ${labels(highLoose)} (${highLoose.reduce((a, c) => a + cardPoints(c), 0)} pts) sitting loose — discard high cards early.`,
       });
     }
@@ -116,10 +128,11 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
       missedSapawTurns++;
       notes.push({
         level: "warn",
+        tag: "missed-sapaw",
         text: `Missed sapaw — ${labels(missed)} could lay onto a meld to dump deadwood.`,
       });
     }
-    if (!notes.length) notes.push({ level: "tip", text: "Clean turn — no obvious leaks." });
+    if (!notes.length) notes.push({ level: "tip", tag: "clean", text: "Clean turn — no obvious leaks." });
 
     const opponents = s.players
       .map((p, i) => ({ p, i }))
