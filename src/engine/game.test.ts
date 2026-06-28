@@ -107,16 +107,16 @@ describe("fight / laban", () => {
     expect(s.result?.handPoints).toEqual([3, 20]);
   });
 
-  it("breaks a showdown tie toward the caller (Tupong)", () => {
+  it("a showdown tie goes AGAINST the caller — they lose (Tupong)", () => {
     let s = twoPlayer();
     s.phase = "draw";
     s.players[0].melds = [
       { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
     ];
-    s.players[0].hand = [card("2", "clubs")]; // 2 points
+    s.players[0].hand = [card("2", "clubs")]; // caller, 2 points
     s.players[1].hand = [card("2", "hearts")]; // also 2 — a tie
-    s = callFight(s);
-    expect(s.result?.winner).toBe(0); // caller wins the tie
+    s = callFight(s); // player 0 calls
+    expect(s.result?.winner).toBe(1); // caller loses the tie
     expect(s.result?.tupong).toBe(true);
   });
 

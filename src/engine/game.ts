@@ -335,7 +335,9 @@ function lowestHand(points: number[]): number {
   return tie ? -1 : winner;
 }
 
-/** Lowest hand wins; a showdown tie (Tupong) is broken toward the caller. */
+/** Lowest hand wins. On a tie for lowest the CALLER LOSES — they needed strictly
+ *  the lowest. Among the tied players the one nearest the caller in turn order
+ *  wins (Tupong), with the caller excluded if they were part of the tie. */
 function resolveShowdown(
   points: number[],
   caller: number,
@@ -344,9 +346,10 @@ function resolveShowdown(
   const min = Math.min(...points);
   const tied = points.map((p, i) => (p === min ? i : -1)).filter((i) => i >= 0);
   if (tied.length === 1) return { winner: tied[0], tupong: false };
-  // Closest to the caller wins — the caller themselves is distance 0.
-  tied.sort((a, b) => ((a - caller + count) % count) - ((b - caller + count) % count));
-  return { winner: tied[0], tupong: true };
+  const contenders = tied.filter((i) => i !== caller);
+  const pool = contenders.length ? contenders : tied;
+  pool.sort((a, b) => ((a - caller + count) % count) - ((b - caller + count) % count));
+  return { winner: pool[0], tupong: true };
 }
 
 function finish(
