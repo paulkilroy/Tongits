@@ -28,9 +28,12 @@ export interface Player {
   hand: Card[];
   melds: Meld[];
   /** Set when someone (anyone, including this player) sapaws onto one of this
-   *  player's melds. It "burns" their right to call Laban on their next turn,
-   *  and is consumed when that turn begins. */
+   *  player's melds. Burns their right to call Laban on their next turn (consumed
+   *  when that turn begins) — used when the lock is "next turn only". */
   meldSapawed: boolean;
+  /** Burned for the REST of the round (used when sapawLockAllRound). Cleared on a
+   *  new deal. */
+  burned: boolean;
 }
 
 export interface RoundResult {
@@ -92,6 +95,7 @@ export function newRound(
     hand: [],
     melds: [],
     meldSapawed: false,
+    burned: false,
   }));
 
   // The dealer gets 13, everyone else 12.
@@ -194,9 +198,15 @@ export function sapaw(
   if (!remove(p.hand, card)) return state;
   const grown = layOff(s.players[targetPlayer].melds[meldIndex], card)!;
   s.players[targetPlayer].melds[meldIndex] = grown;
-  s.players[targetPlayer].meldSapawed = true; // burns their Laban next turn
+  s.players[targetPlayer].meldSapawed = true; // next-turn lock
+  s.players[targetPlayer].burned = true; // rest-of-round lock
   if (s.mustPlay && cardId(card) === cardId(s.mustPlay)) s.mustPlay = null;
-  note(s, `${p.name} sapaws ${cardLabel(card)} onto ${s.players[targetPlayer].name}'s meld.`);
+  const owner = s.players[targetPlayer].name;
+  const self = targetPlayer === s.current;
+  note(
+    s,
+    `${p.name} sapaws ${cardLabel(card)} onto ${self ? "their own" : owner + "'s"} meld — ${self ? p.name : owner} can't Laban (burned).`,
+  );
   return checkEmptyHand(s, p);
 }
 
@@ -229,7 +239,11 @@ export function callFight(state: GameState): GameState {
 /** Whether the current player may call Laban right now (start of turn only). */
 export function canCallFight(state: GameState): boolean {
   if (state.result || state.phase !== "draw" || !state.rules.enableLaban) return false;
-  if (state.labanBlocked) return false; // meld was sapawed — burned this turn
+  // Burned by a sapaw — either the whole round, or just this (next) turn.
+  const blocked = state.rules.sapawLockAllRound
+    ? currentPlayer(state).burned
+    : state.labanBlocked;
+  if (blocked) return false;
   const p = currentPlayer(state);
   if (state.rules.mustHaveMeldToCall && p.melds.length === 0) return false;
   return true;

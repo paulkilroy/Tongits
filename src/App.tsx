@@ -544,11 +544,12 @@ function Table({
     if (canLayOff(meld, card)) act(sapaw(state, playerIndex, meldIndex, card));
   }
 
+  const sapawLocked = state.rules.sapawLockAllRound ? meP.burned : state.labanBlocked;
   const instruction = !isMyTurn
     ? statusNote ?? `Waiting for ${state.players[state.current].name}…`
     : inDraw
-      ? state.labanBlocked
-        ? "Imo turno — Laban is locked (sapaw'd). Bulit (draw), or Kawat the pile to Buklad it."
+      ? sapawLocked
+        ? "Imo turno — Laban is locked (your meld was sapaw'd). Bulit (draw), or Kawat the pile to Buklad it."
         : "Imo turno — Bulit (draw), Kawat the pile to Buklad (meld), or Laban!"
       : mustPlay
         ? `You took ${cardLabel(mustPlay)} — Buklad it (meld or sapaw) before you Labyog.`
@@ -1055,6 +1056,23 @@ function RulesEditor({ onBack }: { onBack: () => void }) {
           value={rules.allowSapawOnOpponents}
           onChange={(v) => update({ allowSapawOnOpponents: v })}
         />
+        <div className="rule-row col">
+          <span>When your meld is sapaw'd, no Laban for…</span>
+          <div className="segmented">
+            <button
+              className={rules.sapawLockAllRound ? "on" : ""}
+              onClick={() => update({ sapawLockAllRound: true })}
+            >
+              Rest of round
+            </button>
+            <button
+              className={!rules.sapawLockAllRound ? "on" : ""}
+              onClick={() => update({ sapawLockAllRound: false })}
+            >
+              Next turn only
+            </button>
+          </div>
+        </div>
         <div className="rule-row col">
           <span>When the stock runs out</span>
           <div className="segmented">

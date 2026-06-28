@@ -152,8 +152,42 @@ describe("fight / laban", () => {
 });
 
 describe("sapaw lock (burned Laban)", () => {
-  it("blocks the owner's Laban the next turn after their meld is sapawed, then clears", () => {
+  it("opponent sapaw is logged and burns the owner's very next turn", () => {
     let s = twoPlayer();
+    s.players[0].melds = [
+      { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
+    ];
+    s.current = 1;
+    s.phase = "action";
+    s.players[1].hand = [card("9", "diamonds"), card("2", "clubs"), card("K", "spades")];
+    s = sapaw(s, 0, 0, card("9", "diamonds")); // Ella sapaws Paul's 9s → 4 of a kind
+    s = discard(s, card("2", "clubs")); // Ella ends turn → Paul
+    expect(s.current).toBe(0);
+    expect(s.labanBlocked).toBe(true); // Paul is burned THIS (next) turn
+    expect(canCallFight(s)).toBe(false);
+  });
+
+  it("burns you when you sapaw your OWN meld (anyone, including you)", () => {
+    let s = twoPlayer();
+    s.current = 0;
+    s.phase = "action";
+    s.players[0].melds = [
+      { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
+    ];
+    s.players[0].hand = [card("9", "diamonds"), card("2", "clubs"), card("K", "spades")];
+    s = sapaw(s, 0, 0, card("9", "diamonds")); // Paul sapaws his own meld
+    expect(s.players[0].meldSapawed).toBe(true);
+    s = discard(s, card("2", "clubs")); // → Ella
+    s = draw(s, "stock");
+    s = discard(s, currentPlayer(s).hand[0]); // → Paul
+    expect(s.current).toBe(0);
+    expect(s.labanBlocked).toBe(true);
+    expect(canCallFight(s)).toBe(false);
+  });
+
+  it("next-turn-only mode: blocks Laban the next turn, then clears a lap later", () => {
+    let s = twoPlayer();
+    s.rules = { ...s.rules, sapawLockAllRound: false };
     s.players[0].melds = [
       { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
     ];
@@ -177,6 +211,26 @@ describe("sapaw lock (burned Laban)", () => {
     s = discard(s, currentPlayer(s).hand[0]); // → player 0 again
     expect(s.labanBlocked).toBe(false);
     expect(canCallFight(s)).toBe(true);
+  });
+
+  it("rest-of-round mode (default): stays burned for the whole round", () => {
+    let s = twoPlayer(); // STANDARD_RULES → sapawLockAllRound true
+    s.players[0].melds = [
+      { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
+    ];
+    s.current = 1;
+    s.phase = "action";
+    s.players[1].hand = [card("9", "diamonds"), card("2", "clubs"), card("K", "spades")];
+    s = sapaw(s, 0, 0, card("9", "diamonds"));
+    s = discard(s, card("2", "clubs")); // → player 0, burned this round
+    expect(canCallFight(s)).toBe(false);
+    // A full lap later — still burned (rest of round).
+    s = draw(s, "stock");
+    s = discard(s, currentPlayer(s).hand[0]); // → player 1
+    s = draw(s, "stock");
+    s = discard(s, currentPlayer(s).hand[0]); // → player 0
+    expect(s.players[0].burned).toBe(true);
+    expect(canCallFight(s)).toBe(false);
   });
 });
 

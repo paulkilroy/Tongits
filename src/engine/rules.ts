@@ -21,6 +21,10 @@ export interface RuleSet {
   /** Allow "sapaw" (laying off) onto *opponents'* melds, not just your own. */
   allowSapawOnOpponents: boolean;
 
+  /** When your meld is sapawed you can't Laban: true = for the rest of the round,
+   *  false = only your very next turn. */
+  sapawLockAllRound: boolean;
+
   /** Going out by emptying your hand ("Tongits") is an instant win worth this bonus. */
   tongitsBonus: number;
 
@@ -46,6 +50,7 @@ export const STANDARD_RULES: RuleSet = {
   enableLaban: true,
   mustHaveMeldToCall: true,
   allowSapawOnOpponents: true,
+  sapawLockAllRound: true,
   tongitsBonus: 0,
   challengeAfterTongits: false,
   stockExhaustion: "lowestHandWins",
