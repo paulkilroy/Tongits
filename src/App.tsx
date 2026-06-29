@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./engine/cards";
-import { classifyMeld, canLayOff, type Meld } from "./engine/melds";
+import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
 import { type RuleSet, type StockExhaustionRule } from "./engine/rules";
@@ -16,7 +16,7 @@ import {
   topDiscard,
   draw,
   layMeld,
-  sapaw,
+  sapawMany,
   discard,
   callFight,
   canCallFight,
@@ -643,19 +643,20 @@ function Table({
   const mustPlay = state.mustPlay;
   const selectedMeld = classifyMeld(selected);
 
-  // The first meld the single selected card can lay onto (own, or an opponent's
-  // if allowed) — so the Buklad button can sapaw, not just lay new melds.
-  function firstSapawTarget(card: Card): { pi: number; mi: number } | null {
+  // The first meld the selected card(s) can ALL lay onto (own, or an opponent's
+  // if allowed) — so Buklad can sapaw one or several cards, not just lay melds.
+  function firstSapawTarget(cards: Card[]): { pi: number; mi: number } | null {
+    if (cards.length === 0) return null;
     for (let pi = 0; pi < state.players.length; pi++) {
       if (pi !== state.current && !state.rules.allowSapawOnOpponents) continue;
       const melds = state.players[pi].melds;
       for (let mi = 0; mi < melds.length; mi++) {
-        if (canLayOff(melds[mi], card)) return { pi, mi };
+        if (canLayOffMany(melds[mi], cards)) return { pi, mi };
       }
     }
     return null;
   }
-  const sapawTarget = inAction && selected.length === 1 ? firstSapawTarget(selected[0]) : null;
+  const sapawTarget = inAction && selected.length >= 1 ? firstSapawTarget(selected) : null;
 
   const canDiscard = inAction && selected.length === 1 && !mustPlay;
   const canBaba = inAction && (selectedMeld !== null || sapawTarget !== null);
@@ -664,7 +665,7 @@ function Table({
 
   function buklad() {
     if (selectedMeld) act(layMeld(state, selected));
-    else if (sapawTarget) act(sapaw(state, sapawTarget.pi, sapawTarget.mi, selected[0]));
+    else if (sapawTarget) act(sapawMany(state, sapawTarget.pi, sapawTarget.mi, selected));
   }
 
   function takeDiscard() {
@@ -679,10 +680,9 @@ function Table({
   }
 
   function onMeldClick(playerIndex: number, meldIndex: number) {
-    if (!inAction || selected.length !== 1) return;
-    const card = selected[0];
+    if (!inAction || selected.length < 1) return;
     const meld = state.players[playerIndex].melds[meldIndex];
-    if (canLayOff(meld, card)) act(sapaw(state, playerIndex, meldIndex, card));
+    if (canLayOffMany(meld, selected)) act(sapawMany(state, playerIndex, meldIndex, selected));
   }
 
   const sapawLocked = state.rules.sapawLockAllRound ? meP.burned : state.labanBlocked;
@@ -775,7 +775,7 @@ function Table({
                 <MeldChip
                   key={mi}
                   meld={m}
-                  active={selected.length === 1 && canLayOff(m, selected[0])}
+                  active={selected.length >= 1 && canLayOffMany(m, selected)}
                   onClick={() => onMeldClick(i, mi)}
                 />
               ))}
@@ -820,7 +820,7 @@ function Table({
               <MeldChip
                 key={mi}
                 meld={m}
-                active={selected.length === 1 && canLayOff(m, selected[0])}
+                active={selected.length >= 1 && canLayOffMany(m, selected)}
                 onClick={() => onMeldClick(me, mi)}
               />
             ))}

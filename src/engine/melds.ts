@@ -71,11 +71,17 @@ export function classifyMeld(cards: readonly Card[]): Meld | null {
  *         end (staying within ace-low … king bounds).
  */
 export function canLayOff(meld: Meld, card: Card): boolean {
-  if (meld.cards.some((c) => cardId(c) === cardId(card))) return false; // already present
-  // A card lays off if the meld plus that card is still a valid meld of the same
-  // kind — which naturally allows a 4th of a set, a run extension at either end,
-  // and an ace at the high end of a king-run.
-  const grown = classifyMeld([...meld.cards, card]);
+  return canLayOffMany(meld, [card]);
+}
+
+/** Whether ALL of `cards` can lay off onto `meld` at once — i.e. the meld plus
+ *  every card is still one valid meld of the same kind (so a 2 AND 3 can extend a
+ *  4-5-6 run together, even though the 2 alone couldn't). */
+export function canLayOffMany(meld: Meld, cards: readonly Card[]): boolean {
+  if (cards.length === 0) return false;
+  const all = [...meld.cards, ...cards];
+  if (new Set(all.map(cardId)).size !== all.length) return false; // a duplicate
+  const grown = classifyMeld(all);
   return grown !== null && grown.kind === meld.kind;
 }
 

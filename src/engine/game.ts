@@ -1,6 +1,6 @@
 import { type Card, cardId, cardLabel, rankOrder } from "./cards";
 import { shuffledDeck } from "./deck";
-import { type Meld, classifyMeld, canLayOff, layOff } from "./melds";
+import { type Meld, classifyMeld, canLayOff, canLayOffMany } from "./melds";
 import { handPoints } from "./scoring";
 import { deadwood } from "./meldFinder";
 import { type RuleSet } from "./rules";
@@ -182,30 +182,39 @@ export function layMeld(state: GameState, cards: Card[]): GameState {
 }
 
 /** Sapaw: lay one card off onto an existing meld (own, or an opponent's if allowed). */
-export function sapaw(
+export function sapaw(state: GameState, targetPlayer: number, meldIndex: number, card: Card): GameState {
+  return sapawMany(state, targetPlayer, meldIndex, [card]);
+}
+
+/** Lay one or more cards off onto an existing meld at once (e.g. a 2 and 3 onto a
+ *  4-5-6 run). All cards must extend the meld together. */
+export function sapawMany(
   state: GameState,
   targetPlayer: number,
   meldIndex: number,
-  card: Card,
+  cards: Card[],
 ): GameState {
-  if (state.result || state.phase !== "action") return state;
+  if (state.result || state.phase !== "action" || cards.length === 0) return state;
   if (targetPlayer !== state.current && !state.rules.allowSapawOnOpponents) return state;
   const target = state.players[targetPlayer]?.melds[meldIndex];
-  if (!target || !canLayOff(target, card)) return state;
+  if (!target || !canLayOffMany(target, cards)) return state;
 
   const s = clone(state);
   const p = currentPlayer(s);
-  if (!remove(p.hand, card)) return state;
-  const grown = layOff(s.players[targetPlayer].melds[meldIndex], card)!;
-  s.players[targetPlayer].melds[meldIndex] = grown;
+  if (!cards.every((c) => p.hand.some((h) => cardId(h) === cardId(c)))) return state;
+  for (const c of cards) remove(p.hand, c);
+  s.players[targetPlayer].melds[meldIndex] = classifyMeld([
+    ...s.players[targetPlayer].melds[meldIndex].cards,
+    ...cards,
+  ])!;
   s.players[targetPlayer].meldSapawed = true; // next-turn lock
   s.players[targetPlayer].burned = true; // rest-of-round lock
-  if (s.mustPlay && cardId(card) === cardId(s.mustPlay)) s.mustPlay = null;
+  if (s.mustPlay && cards.some((c) => cardId(c) === cardId(s.mustPlay!))) s.mustPlay = null;
   const owner = s.players[targetPlayer].name;
   const self = targetPlayer === s.current;
   note(
     s,
-    `${p.name} sapaws ${cardLabel(card)} onto ${self ? "their own" : owner + "'s"} meld — ${self ? p.name : owner} can't Laban (burned).`,
+    `${p.name} sapaws ${cards.map(cardLabel).join(" ")} onto ${self ? "their own" : owner + "'s"} meld — ${self ? p.name : owner} can't Laban (burned).`,
   );
   return checkEmptyHand(s, p);
 }

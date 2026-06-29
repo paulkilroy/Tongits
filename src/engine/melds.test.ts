@@ -6,6 +6,7 @@ import {
   isValidMeld,
   classifyMeld,
   canLayOff,
+  canLayOffMany,
   layOff,
   type Meld,
 } from "./melds";
@@ -119,6 +120,17 @@ describe("sapaw / lay-off", () => {
     expect(canLayOff(lowRun, card("A", "diamonds"))).toBe(true);
     const grown = layOff(lowRun, card("A", "diamonds"));
     expect(labels(grown!.cards)).toEqual(["A♦", "2♦", "3♦", "4♦"]);
+  });
+
+  it("lays MULTIPLE cards onto a run at once (2 and 3 onto 4-5-6)", () => {
+    const run = classifyMeld([card("4", "spades"), card("5", "spades"), card("6", "spades")])!;
+    // 2 alone can't (gap), but 2+3 together extend the run.
+    expect(canLayOff(run, card("2", "spades"))).toBe(false);
+    expect(canLayOffMany(run, [card("2", "spades"), card("3", "spades")])).toBe(true);
+    // 3 and 7 extend both ends at once.
+    expect(canLayOffMany(run, [card("3", "spades"), card("7", "spades")])).toBe(true);
+    // a non-connecting card breaks it.
+    expect(canLayOffMany(run, [card("3", "spades"), card("9", "spades")])).toBe(false);
   });
 
   it("does NOT lay an ace onto the high end of a king-run (ace is low)", () => {

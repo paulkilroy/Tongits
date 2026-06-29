@@ -25,7 +25,9 @@
       "Bash(git commit -q -m 'Fix .card class collision breaking the home panels *)",
       "Bash(git commit -q -m 'Consistent SVG icons, challenge online friends from home, in-app leave modal *)",
       "Bash(git commit -q -m 'Polish round-end reveal: styled primary button + Home/Review links *)",
-      "Bash(git commit -q -m 'Review: judge the hand you KEEP, not the card you just drew *)"
+      "Bash(git commit -q -m 'Review: judge the hand you KEEP, not the card you just drew *)",
+      "Bash(perl -0pi -e 's/selected\\\\.length === 1 && canLayOff\\\\\\(m, selected\\\\[0\\\\]\\\\\\)/selected.length >= 1 \\\\&\\\\& canLayOffMany\\(m, selected\\)/g' src/App.tsx)",
+      "Bash(git commit -q -m 'Sapaw multiple cards at once *)"
     ],
     "defaultMode": "acceptEdits"
   }
