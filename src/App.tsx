@@ -462,11 +462,12 @@ function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[
       }${opp ? " · " + opp : ""}`,
     );
     if (g.reason) out.push(`  → ${g.reason}`);
+    if (g.bestLine) out.push("  best line: " + g.bestLine.join(" › "));
     if (g.discards.length > 1)
       out.push(
         "  discard: " +
           g.discards
-            .map((d) => `${d.label} ${d.pct}%${d.laidMeld ? "+meld" : ""}${d.cardId === g.yourDiscard ? "(you)" : ""}`)
+            .map((d) => `${d.label} ${d.pct}%${d.cardId === g.yourDiscard ? "(you)" : ""}`)
             .join("  ") +
           (g.moreDiscards > 0 ? `  +${g.moreDiscards} weaker` : ""),
       );
@@ -533,6 +534,18 @@ function ReplayBoard({
 
       {g.reason && <div className="rv-reason">{g.reason}</div>}
 
+      {g.bestLine && (
+        <div className="rp-bestline">
+          <span className="rp-bestline-tag">Best line</span>
+          {g.bestLine.map((step, i) => (
+            <span key={i} className="rp-step">
+              {i > 0 && <span className="rp-step-arrow">›</span>}
+              {step}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="rp-section">
         <div className="rp-label">
           Your hand · {meP.hand.length} cards
@@ -578,7 +591,6 @@ function ReplayBoard({
                     />
                   </div>
                   <span className="rp-disc-pct">{d.pct}%</span>
-                  {d.laidMeld && <span className="rp-disc-tag">+meld</span>}
                   {isBest && <span className="rp-disc-tag best">best</span>}
                   {isYou && <span className="rp-disc-tag you">you</span>}
                 </div>

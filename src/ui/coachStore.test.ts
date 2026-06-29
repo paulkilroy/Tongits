@@ -12,6 +12,7 @@ const tg = (grade: TurnGrade["grade"], your: number, best: number): TurnGrade =>
   bestDiscard: null,
   discards: [],
   moreDiscards: 0,
+  bestLine: null,
 });
 
 describe("coach (grade) tally", () => {

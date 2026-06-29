@@ -1,4 +1,4 @@
-import { type Card, cardId, cardLabel } from "./cards";
+import { type Card, cardId, cardLabel, cardPoints } from "./cards";
 import { makeRng } from "./deck";
 import { type GameState, discard, layMeld, sapaw } from "./game";
 import { canLayOff } from "./melds";
@@ -43,6 +43,9 @@ export interface TurnGrade {
   discards: DiscardOption[];
   /** Count of weaker discards omitted from the table (rough estimates only). */
   moreDiscards: number;
+  /** When a different meld/sapaw line wins: the concrete steps, e.g.
+   *  ["Lay 3♠ 3♥ 3♦", "Sapaw 8♥ → Bot 1", "Discard K♣"]. Null if you played best. */
+  bestLine: string[] | null;
 }
 
 /** Cards that are part of a live draw (a pair/run you're building) — don't sapaw these. */
@@ -50,44 +53,6 @@ function liveDrawIds(state: GameState, seat: number): Set<string> {
   const ids = new Set<string>();
   for (const d of handDraws(state, seat)) if (d.outsLive > 0) for (const c of d.held) ids.add(cardId(c));
   return ids;
-}
-
-/** Lay off every loose (non-draw) deadwood card that can go onto a meld. */
-function sapawLoose(state: GameState, seat: number): GameState {
-  let s = state;
-  for (let guard = 0; guard < 20; guard++) {
-    const keep = liveDrawIds(s, seat);
-    const loose = deadwood(s.players[seat].hand).filter((c) => !keep.has(cardId(c)));
-    let moved = false;
-    for (const c of loose) {
-      for (let pi = 0; pi < s.players.length && !moved; pi++) {
-        if (pi !== seat && !s.rules.allowSapawOnOpponents) continue;
-        const melds = s.players[pi].melds;
-        for (let mi = 0; mi < melds.length; mi++) {
-          if (canLayOff(melds[mi], c)) {
-            const nx = sapaw(s, pi, mi, c);
-            if (nx !== s) {
-              s = nx;
-              moved = true;
-              break;
-            }
-          }
-        }
-      }
-      if (moved) break;
-    }
-    if (!moved) break;
-  }
-  return s;
-}
-
-function layAll(state: GameState, seat: number): GameState {
-  let s = state;
-  for (const m of bestMelds(s.players[seat].hand)) {
-    const nx = layMeld(s, [...m.cards]);
-    if (nx !== s) s = nx;
-  }
-  return s;
 }
 
 /** Signature of just the melds on the table (everyone's), for comparing lay decisions. */
@@ -104,46 +69,193 @@ function sig(state: GameState, seat: number): string {
   return `${state.current}#${meldSig(state)}#${hand}#${top}#${state.result?.winner ?? ""}`;
 }
 
+/** A meld/sapaw action, kept so we can spell out the recommended line in words. */
+interface Move {
+  kind: "meld" | "sapaw";
+  cards: Card[];
+  /** For a sapaw onto an OPPONENT, their name; undefined = onto your own meld. */
+  targetName?: string;
+}
+
+/** A meld/sapaw decision (the table state) plus the moves that produced it. */
+interface Config {
+  state: GameState;
+  moves: Move[];
+}
+
 interface Candidate {
   end: GameState;
   discardCard: Card | null;
+  moves: Move[];
 }
 
-/** Plausible end-of-turn plays from the post-draw state (capped for compute). */
-function candidatePlays(postDraw: GameState, seat: number): Candidate[] {
-  const configs: GameState[] = [];
-  const cfgSeen = new Set<string>();
-  const addCfg = (s: GameState) => {
-    const k = sig(s, seat);
-    if (!cfgSeen.has(k)) {
-      cfgSeen.add(k);
-      configs.push(s);
+/** Lay every best-meld; record each lay as a move. */
+function layAllWithMoves(state: GameState, seat: number): Config {
+  let s = state;
+  const moves: Move[] = [];
+  for (const m of bestMelds(s.players[seat].hand)) {
+    const nx = layMeld(s, [...m.cards]);
+    if (nx !== s) {
+      moves.push({ kind: "meld", cards: [...m.cards] });
+      s = nx;
+    }
+  }
+  return { state: s, moves };
+}
+
+/** Lay off every loose (non-draw) deadwood card onto any meld; record each sapaw. */
+function sapawLooseWithMoves(state: GameState, seat: number): Config {
+  let s = state;
+  const moves: Move[] = [];
+  for (let guard = 0; guard < 20; guard++) {
+    const keep = liveDrawIds(s, seat);
+    const loose = deadwood(s.players[seat].hand).filter((c) => !keep.has(cardId(c)));
+    let moved = false;
+    for (const c of loose) {
+      for (let pi = 0; pi < s.players.length && !moved; pi++) {
+        if (pi !== seat && !s.rules.allowSapawOnOpponents) continue;
+        const melds = s.players[pi].melds;
+        for (let mi = 0; mi < melds.length; mi++) {
+          if (canLayOff(melds[mi], c)) {
+            const nx = sapaw(s, pi, mi, c);
+            if (nx !== s) {
+              moves.push({ kind: "sapaw", cards: [c], targetName: pi === seat ? undefined : s.players[pi].name });
+              s = nx;
+              moved = true;
+              break;
+            }
+          }
+        }
+      }
+      if (moved) break;
+    }
+    if (!moved) break;
+  }
+  return { state: s, moves };
+}
+
+/** One config per loose card sapawed ALONE — models "sapaw one at a time". */
+function singleSapaws(state: GameState, seat: number): Config[] {
+  const keep = liveDrawIds(state, seat);
+  const loose = deadwood(state.players[seat].hand)
+    .filter((c) => !keep.has(cardId(c)))
+    .sort((a, b) => cardPoints(b) - cardPoints(a)); // dump the costliest first
+  const configs: Config[] = [];
+  for (const c of loose) {
+    for (let pi = 0; pi < state.players.length; pi++) {
+      if (pi !== seat && !state.rules.allowSapawOnOpponents) continue;
+      const melds = state.players[pi].melds;
+      let placed = false;
+      for (let mi = 0; mi < melds.length && !placed; mi++) {
+        if (canLayOff(melds[mi], c)) {
+          const nx = sapaw(state, pi, mi, c);
+          if (nx !== state) {
+            configs.push({
+              state: nx,
+              moves: [{ kind: "sapaw", cards: [c], targetName: pi === seat ? undefined : state.players[pi].name }],
+            });
+            placed = true;
+          }
+        }
+      }
+      if (placed) break;
+    }
+  }
+  return configs;
+}
+
+/** Distinct meld/sapaw decisions from the post-draw state (deduped by meld layout). */
+function enumerateConfigs(postDraw: GameState, seat: number): Config[] {
+  const configs: Config[] = [];
+  const seen = new Set<string>();
+  const add = (c: Config) => {
+    const k = meldSig(c.state);
+    if (!seen.has(k)) {
+      seen.add(k);
+      configs.push(c);
     }
   };
-  addCfg(postDraw); // hold everything
-  addCfg(sapawLoose(postDraw, seat)); // dump loose deadwood
-  const laid = layAll(postDraw, seat); // expose melds
-  addCfg(laid);
-  addCfg(sapawLoose(laid, seat));
 
+  add({ state: postDraw, moves: [] }); // hold everything
+
+  const lay = layAllWithMoves(postDraw, seat);
+  if (lay.moves.length) add(lay); // lay every meld
+
+  const melds = bestMelds(postDraw.players[seat].hand);
+  if (melds.length > 1) {
+    for (const m of melds) {
+      const nx = layMeld(postDraw, [...m.cards]); // lay just THIS meld
+      if (nx !== postDraw) add({ state: nx, moves: [{ kind: "meld", cards: [...m.cards] }] });
+    }
+  }
+
+  const sHold = sapawLooseWithMoves(postDraw, seat); // sapaw without melding
+  if (sHold.moves.length) add(sHold);
+  if (lay.moves.length) {
+    const sLay = sapawLooseWithMoves(lay.state, seat); // lay then sapaw
+    if (sLay.moves.length) add({ state: sLay.state, moves: [...lay.moves, ...sLay.moves] });
+  }
+
+  for (const c of singleSapaws(postDraw, seat).slice(0, 3)) add(c); // one-at-a-time sapaws
+
+  return configs;
+}
+
+/** The card you'd most plausibly discard from a config (costliest loose card). */
+function naturalDiscard(state: GameState, seat: number): Card | null {
+  const hand = state.players[seat].hand;
+  if (!hand.length) return null;
+  const keep = liveDrawIds(state, seat);
+  const dw = deadwood(hand);
+  const loose = dw.filter((c) => !keep.has(cardId(c)));
+  const pool = loose.length ? loose : dw.length ? dw : hand;
+  return [...pool].sort((a, b) => cardPoints(b) - cardPoints(a))[0] ?? hand[0];
+}
+
+/** Spell out a line as human steps: lays, sapaws, then the discard. */
+function lineText(moves: Move[], discardCard: Card | null): string[] {
+  const out = moves.map((m) =>
+    m.kind === "meld"
+      ? `Lay ${m.cards.map(cardLabel).join(" ")}`
+      : `Sapaw ${m.cards.map(cardLabel).join(" ")}${m.targetName ? ` → ${m.targetName}` : " onto your meld"}`,
+  );
+  out.push(discardCard ? `Discard ${cardLabel(discardCard)}` : "Tongits — meld out!");
+  return out;
+}
+
+/** Plausible end-of-turn plays. Your actual meld decision + holding everything get
+ *  EVERY discard (the per-card table); other meld/sapaw lines get only their natural
+ *  discard (enough to judge whether that line beats yours). */
+function candidatePlays(postDraw: GameState, seat: number, yourMeldSig: string): Candidate[] {
+  const holdSig = meldSig(postDraw);
   const out: Candidate[] = [];
   const endSeen = new Set<string>();
-  const addEnd = (end: GameState, dc: Card | null) => {
+  const addEnd = (end: GameState, dc: Card | null, moves: Move[]) => {
     const k = sig(end, seat);
     if (!endSeen.has(k)) {
       endSeen.add(k);
-      out.push({ end, discardCard: dc });
+      out.push({ end, discardCard: dc, moves });
     }
   };
-  for (const cfg of configs) {
-    if (cfg.result) {
-      addEnd(cfg, null); // melded out (Tongits) — no discard
+
+  for (const cfg of enumerateConfigs(postDraw, seat)) {
+    if (cfg.state.result) {
+      addEnd(cfg.state, null, cfg.moves); // melded out (Tongits) — no discard
       continue;
     }
-    if (cfg.mustPlay) continue; // a taken-discard card still owed — can't end the turn here
-    for (const c of cfg.players[seat].hand) {
-      const end = discard(cfg, c);
-      if (end !== cfg) addEnd(end, c);
+    if (cfg.state.mustPlay) continue; // a taken-discard card still owed — can't end here
+    const ms = meldSig(cfg.state);
+    if (ms === holdSig || ms === yourMeldSig) {
+      for (const c of cfg.state.players[seat].hand) {
+        const end = discard(cfg.state, c);
+        if (end !== cfg.state) addEnd(end, c, cfg.moves);
+      }
+    } else {
+      const c = naturalDiscard(cfg.state, seat);
+      if (c) {
+        const end = discard(cfg.state, c);
+        if (end !== cfg.state) addEnd(end, c, cfg.moves);
+      }
     }
   }
   return out;
@@ -192,18 +304,22 @@ export function analyzeTurns(
   // because the max over many noisy estimates is biased upward and otherwise
   // invents "mistakes" — e.g. telling you to break a live draw on a lucky sample.
   const screen = samples;
-  const confirm = Math.max(samples * 5, 240);
+  const confirm = Math.max(samples * 4, 220);
 
-  const work = roundSegments(history, seat).map((seg) => ({ seg, cands: candidatePlays(seg.first, seat) }));
+  const work = roundSegments(history, seat).map((seg) => ({
+    seg,
+    yourMeldSig: meldSig(seg.after),
+    cands: candidatePlays(seg.first, seat, meldSig(seg.after)),
+  }));
   const total = Math.max(
     1,
-    work.reduce((a, w) => a + w.cands.length + Math.min(TABLE_M + 2, w.cands.length) + 1, 0),
+    work.reduce((a, w) => a + w.cands.length + Math.min(TABLE_M + 5, w.cands.length) + 1, 0),
   );
   let done = 0;
   const tick = () => onProgress?.(++done / total);
   const out: TurnGrade[] = [];
 
-  work.forEach(({ seg, cands }, idx) => {
+  work.forEach(({ seg, cands, yourMeldSig }, idx) => {
     const yourDiscard =
       seg.last.players[seat].hand.find(
         (c) => !seg.after.players[seat].hand.some((h) => cardId(h) === cardId(c)),
@@ -235,25 +351,26 @@ export function analyzeTurns(
     });
     type Item = (typeof screened)[number];
 
-    // Per discard card, the best-screening variant becomes that card's row...
+    // The discard table is about YOUR meld decision: one row per discard you could
+    // have made while keeping the melds you actually laid (so it answers "which card
+    // should I have thrown?" without muddling in a different meld choice).
     const rowFor = new Map<string, Item>();
     for (const s of screened) {
-      if (!s.discardId) continue;
+      if (!s.discardId || meldSig(s.cand.end) !== yourMeldSig) continue;
       const p = rowFor.get(s.discardId);
       if (!p || s.pct > p.pct) rowFor.set(s.discardId, s);
     }
-    // ...except your actual discard card, which is pinned to the line you really
-    // played (so the "you" row reflects YOUR melds, not a hypothetical +meld variant).
     const yourItem = screened.find((s) => s.isYours);
     if (yourItem && yourDiscardId) rowFor.set(yourDiscardId, yourItem);
 
-    // Confirm set: the top-M discard rows + your play + the best meld-out (no-discard)
-    // line, so everything the table shows — and the grade — is high-resolution.
+    // Confirm set: top-M table rows + your play + best meld-out + the top few lines
+    // OVERALL (so a different meld/sapaw decision gets a high-resolution check too).
     const confirmSet = new Set<Item>();
     for (const s of [...rowFor.values()].sort((a, b) => b.pct - a.pct).slice(0, TABLE_M)) confirmSet.add(s);
     if (yourItem) confirmSet.add(yourItem);
     const meldOut = screened.filter((s) => !s.discardId).sort((a, b) => b.pct - a.pct)[0];
     if (meldOut) confirmSet.add(meldOut);
+    for (const s of [...screened].sort((a, b) => b.pct - a.pct).slice(0, 3)) confirmSet.add(s);
 
     // Stage 2 — confirm them at high resolution; grade and table use only these.
     let best: { pct: number; cand: Candidate | null } = { pct: -1, cand: null };
@@ -300,6 +417,15 @@ export function analyzeTurns(
       grade === "best" || !best.cand
         ? ""
         : describe(seg.after, best.cand.end, yourDiscard, best.cand.discardCard, seat);
+
+    // Best line in words — only when the winning play involves a different meld/sapaw
+    // decision than yours (a pure discard swap is already covered by `reason`).
+    const meldDiffers = best.cand != null && meldSig(seg.after) !== meldSig(best.cand.end);
+    const bestLine =
+      grade !== "best" && best.cand && meldDiffers && best.cand.moves.length
+        ? lineText(best.cand.moves, best.cand.discardCard)
+        : null;
+
     out.push({
       turn: idx + 1,
       yourPct,
@@ -310,6 +436,7 @@ export function analyzeTurns(
       bestDiscard: differs && best.cand!.discardCard ? cardId(best.cand!.discardCard) : null,
       discards,
       moreDiscards,
+      bestLine,
     });
   });
 

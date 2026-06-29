@@ -1328,6 +1328,37 @@ h1 {
   opacity: 0.5;
   margin-top: 0.3rem;
 }
+.rp-bestline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(54, 196, 106, 0.14);
+  border: 1px solid rgba(54, 196, 106, 0.4);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.86rem;
+}
+.rp-bestline-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0b1f12;
+  background: #36c46a;
+  border-radius: 5px;
+  padding: 0.08rem 0.35rem;
+}
+.rp-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+.rp-step-arrow {
+  opacity: 0.5;
+}
 .rp-opp {
   margin-top: 0.4rem;
 }
