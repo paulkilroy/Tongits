@@ -1557,7 +1557,7 @@ function Lobby({
         <span className="wallet-chip">{account ? `₱${account.balance.toLocaleString()}` : "₱ ⋯"}</span>
       </header>
 
-      <section className="card identity">
+      <section className="panel identity">
         <button
           className="avatar-big"
           onClick={() => setShowAvatars((v) => !v)}
@@ -1576,7 +1576,7 @@ function Lobby({
       </section>
 
       {showAvatars && (
-        <div className="card avatar-grid">
+        <div className="panel avatar-grid">
           {AVATARS.map((a) => (
             <button
               key={a}
@@ -1593,7 +1593,7 @@ function Lobby({
         </div>
       )}
 
-      <section className="card play">
+      <section className="panel play">
         <button className="big play-primary" onClick={() => onStart({ kind: "local" })}>
           ▶ Practice vs AI
         </button>

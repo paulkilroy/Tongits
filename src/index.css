@@ -87,7 +87,7 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.card {
+.panel {
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;

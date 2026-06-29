@@ -20,7 +20,9 @@
       "Skill(fewer-permission-prompts)",
       "Skill(fewer-permission-prompts:*)",
       "Bash(npm test *)",
-      "Bash(git commit -q -m 'Redesign home page + consistent sub-screens + wallet placeholder *)"
+      "Bash(git commit -q -m 'Redesign home page + consistent sub-screens + wallet placeholder *)",
+      "Bash(perl -0pi -e 's/className=\"card identity\"/className=\"panel identity\"/; s/className=\"card play\"/className=\"panel play\"/; s/className=\"card avatar-grid\"/className=\"panel avatar-grid\"/' src/App.tsx)",
+      "Bash(git commit -q -m 'Fix .card class collision breaking the home panels *)"
     ],
     "defaultMode": "acceptEdits"
   }
