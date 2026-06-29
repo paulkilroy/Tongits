@@ -1165,9 +1165,98 @@ h1 {
 .wg-dot.grade-mistake {
   fill: #ff5a5a;
 }
+.wg-dot.clickable {
+  cursor: pointer;
+}
+.wg-dot.active {
+  stroke: #fff;
+  stroke-width: 2;
+}
+.wg-cursor {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1;
+}
 .wg-progress {
   margin-bottom: 0.9rem;
   font-size: 0.85rem;
+}
+
+/* Replay board */
+.replay {
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.8rem;
+  text-align: left;
+}
+.rp-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.rp-nav-mid {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+.rp-turn {
+  opacity: 0.85;
+}
+.rp-arrow {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.rp-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.rp-section {
+  margin-top: 0.55rem;
+}
+.rp-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  margin-bottom: 0.3rem;
+}
+.rp-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.rp-hand .mc.loose {
+  opacity: 0.5;
+}
+.rp-melds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.rp-empty {
+  font-size: 0.82rem;
+  opacity: 0.5;
+}
+.rp-opp {
+  margin-top: 0.4rem;
+}
+.rp-opp-head {
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.9;
 }
 .wg-bar {
   margin-top: 0.4rem;

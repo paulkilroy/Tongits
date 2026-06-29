@@ -30,7 +30,7 @@ import { useFriends } from "./ui/useFriends";
 import { addBalance, type Account } from "./online/auth";
 import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
 import { settlementDelta } from "./engine/wallet";
-import { reviewRound } from "./engine/review";
+import { reviewRound, roundSegments } from "./engine/review";
 import { type TurnGrade, type Grade } from "./engine/analysis";
 import {
   recordAnalysis,
@@ -406,7 +406,15 @@ const GRADE_LABEL: Record<Grade, string> = {
   mistake: "Mistake",
 };
 
-function WinGraph({ grades }: { grades: TurnGrade[] }) {
+function WinGraph({
+  grades,
+  current,
+  onSelect,
+}: {
+  grades: TurnGrade[];
+  current?: number;
+  onSelect?: (i: number) => void;
+}) {
   const W = 520;
   const H = 130;
   const pad = 8;
@@ -423,8 +431,16 @@ function WinGraph({ grades }: { grades: TurnGrade[] }) {
       <line className="wg-mid" x1={pad} x2={W - pad} y1={y(50)} y2={y(50)} />
       <path className="wg-area" d={area} />
       <polyline className="wg-line" points={line} />
+      {current != null && <line className="wg-cursor" x1={x(current)} x2={x(current)} y1={pad} y2={H - pad} />}
       {grades.map((g, i) => (
-        <circle key={i} cx={x(i)} cy={y(g.yourPct)} r={3.6} className={`wg-dot grade-${g.grade}`} />
+        <circle
+          key={i}
+          cx={x(i)}
+          cy={y(g.yourPct)}
+          r={current === i ? 5.5 : 3.6}
+          className={`wg-dot grade-${g.grade} ${current === i ? "active" : ""} ${onSelect ? "clickable" : ""}`}
+          onClick={onSelect ? () => onSelect(i) : undefined}
+        />
       ))}
     </svg>
   );
@@ -452,12 +468,140 @@ function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[
   return out.join("\n");
 }
 
+// Step through your turns: your full hand + melds and each opponent's melds, with
+// the engine's grade/reason for the play you actually made on that turn.
+function ReplayBoard({
+  history,
+  me,
+  grades,
+  result,
+  step,
+  setStep,
+}: {
+  history: GameState[];
+  me: number;
+  grades: TurnGrade[];
+  result: ReturnType<typeof reviewRound>;
+  step: number;
+  setStep: (i: number) => void;
+}) {
+  const segments = useMemo(() => roundSegments(history, me), [history, me]);
+  const n = Math.min(segments.length, grades.length);
+  const i = Math.max(0, Math.min(n - 1, step));
+  const seg = segments[i];
+  const g = grades[i];
+  const t = result.turns.find((x) => x.turn === g.turn);
+  const meP = seg.first.players[me];
+  const handIds = meldCardIds(meP.hand);
+  const hand = [...meP.hand].sort(
+    (a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
+  );
+  const opponents = seg.first.players.map((p, pi) => ({ p, pi })).filter((x) => x.pi !== me);
+
+  return (
+    <div className="replay">
+      <div className="rp-nav">
+        <button className="rp-arrow" onClick={() => setStep(i - 1)} disabled={i === 0} aria-label="Previous play">
+          ‹
+        </button>
+        <div className="rp-nav-mid">
+          <span className={`rv-grade grade-${g.grade}`}>{GRADE_LABEL[g.grade]}</span>
+          <span className="rp-turn">
+            Turn {g.turn} / {n}
+          </span>
+          <strong>{g.yourPct}%</strong>
+          {g.bestPct > g.yourPct && <span className="rv-best"> best {g.bestPct}%</span>}
+        </div>
+        <button
+          className="rp-arrow"
+          onClick={() => setStep(i + 1)}
+          disabled={i === n - 1}
+          aria-label="Next play"
+        >
+          ›
+        </button>
+      </div>
+
+      {g.reason && <div className="rv-reason">{g.reason}</div>}
+
+      <div className="rp-section">
+        <div className="rp-label">Your hand · {meP.hand.length} cards</div>
+        <div className="rp-hand">
+          {hand.map((c) => (
+            <span
+              key={cardId(c)}
+              className={`mc ${SUIT_CLASS[c.suit]} ${handIds.has(cardId(c)) ? "" : "loose"}`}
+            >
+              {cardLabel(c)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="rp-section">
+        <div className="rp-label">Your melds</div>
+        {meP.melds.length ? (
+          <div className="rp-melds">
+            {meP.melds.map((m, mi) => (
+              <MeldChip key={mi} meld={m} />
+            ))}
+          </div>
+        ) : (
+          <div className="rp-empty">— none down yet —</div>
+        )}
+      </div>
+
+      {t && t.draws.length > 0 && (
+        <div className="rp-section">
+          <div className="rp-label">Draws you're building</div>
+          <div className="rv-draws">
+            {t.draws.map((d, di) => (
+              <div className="rv-draw" key={di}>
+                <span className="rv-cards">
+                  {d.held.map((c) => (
+                    <span key={cardId(c)} className={`mc ${SUIT_CLASS[c.suit]}`}>
+                      {cardLabel(c)}
+                    </span>
+                  ))}
+                </span>
+                <span className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}>
+                  {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rp-section">
+        <div className="rp-label">Opponents</div>
+        {opponents.map(({ p }) => (
+          <div key={p.name} className="rp-opp">
+            <div className="rp-opp-head">
+              {p.name} · {p.hand.length} cards
+            </div>
+            {p.melds.length ? (
+              <div className="rp-melds">
+                {p.melds.map((m, mi) => (
+                  <MeldChip key={mi} meld={m} />
+                ))}
+              </div>
+            ) : (
+              <div className="rp-empty">— no melds —</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
   const result = useMemo(() => reviewRound(history, me), [history, me]);
   const { progress, grades } = useAnalysis(history, me);
   const [copied, setCopied] = useState(false);
+  const [step, setStep] = useState(0);
   const recorded = useRef(false);
-  const byTurn = useMemo(() => new Map(result.turns.map((t) => [t.turn, t])), [result]);
 
   // Once the engine finishes, fold these grades into the cross-game coach (once).
   useEffect(() => {
@@ -484,7 +628,7 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
                 Win odds · {grades[0].yourPct}% → <strong>{grades[grades.length - 1].yourPct}%</strong>
                 <span className="wg-legend"> · dot colour = play grade</span>
               </div>
-              <WinGraph grades={grades} />
+              <WinGraph grades={grades} current={Math.min(step, grades.length - 1)} onSelect={setStep} />
             </>
           )
         ) : (
@@ -501,47 +645,9 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
             <div key={i}>{s}</div>
           ))}
         </div>
-        <div className="review-turns">
-          {(grades ?? []).map((g) => {
-            const t = byTurn.get(g.turn);
-            return (
-              <div className="rv-turn" key={g.turn}>
-                <div className="rv-head">
-                  <span className={`rv-grade grade-${g.grade}`}>{GRADE_LABEL[g.grade]}</span>
-                  Turn {g.turn} · <strong>{g.yourPct}%</strong>
-                  {g.bestPct > g.yourPct && <span className="rv-best"> (best {g.bestPct}%)</span>}
-                  {t?.opponents.map((o) => (
-                    <span key={o.name} className="rv-opp">
-                      {" · "}
-                      {o.name} {o.cards}c{o.melds > 0 ? `, ${o.melds} meld${o.melds > 1 ? "s" : ""}` : ""}
-                    </span>
-                  ))}
-                </div>
-                {g.reason && <div className="rv-reason">{g.reason}</div>}
-                {t && t.draws.length > 0 && (
-                  <div className="rv-draws">
-                    {t.draws.map((d, i) => (
-                      <div className="rv-draw" key={i}>
-                        <span className="rv-cards">
-                          {d.held.map((c) => (
-                            <span key={cardId(c)} className={`mc ${SUIT_CLASS[c.suit]}`}>
-                              {cardLabel(c)}
-                            </span>
-                          ))}
-                        </span>
-                        <span
-                          className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}
-                        >
-                          {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {grades && grades.length > 0 && (
+          <ReplayBoard history={history} me={me} grades={grades} result={result} step={step} setStep={setStep} />
+        )}
         <div className="review-actions">
           <button onClick={copy}>{copied ? "Copied!" : "Copy"}</button>
           <button className="reveal-replay" onClick={onClose}>
