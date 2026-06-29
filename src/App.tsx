@@ -462,6 +462,13 @@ function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[
       }${opp ? " · " + opp : ""}`,
     );
     if (g.reason) out.push(`  → ${g.reason}`);
+    if (g.discards.length > 1)
+      out.push(
+        "  discard: " +
+          g.discards
+            .map((d) => `${d.label} ${d.pct}%${d.cardId === g.yourDiscard ? "(you)" : ""}`)
+            .join("  "),
+      );
     if (t) for (const d of t.draws) out.push(`  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`);
     out.push("");
   }
@@ -496,6 +503,7 @@ function ReplayBoard({
   const hand = [...meP.hand].sort(
     (a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
   );
+  const handById = new Map(meP.hand.map((c) => [cardId(c), c] as const));
   const opponents = seg.first.players.map((p, pi) => ({ p, pi })).filter((x) => x.pi !== me);
 
   return (
@@ -548,6 +556,38 @@ function ReplayBoard({
           })}
         </div>
       </div>
+
+      {g.discards.length > 1 && (
+        <div className="rp-section">
+          <div className="rp-label">If you discard… · projected win %</div>
+          <div className="rp-discards">
+            {g.discards.map((d) => {
+              const c = handById.get(d.cardId);
+              const isYou = d.cardId === g.yourDiscard;
+              const isBest = d.cardId === g.discards[0].cardId;
+              return (
+                <div className={`rp-disc ${isYou ? "you" : ""}`} key={d.cardId}>
+                  {c && (
+                    <span className={`mc ${SUIT_CLASS[c.suit]}`}>{cardLabel(c)}</span>
+                  )}
+                  <div className="rp-disc-bar">
+                    <div
+                      className={`rp-disc-fill ${isBest ? "best" : ""}`}
+                      style={{ width: `${Math.max(2, d.pct)}%` }}
+                    />
+                  </div>
+                  <span className="rp-disc-pct">
+                    {d.pct}%{!d.confirmed && <span className="rp-approx" title="rough estimate">~</span>}
+                  </span>
+                  {d.laidMeld && <span className="rp-disc-tag">+meld</span>}
+                  {isBest && <span className="rp-disc-tag best">best</span>}
+                  {isYou && <span className="rp-disc-tag you">you</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="rp-section">
         <div className="rp-label">Your melds</div>
