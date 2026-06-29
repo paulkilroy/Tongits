@@ -29,6 +29,16 @@ describe("game review", () => {
     expect(r.summary.some((x) => /dead draw/i.test(x))).toBe(true);
   });
 
+  it("does NOT flag a sapaw for a card that's part of a live draw (your 8-pair)", () => {
+    const s = turnState([card("8", "hearts"), card("8", "diamonds"), card("K", "clubs")]);
+    s.players[1].melds = [
+      { kind: "run", cards: [card("5", "hearts"), card("6", "hearts"), card("7", "hearts")] },
+    ];
+    // 8♥ could lay onto 5-6-7♥, but it's half of your 8-pair set draw — not a miss.
+    const r = reviewRound([s], 0);
+    expect(r.turns[0].notes.some((n) => /missed sapaw/i.test(n.text))).toBe(false);
+  });
+
   it("flags a missed sapaw when a held card could lay onto a meld", () => {
     const s = turnState([card("2", "spades"), card("K", "hearts")]);
     s.players[1].melds = [

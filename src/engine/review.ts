@@ -94,10 +94,13 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
     );
     const highLoose = dw.filter((c) => cardPoints(c) >= 10 && !liveDrawCards.has(cardId(c)));
 
-    // Missed sapaw: a card you discarded (end-of-turn deadwood) that could have
-    // laid onto a meld instead — so this one uses the pre-discard hand.
+    // Missed sapaw: a loose card that could have laid onto a meld instead. Skip
+    // cards that are part of a live draw (e.g. one of a pair you're building) —
+    // laying those off would break your own draw, so it isn't a clear miss.
     const endHand = seg.last.players[seat].hand;
-    const missed = deadwood(endHand).filter((c) => sapawAvailable(seg.last, seat, c));
+    const missed = deadwood(endHand).filter(
+      (c) => !liveDrawCards.has(cardId(c)) && sapawAvailable(seg.last, seat, c),
+    );
 
     const notes: TurnReview["notes"] = [];
     if (dead.length) {

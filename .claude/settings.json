@@ -31,7 +31,8 @@
       "Bash(git commit -q -m 'Favicon: two-card outline matching the home-page icon *)",
       "Bash(git commit -q -m 'Fix scoring: optimal meld finder \\(min deadwood\\), not greedy *)",
       "Bash(git commit -q -m 'Review: don'\\\\''t call same-out draws '\\\\''competing'\\\\'' *)",
-      "Bash(git commit -q -m 'Review: drop the '\\\\''competing draws'\\\\'' note *)"
+      "Bash(git commit -q -m 'Review: drop the '\\\\''competing draws'\\\\'' note *)",
+      "Bash(git commit -q -m 'Review: don'\\\\''t flag '\\\\''missed sapaw'\\\\'' for a card in a live draw *)"
     ],
     "defaultMode": "acceptEdits"
   }
