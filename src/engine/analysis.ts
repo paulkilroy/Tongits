@@ -39,8 +39,10 @@ export interface TurnGrade {
   yourDiscard: string | null;
   /** Card id the best line discarded, when it differs from yours. */
   bestDiscard: string | null;
-  /** Win % projection for each discard you could have made, best→worst. */
+  /** Win % projection for each discard you could have made, best→worst (confirmed only). */
   discards: DiscardOption[];
+  /** Count of weaker discards omitted from the table (rough estimates only). */
+  moreDiscards: number;
 }
 
 /** Cards that are part of a live draw (a pair/run you're building) — don't sapaw these. */
@@ -176,8 +178,8 @@ function describe(
   return "A slightly stronger line was available.";
 }
 
-/** How many top-screened candidates to re-simulate at high resolution. */
-const REFINE_K = 3;
+/** How many distinct discards (top by screen) to confirm at high resolution and show. */
+const TABLE_M = 4;
 
 export function analyzeTurns(
   history: readonly GameState[],
@@ -190,10 +192,13 @@ export function analyzeTurns(
   // because the max over many noisy estimates is biased upward and otherwise
   // invents "mistakes" — e.g. telling you to break a live draw on a lucky sample.
   const screen = samples;
-  const confirm = Math.max(samples * 6, 300);
+  const confirm = Math.max(samples * 5, 240);
 
   const work = roundSegments(history, seat).map((seg) => ({ seg, cands: candidatePlays(seg.first, seat) }));
-  const total = Math.max(1, work.reduce((a, w) => a + w.cands.length + Math.min(REFINE_K + 1, w.cands.length) + 1, 0));
+  const total = Math.max(
+    1,
+    work.reduce((a, w) => a + w.cands.length + Math.min(TABLE_M + 2, w.cands.length) + 1, 0),
+  );
   let done = 0;
   const tick = () => onProgress?.(++done / total);
   const out: TurnGrade[] = [];
@@ -212,6 +217,7 @@ export function analyzeTurns(
     const seedConfirm = ((idx + 1) * 0x85ebca77) >>> 0;
 
     const baseMelds = meldSig(seg.first);
+    const yourDiscardId = yourDiscard ? cardId(yourDiscard) : null;
 
     // Stage 1 — screen all candidates cheaply.
     const screened = cands.map((cand) => {
@@ -221,53 +227,66 @@ export function analyzeTurns(
         cand,
         pct,
         confirmed: false,
+        discardId: cand.discardCard ? cardId(cand.discardCard) : null,
+        label: cand.discardCard ? cardLabel(cand.discardCard) : null,
         isYours: sig(cand.end, seat) === actualSig,
         laidMeld: meldSig(cand.end) !== baseMelds,
       };
     });
+    type Item = (typeof screened)[number];
 
-    // Refine set: the top-K plus your actual play (so your number is trustworthy).
-    const ranked = [...screened].sort((a, b) => b.pct - a.pct);
-    const refine = new Set<(typeof screened)[number]>();
-    for (const s of ranked.slice(0, REFINE_K)) refine.add(s);
-    const yours = screened.find((s) => s.isYours);
-    if (yours) refine.add(yours);
+    // Per discard card, the best-screening variant becomes that card's row...
+    const rowFor = new Map<string, Item>();
+    for (const s of screened) {
+      if (!s.discardId) continue;
+      const p = rowFor.get(s.discardId);
+      if (!p || s.pct > p.pct) rowFor.set(s.discardId, s);
+    }
+    // ...except your actual discard card, which is pinned to the line you really
+    // played (so the "you" row reflects YOUR melds, not a hypothetical +meld variant).
+    const yourItem = screened.find((s) => s.isYours);
+    if (yourItem && yourDiscardId) rowFor.set(yourDiscardId, yourItem);
 
-    // Stage 2 — confirm those few at high resolution; grade off these numbers.
+    // Confirm set: the top-M discard rows + your play + the best meld-out (no-discard)
+    // line, so everything the table shows — and the grade — is high-resolution.
+    const confirmSet = new Set<Item>();
+    for (const s of [...rowFor.values()].sort((a, b) => b.pct - a.pct).slice(0, TABLE_M)) confirmSet.add(s);
+    if (yourItem) confirmSet.add(yourItem);
+    const meldOut = screened.filter((s) => !s.discardId).sort((a, b) => b.pct - a.pct)[0];
+    if (meldOut) confirmSet.add(meldOut);
+
+    // Stage 2 — confirm them at high resolution; grade and table use only these.
     let best: { pct: number; cand: Candidate | null } = { pct: -1, cand: null };
-    let yourFrac = -1;
-    for (const s of refine) {
+    for (const s of confirmSet) {
       s.pct = estimateWinOdds(s.cand.end, seat, confirm, makeRng(seedConfirm));
       s.confirmed = true;
-      if (s.isYours) yourFrac = s.pct;
       if (s.pct > best.pct) best = { pct: s.pct, cand: s.cand };
       tick();
     }
-    if (yourFrac < 0) yourFrac = estimateWinOdds(seg.after, seat, confirm, makeRng(seedConfirm));
-    tick();
+    let yourFrac: number;
+    if (yourItem) {
+      yourFrac = yourItem.pct;
+    } else {
+      yourFrac = estimateWinOdds(seg.after, seat, confirm, makeRng(seedConfirm));
+      tick();
+    }
 
     const yourPct = Math.round(yourFrac * 100);
     const bestPct = best.cand ? Math.max(Math.round(best.pct * 100), yourPct) : yourPct;
 
-    // Per-discard table: collapse to one row per discarded card (best variant),
-    // confirmed numbers for contenders, screen estimates for the rest.
-    const byDiscard = new Map<string, DiscardOption>();
-    for (const s of screened) {
-      if (!s.cand.discardCard) continue;
-      const id = cardId(s.cand.discardCard);
-      const pct = Math.round(s.pct * 100);
-      const prev = byDiscard.get(id);
-      if (!prev || pct > prev.pct || (s.confirmed && !prev.confirmed)) {
-        byDiscard.set(id, {
-          cardId: id,
-          label: cardLabel(s.cand.discardCard),
-          pct,
-          confirmed: s.confirmed,
-          laidMeld: s.laidMeld,
-        });
-      }
-    }
-    const discards = [...byDiscard.values()].sort((a, b) => b.pct - a.pct);
+    // Per-discard table: only confirmed rows (the noisy screen tail is dropped, with
+    // a count, so an unconfirmed estimate can never out-rank your confirmed play).
+    const confirmedRows = [...rowFor.values()].filter((s) => s.confirmed);
+    const discards: DiscardOption[] = confirmedRows
+      .map((s) => ({
+        cardId: s.discardId!,
+        label: s.label!,
+        pct: Math.round(s.pct * 100),
+        confirmed: true,
+        laidMeld: s.laidMeld,
+      }))
+      .sort((a, b) => b.pct - a.pct);
+    const moreDiscards = rowFor.size - confirmedRows.length;
     const gap = bestPct - yourPct;
     const grade = gradeOf(gap);
     const differs =
@@ -290,6 +309,7 @@ export function analyzeTurns(
       yourDiscard: yourDiscard ? cardId(yourDiscard) : null,
       bestDiscard: differs && best.cand!.discardCard ? cardId(best.cand!.discardCard) : null,
       discards,
+      moreDiscards,
     });
   });
 

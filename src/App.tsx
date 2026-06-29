@@ -466,8 +466,9 @@ function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[
       out.push(
         "  discard: " +
           g.discards
-            .map((d) => `${d.label} ${d.pct}%${d.cardId === g.yourDiscard ? "(you)" : ""}`)
-            .join("  "),
+            .map((d) => `${d.label} ${d.pct}%${d.laidMeld ? "+meld" : ""}${d.cardId === g.yourDiscard ? "(you)" : ""}`)
+            .join("  ") +
+          (g.moreDiscards > 0 ? `  +${g.moreDiscards} weaker` : ""),
       );
     if (t) for (const d of t.draws) out.push(`  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`);
     out.push("");
@@ -576,9 +577,7 @@ function ReplayBoard({
                       style={{ width: `${Math.max(2, d.pct)}%` }}
                     />
                   </div>
-                  <span className="rp-disc-pct">
-                    {d.pct}%{!d.confirmed && <span className="rp-approx" title="rough estimate">~</span>}
-                  </span>
+                  <span className="rp-disc-pct">{d.pct}%</span>
                   {d.laidMeld && <span className="rp-disc-tag">+meld</span>}
                   {isBest && <span className="rp-disc-tag best">best</span>}
                   {isYou && <span className="rp-disc-tag you">you</span>}
@@ -586,6 +585,9 @@ function ReplayBoard({
               );
             })}
           </div>
+          {g.moreDiscards > 0 && (
+            <div className="rp-disc-more">+{g.moreDiscards} weaker discard{g.moreDiscards > 1 ? "s" : ""}</div>
+          )}
         </div>
       )}
 

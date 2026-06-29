@@ -1323,6 +1323,11 @@ h1 {
   color: #0b1f12;
   opacity: 1;
 }
+.rp-disc-more {
+  font-size: 0.72rem;
+  opacity: 0.5;
+  margin-top: 0.3rem;
+}
 .rp-opp {
   margin-top: 0.4rem;
 }
