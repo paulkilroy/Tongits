@@ -3,7 +3,7 @@ import { type GameState } from "./game";
 import { canLayOff } from "./melds";
 import { deadwood } from "./meldFinder";
 import { handPoints } from "./scoring";
-import { handDraws, isDeadDraw, conflictingCards, type DrawOdds } from "./odds";
+import { handDraws, isDeadDraw, type DrawOdds } from "./odds";
 
 // Turns a recorded round (a list of per-ply game states) into a per-turn review
 // for one seat: the odds of each draw they held, plus rule-based lessons drawn
@@ -86,7 +86,6 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
     const hand = seg.after.players[seat].hand;
     const draws = handDraws(seg.after, seat);
     const dead = draws.filter(isDeadDraw);
-    const conflicts = conflictingCards(draws);
     const dw = deadwood(hand);
 
     // High-value loose cards not contributing to any live draw.
@@ -117,13 +116,6 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
           text: `Long shot: ${labels(d.held)} is ${d.kind === "run-gutshot" ? "an inside" : d.kind === "run-open" ? "an outside" : "a set"} draw with ${d.outsLive} live out${d.outsLive === 1 ? "" : "s"} (~${pct(d.probability)}%).`,
         });
       }
-    }
-    if (conflicts.size) {
-      notes.push({
-        level: "tip",
-        tag: "competing",
-        text: `Competing draws share ${[...conflicts].map((id) => cardLabel(hand.find((c) => cardId(c) === id)!)).join(", ")} — they can't both pay off; commit to the better one.`,
-      });
     }
     if (highLoose.length) {
       notes.push({
