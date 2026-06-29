@@ -1086,9 +1086,21 @@ h1 {
 }
 .reveal-replay {
   width: 100%;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #062b18;
+  background: #ffd65a;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
 }
-.review-link {
-  margin-top: 0.8rem;
+.reveal-links {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 0.85rem;
 }
 
 /* Game review */

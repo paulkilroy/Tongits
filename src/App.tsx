@@ -223,6 +223,7 @@ function RoundReveal({
   onNext,
   onNewMatch,
   onReview,
+  onExit,
 }: {
   state: GameState;
   me: number;
@@ -234,6 +235,7 @@ function RoundReveal({
   onNext: () => void;
   onNewMatch: () => void;
   onReview: () => void;
+  onExit: () => void;
 }) {
   const r = state.result!;
   const pts = r.handPoints;
@@ -330,30 +332,30 @@ function RoundReveal({
           <span className="sb-label">to {target}</span>
         </div>
 
-        {matchOver ? (
-          <>
-            <div className="reveal-match">
-              {champion === me ? "You win the match! 🏆" : `${name(champion)} wins the match.`}
-            </div>
-            {canControlMatch ? (
-              <button className="reveal-replay" onClick={onNewMatch}>
-                New match
-              </button>
-            ) : (
-              <div className="reveal-wait">Waiting for host to start a new match…</div>
-            )}
-          </>
-        ) : canControlMatch ? (
-          <button className="reveal-replay" onClick={onNext}>
-            Next game
-          </button>
-        ) : (
-          <div className="reveal-wait">Waiting for host to deal the next game…</div>
+        {matchOver && (
+          <div className="reveal-match">
+            {champion === me ? "You win the match! 🏆" : `${name(champion)} wins the match.`}
+          </div>
         )}
 
-        <button className="link-btn review-link" onClick={onReview}>
-          📊 Game Review
-        </button>
+        {canControlMatch ? (
+          <button className="reveal-replay" onClick={matchOver ? onNewMatch : onNext}>
+            {matchOver ? "New match" : "Next game"}
+          </button>
+        ) : (
+          <div className="reveal-wait">
+            Waiting for host to {matchOver ? "start a new match" : "deal the next game"}…
+          </div>
+        )}
+
+        <div className="reveal-links">
+          <button className="link-btn" onClick={onReview}>
+            Game Review
+          </button>
+          <button className="link-btn" onClick={onExit}>
+            Home
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -551,6 +553,7 @@ function Table({
   onAction,
   onNext,
   onNewMatch,
+  onExit,
   canControlMatch,
   headerExtra,
   statusNote,
@@ -566,6 +569,7 @@ function Table({
   onAction: (next: GameState) => void;
   onNext: () => void;
   onNewMatch: () => void;
+  onExit: () => void;
   canControlMatch: boolean;
   headerExtra?: ReactNode;
   statusNote?: string;
@@ -896,6 +900,7 @@ function Table({
           onNext={onNext}
           onNewMatch={onNewMatch}
           onReview={() => setReviewing(true)}
+          onExit={onExit}
         />
       )}
 
@@ -926,6 +931,7 @@ function LocalGame({ onExit }: { onExit: () => void }) {
       onAction={setState}
       onNext={nextGame}
       onNewMatch={() => newMatch((state.players.length - 1) as 1 | 2)}
+      onExit={onExit}
       canControlMatch
       headerExtra={
         <>
@@ -1098,6 +1104,7 @@ function OnlineGame({
       onAction={(next) => dispatch(next)}
       onNext={nextGame}
       onNewMatch={newMatch}
+      onExit={onExit}
       canControlMatch={isHost}
       statusNote={waiting}
       balance={account?.balance}
