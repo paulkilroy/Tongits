@@ -708,7 +708,9 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
           <ReplayBoard history={history} me={me} grades={grades} result={result} step={step} setStep={setStep} />
         )}
         <div className="review-actions">
-          <button onClick={copy}>{copied ? "Copied!" : "Copy"}</button>
+          <button className="reveal-secondary" onClick={copy}>
+            {copied ? "Copied!" : "Copy"}
+          </button>
           <button className="reveal-replay" onClick={onClose}>
             Close
           </button>

@@ -1096,6 +1096,19 @@ h1 {
   padding: 0.75rem 1rem;
   cursor: pointer;
 }
+/* Same shape as .reveal-replay, but a subdued secondary fill. */
+.reveal-secondary {
+  width: 100%;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
 .reveal-links {
   display: flex;
   justify-content: center;
