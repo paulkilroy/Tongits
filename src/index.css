@@ -58,6 +58,215 @@ h1 {
   cursor: default;
 }
 
+/* ============================ Home & screens ============================ */
+.app.home,
+.app.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding-top: 1rem;
+}
+
+.home-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.home-top h1 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+.wallet-chip {
+  min-width: 5.2rem; /* reserves space so the late-loading balance doesn't shift the page */
+  text-align: center;
+  font-weight: 800;
+  color: #36c46a;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.9rem;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.avatar-big {
+  flex: 0 0 auto;
+  width: 3.2rem;
+  height: 3.2rem;
+  font-size: 1.8rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.name-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 1.05rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.play {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.play-primary {
+  width: 100%;
+  font-size: 1.05rem;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  opacity: 0.55;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.play-online,
+.join-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.play-online button {
+  flex: 1;
+}
+.join-row input {
+  flex: 1;
+}
+.play button:not(.play-primary),
+.join-row button {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  cursor: pointer;
+}
+.play button:disabled,
+.join-row button:disabled {
+  opacity: 0.4;
+}
+.play input,
+.join-row input {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  min-width: 0;
+}
+
+.tiles {
+  display: flex;
+  gap: 0.6rem;
+}
+.tile {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 0.9rem 0.5rem;
+  cursor: pointer;
+}
+.tile-icon {
+  font-size: 1.5rem;
+}
+.tile-badge {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  background: #36c46a;
+  color: #06240f;
+  font-size: 0.7rem;
+  font-weight: 800;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.25rem;
+}
+
+/* Sub-screen shell (Rules / Coach / Friends) */
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.screen-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.back-btn {
+  flex: 0 0 auto;
+  width: 2.2rem;
+  height: 2.2rem;
+  font: inherit;
+  font-size: 1.3rem;
+  line-height: 1;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
+.screen-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.screen-body .lobby-section,
+.screen-body .lobby-section.narrow,
+.screen-body .rules-list {
+  width: 100%;
+  max-width: none;
+}
+.screen-body .lobby-section {
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+}
+
 /* Lobby */
 .center-screen {
   display: flex;

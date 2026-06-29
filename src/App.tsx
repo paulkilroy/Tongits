@@ -1055,6 +1055,19 @@ type Mode =
   | { kind: "local" }
   | { kind: "online"; code: string; isHost: boolean; me: number };
 
+/* ------------------------------ sub-screens ------------------------------ */
+
+function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <header className="screen-head">
+      <button className="back-btn" onClick={onBack} aria-label="Back">
+        ←
+      </button>
+      <h1>{title}</h1>
+    </header>
+  );
+}
+
 /* ------------------------------ house rules ------------------------------ */
 
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
@@ -1110,8 +1123,9 @@ function RulesEditor({ onBack }: { onBack: () => void }) {
   ];
 
   return (
-    <main className="app center-screen">
-      <h1>House Rules</h1>
+    <main className="app screen">
+      <ScreenHeader title="House Rules" onBack={onBack} />
+      <div className="screen-body">
       <div className="rules-list">
         <Stepper
           label="Games to win the match"
@@ -1168,9 +1182,7 @@ function RulesEditor({ onBack }: { onBack: () => void }) {
         </div>
       </div>
       <p className="muted">Applies to games you host (and your practice games).</p>
-      <button className="big" onClick={onBack}>
-        Done
-      </button>
+      </div>
     </main>
   );
 }
@@ -1275,9 +1287,9 @@ function FriendsScreen({
   const onlineCount = fr.friends.filter((f) => f.online).length;
 
   return (
-    <main className="app center-screen">
-      <h1>Friends</h1>
-
+    <main className="app screen">
+      <ScreenHeader title="Friends" onBack={onBack} />
+      <div className="screen-body">
       {account && (
         <div className="lobby-section narrow">
           <div className="lobby-title">Your friend code</div>
@@ -1352,9 +1364,7 @@ function FriendsScreen({
         )}
       </div>
 
-      <button className="link-btn" onClick={onBack}>
-        ← Back
-      </button>
+      </div>
     </main>
   );
 }
@@ -1365,8 +1375,9 @@ function CoachScreen({ onBack }: { onBack: () => void }) {
   const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
 
   return (
-    <main className="app center-screen">
-      <h1>Coach</h1>
+    <main className="app screen">
+      <ScreenHeader title="Coach" onBack={onBack} />
+      <div className="screen-body">
       {stats.games === 0 ? (
         <p className="muted">Play some games — I'll track your recurring leaks here.</p>
       ) : (
@@ -1413,9 +1424,7 @@ function CoachScreen({ onBack }: { onBack: () => void }) {
           </button>
         </>
       )}
-      <button className="big" onClick={onBack}>
-        Done
-      </button>
+      </div>
     </main>
   );
 }
@@ -1432,6 +1441,7 @@ function Lobby({
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
   const [screen, setScreen] = useState<"main" | "rules" | "friends" | "coach">("main");
+  const [showAvatars, setShowAvatars] = useState(false);
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
@@ -1539,19 +1549,34 @@ function Lobby({
   const onlineFriends = fr.friends.filter((f) => f.online).length;
 
   return (
-    <main className="app center-screen">
+    <main className="app home">
       {prompt}
-      <h1>Tongits</h1>
 
-      <div className="profile">
+      <header className="home-top">
+        <h1>🃏 Tongits</h1>
+        <span className="wallet-chip">{account ? `₱${account.balance.toLocaleString()}` : "₱ ⋯"}</span>
+      </header>
+
+      <section className="card identity">
+        <button
+          className="avatar-big"
+          onClick={() => setShowAvatars((v) => !v)}
+          aria-label="Change avatar"
+        >
+          {profile.avatar}
+        </button>
         <input
+          className="name-input"
           placeholder="Your name"
           value={profile.name}
           onChange={(e) => localUpdate({ ...profile, name: e.target.value })}
           onBlur={() => onUpdateProfile({ name: profile.name })}
           maxLength={12}
         />
-        <div className="avatar-grid">
+      </section>
+
+      {showAvatars && (
+        <div className="card avatar-grid">
           {AVATARS.map((a) => (
             <button
               key={a}
@@ -1559,51 +1584,34 @@ function Lobby({
               onClick={() => {
                 localUpdate({ ...profile, avatar: a });
                 onUpdateProfile({ avatar: a });
+                setShowAvatars(false);
               }}
             >
               {a}
             </button>
           ))}
         </div>
-        {account && <div className="wallet">Wallet: ₱{account.balance}</div>}
-      </div>
+      )}
 
-      <button className="big" onClick={() => onStart({ kind: "local" })}>
-        {profile.avatar} Practice vs AI
-      </button>
-
-      <div className="lobby-links">
-        <button className="link-btn" onClick={() => setScreen("rules")}>
-          ⚙ House Rules
+      <section className="card play">
+        <button className="big play-primary" onClick={() => onStart({ kind: "local" })}>
+          ▶ Practice vs AI
         </button>
-        <button className="link-btn" onClick={() => setScreen("coach")}>
-          📊 Coach
-        </button>
-        {onlineConfigured && (
-          <button className="link-btn" onClick={() => setScreen("friends")}>
-            👥 Friends{onlineFriends > 0 ? ` (${onlineFriends} online)` : ""}
-          </button>
-        )}
-      </div>
 
-      {onlineConfigured ? (
-        <div className="lobby-online">
-          <div className="lobby-section">
-            <div className="lobby-title">Start a game (you host)</div>
-            <div className="lobby-row">
+        {onlineConfigured ? (
+          <>
+            <div className="divider">Play online</div>
+            <div className="play-online">
               <button disabled={busy} onClick={() => host(false)}>
-                Host vs a friend
+                Host vs friend
               </button>
               <button disabled={busy} onClick={() => host(true)}>
-                Host + AI (3 players)
+                Host + AI
               </button>
             </div>
-          </div>
-          <div className="lobby-section">
-            <div className="lobby-title">Join a game</div>
-            <div className="lobby-row">
+            <div className="join-row">
               <input
-                placeholder="Code"
+                placeholder="Enter code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 maxLength={5}
@@ -1613,12 +1621,30 @@ function Lobby({
                 Join
               </button>
             </div>
-          </div>
-          {error && <p className="error">{error}</p>}
-        </div>
-      ) : (
-        <p className="muted">Online play isn’t configured yet (Supabase keys missing).</p>
-      )}
+            {error && <p className="error">{error}</p>}
+          </>
+        ) : (
+          <p className="muted">Online play isn’t configured yet.</p>
+        )}
+      </section>
+
+      <nav className="tiles">
+        <button className="tile" onClick={() => setScreen("rules")}>
+          <span className="tile-icon">⚙</span>
+          Rules
+        </button>
+        <button className="tile" onClick={() => setScreen("coach")}>
+          <span className="tile-icon">📊</span>
+          Coach
+        </button>
+        {onlineConfigured && (
+          <button className="tile" onClick={() => setScreen("friends")}>
+            <span className="tile-icon">👥</span>
+            Friends
+            {onlineFriends > 0 && <span className="tile-badge">{onlineFriends}</span>}
+          </button>
+        )}
+      </nav>
     </main>
   );
 }
