@@ -88,6 +88,66 @@ function applyCustomOrder(hand: readonly Card[], order: string[]): Card[] {
   return out;
 }
 
+/* --------------------------------- icons --------------------------------- */
+// Consistent line icons (Feather-style: 24×24, stroke = currentColor).
+function Icon({ name, size = 22 }: { name: "card" | "gear" | "chart" | "people" | "back"; size?: number }) {
+  const svg = (children: ReactNode) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+  switch (name) {
+    case "card":
+      return svg(
+        <>
+          <rect x="3" y="6" width="11" height="15" rx="2" transform="rotate(-9 8.5 13.5)" />
+          <rect x="10" y="3" width="11" height="15" rx="2" transform="rotate(8 15.5 10.5)" />
+        </>,
+      );
+    case "gear":
+      return svg(
+        <>
+          <circle cx="12" cy="12" r="3.2" />
+          <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" />
+        </>,
+      );
+    case "chart":
+      return svg(
+        <>
+          <line x1="6" y1="20" x2="6" y2="13" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="18" y1="20" x2="18" y2="9" />
+        </>,
+      );
+    case "people":
+      return svg(
+        <>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </>,
+      );
+    case "back":
+      return svg(
+        <>
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </>,
+      );
+  }
+}
+
 function CardView({
   card,
   selected,
@@ -961,6 +1021,7 @@ function OnlineGame({
   const { game, wins, gameId, target, matchOver, connected, dispatch, nextGame, newMatch } =
     useOnlineMatch(code, isHost);
   const [moneyDelta, setMoneyDelta] = useState<number | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   // When a round ends, settle this seat's wallet exactly once.
   const result = game?.result;
@@ -988,13 +1049,27 @@ function OnlineGame({
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
 
-  function leave() {
-    if (window.confirm("Leave this game? The game stays open — you can rejoin with the code.")) onExit();
-  }
+  const leave = () => setConfirmLeave(true);
+
+  const leaveModal = confirmLeave ? (
+    <div className="reveal-backdrop">
+      <div className="reveal" style={{ maxWidth: 320 }}>
+        <h2 className="reveal-title">Leave game?</h2>
+        <p className="reveal-sub">The game stays open — you can rejoin with the code.</p>
+        <div className="modal-actions">
+          <button onClick={() => setConfirmLeave(false)}>Stay</button>
+          <button className="big" onClick={onExit}>
+            Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   if (!game) {
     return (
       <main className="app center-screen">
+        {leaveModal}
         <h1>Tongits</h1>
         <p>{connected ? "Connecting to game…" : "Loading…"}</p>
         <p className="code-line">
@@ -1012,8 +1087,10 @@ function OnlineGame({
     isHost && !!game.players[1] && !game.players[1].isAI && game.players[1].name === "Player 2";
 
   return (
-    <Table
-      state={game}
+    <>
+      {leaveModal}
+      <Table
+        state={game}
       me={me}
       wins={wins}
       target={target}
@@ -1044,7 +1121,8 @@ function OnlineGame({
           <button onClick={leave}>Leave</button>
         </>
       }
-    />
+      />
+    </>
   );
 }
 
@@ -1061,7 +1139,7 @@ function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) 
   return (
     <header className="screen-head">
       <button className="back-btn" onClick={onBack} aria-label="Back">
-        ←
+        <Icon name="back" size={20} />
       </button>
       <h1>{title}</h1>
     </header>
@@ -1553,7 +1631,9 @@ function Lobby({
       {prompt}
 
       <header className="home-top">
-        <h1>🃏 Tongits</h1>
+        <h1>
+          <Icon name="card" size={26} /> Tongits
+        </h1>
         <span className="wallet-chip">{account ? `₱${account.balance.toLocaleString()}` : "₱ ⋯"}</span>
       </header>
 
@@ -1601,6 +1681,23 @@ function Lobby({
         {onlineConfigured ? (
           <>
             <div className="divider">Play online</div>
+            {onlineFriends > 0 && (
+              <div className="online-friends">
+                <div className="of-label">Online now</div>
+                {fr.friends
+                  .filter((f) => f.online)
+                  .map(({ profile }) => (
+                    <div className="of-row" key={profile.id}>
+                      <span>
+                        <span className="dot on" /> {profile.avatar} {profile.name}
+                      </span>
+                      <button disabled={busy} onClick={() => challenge(profile.id)}>
+                        Challenge
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
             <div className="play-online">
               <button disabled={busy} onClick={() => host(false)}>
                 Host vs friend
@@ -1630,16 +1727,22 @@ function Lobby({
 
       <nav className="tiles">
         <button className="tile" onClick={() => setScreen("rules")}>
-          <span className="tile-icon">⚙</span>
+          <span className="tile-icon">
+            <Icon name="gear" size={26} />
+          </span>
           Rules
         </button>
         <button className="tile" onClick={() => setScreen("coach")}>
-          <span className="tile-icon">📊</span>
+          <span className="tile-icon">
+            <Icon name="chart" size={26} />
+          </span>
           Coach
         </button>
         {onlineConfigured && (
           <button className="tile" onClick={() => setScreen("friends")}>
-            <span className="tile-icon">👥</span>
+            <span className="tile-icon">
+              <Icon name="people" size={26} />
+            </span>
             Friends
             {onlineFriends > 0 && <span className="tile-badge">{onlineFriends}</span>}
           </button>
