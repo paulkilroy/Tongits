@@ -392,7 +392,7 @@ function useAnalysis(history: GameState[], seat: number) {
         setProgress(1);
       }
     };
-    worker.postMessage({ history, seat, samples: 56 });
+    worker.postMessage({ history, seat, samples: 48 });
     return () => worker.terminate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -575,8 +575,16 @@ function ReplayBoard({
                     </span>
                   ))}
                 </span>
-                <span className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}>
-                  {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
+                <span className="rv-odds-wrap">
+                  <span className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}>
+                    {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
+                  </span>
+                  {d.gone.length > 0 && (
+                    <span className="rv-gone">
+                      {d.outsLive === 0 ? "dead — " : "needs "}
+                      {d.gone.map(cardLabel).join(", ")} gone
+                    </span>
+                  )}
                 </span>
               </div>
             ))}

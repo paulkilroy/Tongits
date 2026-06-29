@@ -16,6 +16,8 @@ export interface DrawOdds {
   held: Card[];
   /** Cards that would complete it and are still unseen (live). */
   outs: Card[];
+  /** Completing cards that are already seen (in a discard pile / meld) — why it's dying. */
+  gone: Card[];
   /** Live out count (outs.length) and the max ignoring what's been seen. */
   outsLive: number;
   outsMax: number;
@@ -67,13 +69,14 @@ export function handDraws(state: GameState, seat: number): DrawOdds[] {
   const draws = remainingDraws(state);
   const out: DrawOdds[] = [];
 
-  const liveOuts = (candidates: Card[]) => candidates.filter((c) => !vis.has(cardId(c)));
   const make = (kind: DrawKind, held: Card[], candidates: Card[]) => {
-    const outs = liveOuts(candidates);
+    const outs = candidates.filter((c) => !vis.has(cardId(c)));
+    const gone = candidates.filter((c) => vis.has(cardId(c)));
     out.push({
       kind,
       held,
       outs,
+      gone,
       outsLive: outs.length,
       outsMax: candidates.length,
       probability: completionProbability(outs.length, unseen, draws),

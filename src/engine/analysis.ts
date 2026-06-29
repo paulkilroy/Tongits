@@ -132,8 +132,11 @@ function candidatePlays(postDraw: GameState, seat: number): Candidate[] {
   return out;
 }
 
+// Thresholds are deliberately forgiving: even at confirm resolution there's a
+// couple points of MC noise, so we only call something a "mistake" when the
+// best line beats your play by a confident margin (>12%).
 const gradeOf = (gap: number): Grade =>
-  gap <= 1 ? "best" : gap <= 4 ? "good" : gap <= 9 ? "inaccuracy" : "mistake";
+  gap <= 2 ? "best" : gap <= 6 ? "good" : gap <= 12 ? "inaccuracy" : "mistake";
 
 function describe(
   yourEnd: GameState,
@@ -158,15 +161,26 @@ function describe(
   return "A slightly stronger line was available.";
 }
 
+/** How many top-screened candidates to re-simulate at high resolution. */
+const REFINE_K = 3;
+
 export function analyzeTurns(
   history: readonly GameState[],
   seat: number,
   samples: number,
   onProgress?: (fraction: number) => void,
 ): TurnGrade[] {
+  // `samples` is the SCREEN budget (cheap, ranks every candidate). The apparent
+  // best handful + your actual play are then CONFIRMED at much higher resolution,
+  // because the max over many noisy estimates is biased upward and otherwise
+  // invents "mistakes" — e.g. telling you to break a live draw on a lucky sample.
+  const screen = samples;
+  const confirm = Math.max(samples * 6, 300);
+
   const work = roundSegments(history, seat).map((seg) => ({ seg, cands: candidatePlays(seg.first, seat) }));
-  const total = Math.max(1, work.reduce((a, w) => a + w.cands.length + 1, 0));
+  const total = Math.max(1, work.reduce((a, w) => a + w.cands.length + Math.min(REFINE_K + 1, w.cands.length) + 1, 0));
   let done = 0;
+  const tick = () => onProgress?.(++done / total);
   const out: TurnGrade[] = [];
 
   work.forEach(({ seg, cands }, idx) => {
@@ -176,25 +190,40 @@ export function analyzeTurns(
       ) ?? null;
     const actualSig = sig(seg.after, seat);
 
-    // Common random numbers: every candidate this turn is judged against the SAME
-    // seeded deals/stock, so the comparison is paired and reflects the PLAY, not
-    // lucky draws. (Without this, "throw your live-draw card" can win by chance.)
-    const seed = ((idx + 1) * 0x9e3779b1) >>> 0;
+    // Common random numbers: judge every candidate against the SAME seeded deals,
+    // so a comparison reflects the PLAY, not lucky draws. Fresh seed per stage so
+    // the confirm pass isn't locked into the screen pass's particular scenarios.
+    const seedScreen = ((idx + 1) * 0x9e3779b1) >>> 0;
+    const seedConfirm = ((idx + 1) * 0x85ebca77) >>> 0;
 
+    // Stage 1 — screen all candidates cheaply.
+    const screened = cands.map((cand) => {
+      const pct = estimateWinOdds(cand.end, seat, screen, makeRng(seedScreen));
+      tick();
+      return { cand, pct, isYours: sig(cand.end, seat) === actualSig };
+    });
+
+    // Refine set: the top-K plus your actual play (so your number is trustworthy).
+    const ranked = [...screened].sort((a, b) => b.pct - a.pct);
+    const refine = new Map<Candidate, (typeof screened)[number]>();
+    for (const s of ranked.slice(0, REFINE_K)) refine.set(s.cand, s);
+    const yours = screened.find((s) => s.isYours);
+    if (yours) refine.set(yours.cand, yours);
+
+    // Stage 2 — confirm those few at high resolution; grade off these numbers.
     let best: { pct: number; cand: Candidate | null } = { pct: -1, cand: null };
-    let yourPct = -1;
-    for (const cand of cands) {
-      const pct = Math.round(estimateWinOdds(cand.end, seat, samples, makeRng(seed)) * 100);
-      if (sig(cand.end, seat) === actualSig) yourPct = pct;
-      if (pct > best.pct) best = { pct, cand };
-      done++;
-      onProgress?.(done / total);
+    let yourFrac = -1;
+    for (const s of refine.values()) {
+      const pct = estimateWinOdds(s.cand.end, seat, confirm, makeRng(seedConfirm));
+      if (s.isYours) yourFrac = pct;
+      if (pct > best.pct) best = { pct, cand: s.cand };
+      tick();
     }
-    if (yourPct < 0) yourPct = Math.round(estimateWinOdds(seg.after, seat, samples, makeRng(seed)) * 100);
-    done++;
-    onProgress?.(done / total);
+    if (yourFrac < 0) yourFrac = estimateWinOdds(seg.after, seat, confirm, makeRng(seedConfirm));
+    tick();
 
-    const bestPct = best.cand ? best.pct : yourPct;
+    const yourPct = Math.round(yourFrac * 100);
+    const bestPct = best.cand ? Math.max(Math.round(best.pct * 100), yourPct) : yourPct;
     const gap = bestPct - yourPct;
     const grade = gradeOf(gap);
     const differs =
