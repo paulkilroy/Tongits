@@ -44,26 +44,31 @@ function sapawAvailable(state: GameState, seat: number, card: Card): boolean {
 
 export interface TurnSegment {
   first: GameState; // decision point — first action state of the turn (after drawing)
-  last: GameState; // end of the turn
+  last: GameState; // last state still on your turn (before you discard)
+  after: GameState; // first state once your turn ends — what you KEEP (post-discard)
 }
 
-/** Split a recorded round into the seat's turns. Each segment's `first` is the
- *  decision point (right after drawing). Shared by the review + win-odds graph. */
+/** Split a recorded round into the seat's turns. `first` is the decision point
+ *  (after drawing, before discarding); `after` is what you carry forward once the
+ *  turn ends (so the card you just drew + discarded isn't counted as "held"). */
 export function roundSegments(history: readonly GameState[], seat: number): TurnSegment[] {
-  const segs: { first?: GameState; last?: GameState }[] = [];
-  let prevCurrent = -1;
-  for (const s of history) {
-    if (s.current !== prevCurrent) {
-      segs.push({});
-      prevCurrent = s.current;
+  const out: TurnSegment[] = [];
+  let i = 0;
+  while (i < history.length) {
+    while (i < history.length && history[i].current !== seat) i++;
+    if (i >= history.length) break;
+    let first: GameState | undefined;
+    let last = history[i];
+    while (i < history.length && history[i].current === seat) {
+      const s = history[i];
+      if (s.phase === "action" && !first) first = s;
+      last = s;
+      i++;
     }
-    if (s.current === seat) {
-      const seg = segs[segs.length - 1];
-      if (s.phase === "action" && !seg.first) seg.first = s;
-      seg.last = s;
-    }
+    const after = i < history.length ? history[i] : last; // post-discard, or last if round ended
+    if (first) out.push({ first, last, after });
   }
-  return segs.filter((s): s is TurnSegment => !!s.first);
+  return out;
 }
 
 export function reviewRound(history: readonly GameState[], seat: number): GameReviewResult {
@@ -75,11 +80,13 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
 
   for (const seg of segments) {
     n++;
-    const s = seg.first;
-    const draws = handDraws(s, seat);
+    const s = seg.first; // for opponent context + the turn number
+    // Judge what you actually KEEP after discarding — not the card you just drew
+    // and are about to throw away.
+    const hand = seg.after.players[seat].hand;
+    const draws = handDraws(seg.after, seat);
     const dead = draws.filter(isDeadDraw);
     const conflicts = conflictingCards(draws);
-    const hand = s.players[seat].hand;
     const dw = deadwood(hand);
 
     // High-value loose cards not contributing to any live draw.
@@ -88,7 +95,8 @@ export function reviewRound(history: readonly GameState[], seat: number): GameRe
     );
     const highLoose = dw.filter((c) => cardPoints(c) >= 10 && !liveDrawCards.has(cardId(c)));
 
-    // Missed sapaw: deadwood at the END of the turn that could have laid off.
+    // Missed sapaw: a card you discarded (end-of-turn deadwood) that could have
+    // laid onto a meld instead — so this one uses the pre-discard hand.
     const endHand = seg.last.players[seat].hand;
     const missed = deadwood(endHand).filter((c) => sapawAvailable(seg.last, seat, c));
 
