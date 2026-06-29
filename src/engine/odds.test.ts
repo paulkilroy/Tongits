@@ -56,6 +56,14 @@ describe("draw odds", () => {
     expect(set.outsMax).toBe(2); // 9♦, 9♠
   });
 
+  it("does NOT flag draws that share an out (they merge into a bigger run)", () => {
+    // 10♥-Q♥ and Q♥-K♥ both want J♥ → 10-J-Q-K. Not competing.
+    const s = stateWithHand([card("10", "hearts"), card("Q", "hearts"), card("K", "hearts")]);
+    const draws = handDraws(s, 0);
+    expect(draws.length).toBeGreaterThanOrEqual(2);
+    expect(conflictingCards(draws).size).toBe(0);
+  });
+
   it("flags a card serving two competing draws", () => {
     // 5♥ feeds both the 5♥-6♥ run and the 5♥-5♠ pair.
     const s = stateWithHand([card("5", "hearts"), card("6", "hearts"), card("5", "spades")]);

@@ -29,7 +29,8 @@
       "Bash(perl -0pi -e 's/selected\\\\.length === 1 && canLayOff\\\\\\(m, selected\\\\[0\\\\]\\\\\\)/selected.length >= 1 \\\\&\\\\& canLayOffMany\\(m, selected\\)/g' src/App.tsx)",
       "Bash(git commit -q -m 'Sapaw multiple cards at once *)",
       "Bash(git commit -q -m 'Favicon: two-card outline matching the home-page icon *)",
-      "Bash(git commit -q -m 'Fix scoring: optimal meld finder \\(min deadwood\\), not greedy *)"
+      "Bash(git commit -q -m 'Fix scoring: optimal meld finder \\(min deadwood\\), not greedy *)",
+      "Bash(git commit -q -m 'Review: don'\\\\''t call same-out draws '\\\\''competing'\\\\'' *)"
     ],
     "defaultMode": "acceptEdits"
   }

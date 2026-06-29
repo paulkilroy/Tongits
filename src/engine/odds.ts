@@ -117,15 +117,20 @@ export function handDraws(state: GameState, seat: number): DrawOdds[] {
 /** A draw is dead when none of its outs remain live. */
 export const isDeadDraw = (d: DrawOdds): boolean => d.outsLive === 0;
 
-/** Cards that serve more than one draw at once (competing/conflicting draws). */
+/** Cards shared by two draws that genuinely COMPETE — i.e. completing one would
+ *  kill the other. Two draws that complete with the SAME out merge into one
+ *  bigger meld (e.g. 10-Q and Q-K both want J → 10-J-Q-K), so they don't compete. */
 export function conflictingCards(draws: DrawOdds[]): Set<string> {
-  const seen = new Set<string>();
   const conflict = new Set<string>();
-  for (const d of draws) {
-    for (const c of d.held) {
-      const id = cardId(c);
-      if (seen.has(id)) conflict.add(id);
-      seen.add(id);
+  for (let i = 0; i < draws.length; i++) {
+    for (let j = i + 1; j < draws.length; j++) {
+      const a = draws[i];
+      const b = draws[j];
+      const shared = a.held.filter((c) => b.held.some((h) => cardId(h) === cardId(c)));
+      if (shared.length === 0) continue;
+      const aOuts = new Set(a.outs.map(cardId));
+      if (b.outs.some((o) => aOuts.has(cardId(o)))) continue; // share an out → they merge, not compete
+      for (const c of shared) conflict.add(cardId(c));
     }
   }
   return conflict;
