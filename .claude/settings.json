@@ -27,7 +27,8 @@
       "Bash(git commit -q -m 'Polish round-end reveal: styled primary button + Home/Review links *)",
       "Bash(git commit -q -m 'Review: judge the hand you KEEP, not the card you just drew *)",
       "Bash(perl -0pi -e 's/selected\\\\.length === 1 && canLayOff\\\\\\(m, selected\\\\[0\\\\]\\\\\\)/selected.length >= 1 \\\\&\\\\& canLayOffMany\\(m, selected\\)/g' src/App.tsx)",
-      "Bash(git commit -q -m 'Sapaw multiple cards at once *)"
+      "Bash(git commit -q -m 'Sapaw multiple cards at once *)",
+      "Bash(git commit -q -m 'Favicon: two-card outline matching the home-page icon *)"
     ],
     "defaultMode": "acceptEdits"
   }
