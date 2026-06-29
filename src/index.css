@@ -1258,6 +1258,33 @@ h1 {
   margin-bottom: 0.25rem;
   opacity: 0.9;
 }
+.rp-legend {
+  float: right;
+  display: inline-flex;
+  gap: 0.5rem;
+}
+.rp-key {
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.rp-key.discarded {
+  color: #cfe9d6;
+}
+.rp-key.shoulda {
+  color: #ffd27a;
+}
+.rp-hand .mc.discarded {
+  outline: 2px solid #cfe9d6;
+  outline-offset: 1px;
+  opacity: 1;
+}
+.rp-hand .mc.shoulda {
+  outline: 2px dashed #ffc24a;
+  outline-offset: 1px;
+  box-shadow: 0 0 8px rgba(255, 194, 74, 0.6);
+  opacity: 1;
+}
 .wg-bar {
   margin-top: 0.4rem;
   height: 8px;

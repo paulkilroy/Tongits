@@ -86,11 +86,16 @@ function rolloutOnce(
   return s.result?.winner === seat;
 }
 
-export function estimateWinOdds(state: GameState, seat: number, samples: number): number {
+export function estimateWinOdds(
+  state: GameState,
+  seat: number,
+  samples: number,
+  rng: () => number = Math.random,
+): number {
   const lastDisc = lastDiscards(state, seat);
   let wins = 0;
   for (let i = 0; i < samples; i++) {
-    if (rolloutOnce(state, seat, lastDisc, Math.random)) wins++;
+    if (rolloutOnce(state, seat, lastDisc, rng)) wins++;
   }
   return wins / samples;
 }

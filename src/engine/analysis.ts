@@ -1,4 +1,5 @@
 import { type Card, cardId, cardLabel } from "./cards";
+import { makeRng } from "./deck";
 import { type GameState, discard, layMeld, sapaw } from "./game";
 import { canLayOff } from "./melds";
 import { bestMelds, deadwood } from "./meldFinder";
@@ -21,6 +22,10 @@ export interface TurnGrade {
   bestPct: number;
   grade: Grade;
   reason: string;
+  /** Card id you actually discarded this turn (for the replay highlight). */
+  yourDiscard: string | null;
+  /** Card id the best line discarded, when it differs from yours. */
+  bestDiscard: string | null;
 }
 
 /** Cards that are part of a live draw (a pair/run you're building) — don't sapaw these. */
@@ -68,14 +73,18 @@ function layAll(state: GameState, seat: number): GameState {
   return s;
 }
 
-/** A compact signature of a position from `seat`'s view, for de-duping plays. */
-function sig(state: GameState, seat: number): string {
-  const melds = state.players
+/** Signature of just the melds on the table (everyone's), for comparing lay decisions. */
+function meldSig(state: GameState): string {
+  return state.players
     .map((p) => p.melds.map((m) => m.cards.map(cardId).sort().join("|")).sort().join(";"))
     .join("/");
+}
+
+/** A compact signature of a position from `seat`'s view, for de-duping plays. */
+function sig(state: GameState, seat: number): string {
   const hand = [...state.players[seat].hand].map(cardId).sort().join(",");
   const top = state.discard.length ? cardId(state.discard[state.discard.length - 1]) : "";
-  return `${state.current}#${melds}#${hand}#${top}#${state.result?.winner ?? ""}`;
+  return `${state.current}#${meldSig(state)}#${hand}#${top}#${state.result?.winner ?? ""}`;
 }
 
 interface Candidate {
@@ -133,7 +142,10 @@ function describe(
   bestDiscard: Card | null,
   seat: number,
 ): string {
-  if (bestDiscard && yourDiscard && cardId(bestDiscard) !== cardId(yourDiscard)) {
+  // Only blame the discard when both lines laid the SAME melds — otherwise the
+  // real gain is the meld decision, and naming the discard would mislead.
+  const sameMelds = meldSig(yourEnd) === meldSig(bestEnd);
+  if (sameMelds && bestDiscard && yourDiscard && cardId(bestDiscard) !== cardId(yourDiscard)) {
     return `Discard ${cardLabel(bestDiscard)} instead of ${cardLabel(yourDiscard)}.`;
   }
   const yourHand = new Set(yourEnd.players[seat].hand.map(cardId));
@@ -142,6 +154,7 @@ function describe(
   const youKeptBestPlayed = [...yourHand].filter((id) => !bestHand.has(id));
   if (bestKeptYouPlayed.length) return "Hold those cards instead of laying them off — keep building.";
   if (youKeptBestPlayed.length) return "Lay off your loose cards to dump deadwood.";
+  if (!sameMelds) return "A different meld decision was a touch stronger.";
   return "A slightly stronger line was available.";
 }
 
@@ -163,27 +176,47 @@ export function analyzeTurns(
       ) ?? null;
     const actualSig = sig(seg.after, seat);
 
+    // Common random numbers: every candidate this turn is judged against the SAME
+    // seeded deals/stock, so the comparison is paired and reflects the PLAY, not
+    // lucky draws. (Without this, "throw your live-draw card" can win by chance.)
+    const seed = ((idx + 1) * 0x9e3779b1) >>> 0;
+
     let best: { pct: number; cand: Candidate | null } = { pct: -1, cand: null };
     let yourPct = -1;
     for (const cand of cands) {
-      const pct = Math.round(estimateWinOdds(cand.end, seat, samples) * 100);
+      const pct = Math.round(estimateWinOdds(cand.end, seat, samples, makeRng(seed)) * 100);
       if (sig(cand.end, seat) === actualSig) yourPct = pct;
       if (pct > best.pct) best = { pct, cand };
       done++;
       onProgress?.(done / total);
     }
-    if (yourPct < 0) yourPct = Math.round(estimateWinOdds(seg.after, seat, samples) * 100);
+    if (yourPct < 0) yourPct = Math.round(estimateWinOdds(seg.after, seat, samples, makeRng(seed)) * 100);
     done++;
     onProgress?.(done / total);
 
     const bestPct = best.cand ? best.pct : yourPct;
     const gap = bestPct - yourPct;
     const grade = gradeOf(gap);
+    const differs =
+      grade !== "best" &&
+      best.cand != null &&
+      best.cand.discardCard != null &&
+      yourDiscard != null &&
+      cardId(best.cand.discardCard) !== cardId(yourDiscard) &&
+      meldSig(seg.after) === meldSig(best.cand.end);
     const reason =
       grade === "best" || !best.cand
         ? ""
         : describe(seg.after, best.cand.end, yourDiscard, best.cand.discardCard, seat);
-    out.push({ turn: idx + 1, yourPct, bestPct, grade, reason });
+    out.push({
+      turn: idx + 1,
+      yourPct,
+      bestPct,
+      grade,
+      reason,
+      yourDiscard: yourDiscard ? cardId(yourDiscard) : null,
+      bestDiscard: differs && best.cand!.discardCard ? cardId(best.cand!.discardCard) : null,
+    });
   });
 
   return out;

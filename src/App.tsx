@@ -525,16 +525,27 @@ function ReplayBoard({
       {g.reason && <div className="rv-reason">{g.reason}</div>}
 
       <div className="rp-section">
-        <div className="rp-label">Your hand · {meP.hand.length} cards</div>
+        <div className="rp-label">
+          Your hand · {meP.hand.length} cards
+          <span className="rp-legend">
+            <span className="rp-key discarded">▦ discarded</span>
+            {g.bestDiscard && <span className="rp-key shoulda">▦ should’ve</span>}
+          </span>
+        </div>
         <div className="rp-hand">
-          {hand.map((c) => (
-            <span
-              key={cardId(c)}
-              className={`mc ${SUIT_CLASS[c.suit]} ${handIds.has(cardId(c)) ? "" : "loose"}`}
-            >
-              {cardLabel(c)}
-            </span>
-          ))}
+          {hand.map((c) => {
+            const id = cardId(c);
+            const mark =
+              id === g.yourDiscard ? "discarded" : id === g.bestDiscard ? "shoulda" : "";
+            return (
+              <span
+                key={id}
+                className={`mc ${SUIT_CLASS[c.suit]} ${handIds.has(id) ? "" : "loose"} ${mark}`}
+              >
+                {cardLabel(c)}
+              </span>
+            );
+          })}
         </div>
       </div>
 
