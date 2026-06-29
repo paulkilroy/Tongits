@@ -31,13 +31,13 @@ import { addBalance, type Account } from "./online/auth";
 import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
 import { settlementDelta } from "./engine/wallet";
 import { reviewRound } from "./engine/review";
-import { type WinPoint } from "./engine/winodds";
+import { type TurnGrade, type Grade } from "./engine/analysis";
 import {
-  recordGame,
+  recordAnalysis,
   loadCoach,
   resetCoach,
-  rankedLeaks,
-  tagCount,
+  accuracy,
+  avgGap,
   type CoachStats,
 } from "./ui/coachStore";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
@@ -376,10 +376,10 @@ function useGameHistory(state: GameState) {
   return hist;
 }
 
-// Spin up the worker once when the review opens; report progress + the series.
-function useWinOdds(history: GameState[], seat: number) {
+// Spin up the worker once when the review opens; report progress + the engine grades.
+function useAnalysis(history: GameState[], seat: number) {
   const [progress, setProgress] = useState(0);
-  const [series, setSeries] = useState<WinPoint[] | null>(null);
+  const [grades, setGrades] = useState<TurnGrade[] | null>(null);
   useEffect(() => {
     const worker = new Worker(new URL("./workers/analysis.worker.ts", import.meta.url), {
       type: "module",
@@ -388,59 +388,65 @@ function useWinOdds(history: GameState[], seat: number) {
       const d = e.data;
       if (d.type === "progress") setProgress(d.fraction);
       else if (d.type === "done") {
-        setSeries(d.series);
+        setGrades(d.grades);
         setProgress(1);
       }
     };
-    worker.postMessage({ history, seat, samples: 160 });
+    worker.postMessage({ history, seat, samples: 56 });
     return () => worker.terminate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return { progress, series };
+  return { progress, grades };
 }
 
-function WinGraph({ series }: { series: WinPoint[] }) {
+const GRADE_LABEL: Record<Grade, string> = {
+  best: "Best",
+  good: "Good",
+  inaccuracy: "Inaccuracy",
+  mistake: "Mistake",
+};
+
+function WinGraph({ grades }: { grades: TurnGrade[] }) {
   const W = 520;
   const H = 130;
   const pad = 8;
-  const n = series.length;
+  const n = grades.length;
   const x = (i: number) => (n === 1 ? W / 2 : pad + (i / (n - 1)) * (W - 2 * pad));
   const y = (pct: number) => pad + (1 - pct / 100) * (H - 2 * pad);
-  const line = series.map((p, i) => `${x(i)},${y(p.pct)}`).join(" ");
+  const line = grades.map((g, i) => `${x(i)},${y(g.yourPct)}`).join(" ");
   const area =
-    `M ${x(0)},${H - pad} ` + series.map((p, i) => `L ${x(i)},${y(p.pct)}`).join(" ") + ` L ${x(n - 1)},${H - pad} Z`;
+    `M ${x(0)},${H - pad} ` +
+    grades.map((g, i) => `L ${x(i)},${y(g.yourPct)}`).join(" ") +
+    ` L ${x(n - 1)},${H - pad} Z`;
   return (
     <svg className="wingraph" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label="win odds graph">
       <line className="wg-mid" x1={pad} x2={W - pad} y1={y(50)} y2={y(50)} />
       <path className="wg-area" d={area} />
       <polyline className="wg-line" points={line} />
-      {series.map((p, i) => (
-        <circle
-          key={i}
-          cx={x(i)}
-          cy={y(p.pct)}
-          r={3.2}
-          className={`wg-dot ${i > 0 && p.pct - series[i - 1].pct <= -15 ? "drop" : ""}`}
-        />
+      {grades.map((g, i) => (
+        <circle key={i} cx={x(i)} cy={y(g.yourPct)} r={3.6} className={`wg-dot grade-${g.grade}`} />
       ))}
     </svg>
   );
 }
 
-function reviewToText(result: ReturnType<typeof reviewRound>, series: WinPoint[] | null): string {
+function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[] | null): string {
   const out: string[] = ["Tongits — Game Review", ""];
-  if (series && series.length) {
-    out.push("Win odds: " + series.map((p) => `T${p.turn} ${p.pct}%`).join("  "), "");
+  if (grades && grades.length) {
+    out.push("Win odds: " + grades.map((g) => `T${g.turn} ${g.yourPct}%`).join("  "), "");
   }
   out.push("Summary:", ...result.summary.map((s) => "- " + s), "");
-  for (const t of result.turns) {
-    const opp = t.opponents.map((o) => `${o.name} ${o.cards}c/${o.melds}m`).join(", ");
-    out.push(`Turn ${t.turn} — ${t.deadwoodPts} pts${opp ? " · " + opp : ""}`);
-    for (const d of t.draws)
-      out.push(
-        `  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`,
-      );
-    for (const n of t.notes) out.push(`  • ${n.text}`);
+  const byTurn = new Map(result.turns.map((t) => [t.turn, t]));
+  for (const g of grades ?? []) {
+    const t = byTurn.get(g.turn);
+    const opp = t ? t.opponents.map((o) => `${o.name} ${o.cards}c/${o.melds}m`).join(", ") : "";
+    out.push(
+      `Turn ${g.turn} — ${GRADE_LABEL[g.grade]} · ${g.yourPct}% (best ${g.bestPct}%)${
+        t ? ` · ${t.deadwoodPts} pts` : ""
+      }${opp ? " · " + opp : ""}`,
+    );
+    if (g.reason) out.push(`  → ${g.reason}`);
+    if (t) for (const d of t.draws) out.push(`  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`);
     out.push("");
   }
   return out.join("\n");
@@ -448,11 +454,21 @@ function reviewToText(result: ReturnType<typeof reviewRound>, series: WinPoint[]
 
 function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
   const result = useMemo(() => reviewRound(history, me), [history, me]);
-  const { progress, series } = useWinOdds(history, me);
-  const coach = useMemo(() => loadCoach(), []);
+  const { progress, grades } = useAnalysis(history, me);
   const [copied, setCopied] = useState(false);
+  const recorded = useRef(false);
+  const byTurn = useMemo(() => new Map(result.turns.map((t) => [t.turn, t])), [result]);
+
+  // Once the engine finishes, fold these grades into the cross-game coach (once).
+  useEffect(() => {
+    if (grades && grades.length && !recorded.current) {
+      recorded.current = true;
+      recordAnalysis(grades);
+    }
+  }, [grades]);
+
   function copy() {
-    void navigator.clipboard?.writeText(reviewToText(result, series));
+    void navigator.clipboard?.writeText(reviewToText(result, grades));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -461,19 +477,19 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
       <div className="reveal review">
         <h2 className="reveal-title">Game Review</h2>
 
-        {series ? (
-          series.length > 0 && (
+        {grades ? (
+          grades.length > 0 && (
             <>
               <div className="wg-caption">
-                Win odds · {series[0].pct}% → <strong>{series[series.length - 1].pct}%</strong>
-                <span className="wg-legend"> · red dot = odds dropped</span>
+                Win odds · {grades[0].yourPct}% → <strong>{grades[grades.length - 1].yourPct}%</strong>
+                <span className="wg-legend"> · dot colour = play grade</span>
               </div>
-              <WinGraph series={series} />
+              <WinGraph grades={grades} />
             </>
           )
         ) : (
           <div className="wg-progress">
-            <div>Computing win odds… {Math.round(progress * 100)}%</div>
+            <div>Analyzing your play… {Math.round(progress * 100)}%</div>
             <div className="wg-bar">
               <div className="wg-bar-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
             </div>
@@ -486,50 +502,45 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
           ))}
         </div>
         <div className="review-turns">
-          {result.turns.map((t) => (
-            <div className="rv-turn" key={t.turn}>
-              <div className="rv-head">
-                Turn {t.turn} · <strong>{t.deadwoodPts}</strong> pts
-                {t.opponents.map((o) => (
-                  <span key={o.name} className="rv-opp">
-                    {" · "}
-                    {o.name} {o.cards}c{o.melds > 0 ? `, ${o.melds} meld${o.melds > 1 ? "s" : ""}` : ""}
-                  </span>
-                ))}
-              </div>
-              {t.draws.length > 0 && (
-                <div className="rv-draws">
-                  {t.draws.map((d, i) => (
-                    <div className="rv-draw" key={i}>
-                      <span className="rv-cards">
-                        {d.held.map((c) => (
-                          <span key={cardId(c)} className={`mc ${SUIT_CLASS[c.suit]}`}>
-                            {cardLabel(c)}
-                          </span>
-                        ))}
-                      </span>
-                      <span
-                        className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}
-                      >
-                        {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
-                      </span>
-                    </div>
+          {(grades ?? []).map((g) => {
+            const t = byTurn.get(g.turn);
+            return (
+              <div className="rv-turn" key={g.turn}>
+                <div className="rv-head">
+                  <span className={`rv-grade grade-${g.grade}`}>{GRADE_LABEL[g.grade]}</span>
+                  Turn {g.turn} · <strong>{g.yourPct}%</strong>
+                  {g.bestPct > g.yourPct && <span className="rv-best"> (best {g.bestPct}%)</span>}
+                  {t?.opponents.map((o) => (
+                    <span key={o.name} className="rv-opp">
+                      {" · "}
+                      {o.name} {o.cards}c{o.melds > 0 ? `, ${o.melds} meld${o.melds > 1 ? "s" : ""}` : ""}
+                    </span>
                   ))}
                 </div>
-              )}
-              <ul className="rv-notes">
-                {t.notes.map((n, i) => {
-                  const total = tagCount(coach, n.tag);
-                  return (
-                    <li key={i} className={n.level}>
-                      {n.text}
-                      {total >= 3 && <span className="rv-trend"> · {total}× in your games</span>}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+                {g.reason && <div className="rv-reason">{g.reason}</div>}
+                {t && t.draws.length > 0 && (
+                  <div className="rv-draws">
+                    {t.draws.map((d, i) => (
+                      <div className="rv-draw" key={i}>
+                        <span className="rv-cards">
+                          {d.held.map((c) => (
+                            <span key={cardId(c)} className={`mc ${SUIT_CLASS[c.suit]}`}>
+                              {cardLabel(c)}
+                            </span>
+                          ))}
+                        </span>
+                        <span
+                          className={`rv-odds ${d.outsLive === 0 ? "dead" : d.probability < 0.15 ? "low" : ""}`}
+                        >
+                          {d.outsLive}/{d.outsMax} outs · {Math.round(d.probability * 100)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="review-actions">
           <button onClick={copy}>{copied ? "Copied!" : "Copy"}</button>
@@ -585,20 +596,7 @@ function Table({
   const [reviewing, setReviewing] = useState(false);
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
   const lastLogLen = useRef(state.log.length);
-  const recorded = useRef(false);
   const history = useGameHistory(state);
-
-  // Record each finished round's leaks into the cross-game coach (once per round).
-  useEffect(() => {
-    if (!state.result) {
-      recorded.current = false;
-      return;
-    }
-    if (recorded.current) return;
-    recorded.current = true;
-    recordGame(reviewRound(history.current, me), state.result.winner === me);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.result, me]);
 
   function flash(msg: string) {
     setNotice(msg);
@@ -1454,50 +1452,48 @@ function FriendsScreen({
   );
 }
 
+const GRADE_ORDER: Grade[] = ["best", "good", "inaccuracy", "mistake"];
+
 function CoachScreen({ onBack }: { onBack: () => void }) {
   const [stats, setStats] = useState<CoachStats>(loadCoach);
-  const leaks = rankedLeaks(stats);
-  const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
+  const acc = accuracy(stats);
+  const gap = avgGap(stats);
 
   return (
     <main className="app screen">
       <ScreenHeader title="Coach" onBack={onBack} />
       <div className="screen-body">
-      {stats.games === 0 ? (
-        <p className="muted">Play some games — I'll track your recurring leaks here.</p>
+      {stats.turns === 0 ? (
+        <p className="muted">Review a finished game — I'll track how sharply you play here.</p>
       ) : (
         <>
           <div className="coach-head">
-            {stats.games} games · {stats.turns} turns · {winRate}% win rate
+            {stats.games} games · {stats.turns} turns reviewed
           </div>
-          {leaks.length > 0 ? (
-            <>
-              <div className="coach-headline">
-                Biggest leak: <strong>{leaks[0].title}</strong> — {leaks[0].fix}
-              </div>
-              <div className="rules-list">
-                {leaks.map((l) => (
-                  <div key={l.tag} className="leak-row">
-                    <div className="leak-top">
-                      <span>{l.title}</span>
-                      <span className="leak-rate">{Math.round(l.rate * 100)}% of turns</span>
-                    </div>
-                    <div className="leak-bar">
-                      <div
-                        className="leak-bar-fill"
-                        style={{ width: `${Math.min(100, Math.round(l.rate * 100))}%` }}
-                      />
-                    </div>
-                    <div className="leak-fix">
-                      {l.fix} · {l.count}× total
-                    </div>
+          <div className="coach-headline">
+            Accuracy: <strong>{acc}%</strong> · giving up <strong>{gap}%</strong> win odds per turn
+          </div>
+          <div className="rules-list">
+            {GRADE_ORDER.map((gr) => {
+              const count = stats.grades[gr];
+              const rate = stats.turns ? count / stats.turns : 0;
+              return (
+                <div key={gr} className="leak-row">
+                  <div className="leak-top">
+                    <span className={`rv-grade grade-${gr}`}>{GRADE_LABEL[gr]}</span>
+                    <span className="leak-rate">{Math.round(rate * 100)}% of turns</span>
                   </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="muted">No leaks tracked yet — clean play! 🎉</p>
-          )}
+                  <div className="leak-bar">
+                    <div
+                      className={`leak-bar-fill grade-${gr}`}
+                      style={{ width: `${Math.min(100, Math.round(rate * 100))}%` }}
+                    />
+                  </div>
+                  <div className="leak-fix">{count}× total</div>
+                </div>
+              );
+            })}
+          </div>
           <button
             className="link-btn"
             onClick={() => {

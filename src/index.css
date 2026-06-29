@@ -1153,7 +1153,16 @@ h1 {
 .wg-dot {
   fill: #36c46a;
 }
-.wg-dot.drop {
+.wg-dot.grade-best {
+  fill: #36c46a;
+}
+.wg-dot.grade-good {
+  fill: #8fd14f;
+}
+.wg-dot.grade-inaccuracy {
+  fill: #ffb24a;
+}
+.wg-dot.grade-mistake {
   fill: #ff5a5a;
 }
 .wg-progress {
@@ -1228,21 +1237,49 @@ h1 {
 .rv-odds.dead {
   color: #ff7a7a;
 }
-.rv-notes {
-  margin: 0;
-  padding-left: 1rem;
-  font-size: 0.82rem;
+.rv-grade {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  margin-right: 0.45rem;
+  color: #0b1f12;
+}
+.rv-grade.grade-best {
+  background: #36c46a;
+}
+.rv-grade.grade-good {
+  background: #8fd14f;
+}
+.rv-grade.grade-inaccuracy {
+  background: #ffb24a;
+}
+.rv-grade.grade-mistake {
+  background: #ff5a5a;
+}
+.rv-best {
+  opacity: 0.7;
+}
+.rv-reason {
+  font-size: 0.85rem;
   line-height: 1.45;
+  margin-bottom: 0.4rem;
+  color: #ffe1a8;
 }
-.rv-notes li.warn {
-  color: #ffc06a;
+.leak-bar-fill.grade-best {
+  background: #36c46a;
 }
-.rv-notes li.tip {
-  color: #cfe9d6;
+.leak-bar-fill.grade-good {
+  background: #8fd14f;
 }
-.rv-trend {
-  opacity: 0.6;
-  font-style: italic;
+.leak-bar-fill.grade-inaccuracy {
+  background: #ffb24a;
+}
+.leak-bar-fill.grade-mistake {
+  background: #ff5a5a;
 }
 
 /* Coach */

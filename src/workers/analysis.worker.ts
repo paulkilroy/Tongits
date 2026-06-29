@@ -1,7 +1,8 @@
-import { winOddsSeries } from "../engine/winodds";
+import { analyzeTurns } from "../engine/analysis";
 import { type GameState } from "../engine/game";
 
-// Runs the (heavy) Monte Carlo win-odds off the main thread, reporting progress.
+// Runs the (heavy) engine-graded play analysis off the main thread, reporting
+// progress as each candidate play is evaluated.
 
 interface Job {
   history: GameState[];
@@ -11,8 +12,8 @@ interface Job {
 
 self.onmessage = (e: MessageEvent<Job>) => {
   const { history, seat, samples } = e.data;
-  const series = winOddsSeries(history, seat, samples, (fraction) =>
+  const grades = analyzeTurns(history, seat, samples, (fraction) =>
     self.postMessage({ type: "progress", fraction }),
   );
-  self.postMessage({ type: "done", series });
+  self.postMessage({ type: "done", grades });
 };

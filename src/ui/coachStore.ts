@@ -1,74 +1,51 @@
-import { type GameReviewResult, type NoteTag } from "../engine/review";
+import { type Grade, type TurnGrade } from "../engine/analysis";
 
-// Persistent "coach": accumulates leak tallies across games (device-local) so we
-// can surface recurring mistakes, not just one-game notes. The tally logic is a
-// pure function (testable); load/save wrap localStorage.
-
-export type LeakTag = Exclude<NoteTag, "clean">;
+// Persistent coach: accumulates engine-graded play quality across the games you
+// review (device-local). Tally logic is pure (testable); load/save wrap storage.
 
 export interface CoachStats {
   games: number;
   turns: number;
-  wins: number;
-  /** Number of turns on which each leak appeared. */
-  tags: Record<string, number>;
+  grades: Record<Grade, number>;
+  /** Total win% given up across all graded turns. */
+  gapSum: number;
 }
-
-export const LEAK_INFO: Record<LeakTag, { title: string; fix: string }> = {
-  "high-deadwood": { title: "Holding high deadwood", fix: "Dump loose face cards earlier." },
-  "missed-sapaw": { title: "Missed sapaw chances", fix: "Always check if a card lays onto a meld." },
-  "dead-draw": { title: "Holding dead draws", fix: "Drop a draw once its outs are gone." },
-  competing: { title: "Keeping competing draws", fix: "Commit to one draw; discard the conflict." },
-  "long-shot": { title: "Chasing long shots", fix: "Fold 1-out draws unless they're free." },
-};
 
 const KEY = "tongits.coach";
 
 export function emptyStats(): CoachStats {
-  return { games: 0, turns: 0, wins: 0, tags: {} };
+  return { games: 0, turns: 0, grades: { best: 0, good: 0, inaccuracy: 0, mistake: 0 }, gapSum: 0 };
 }
 
-/** Pure: fold one finished game's review into the running stats. */
-export function tallyGame(stats: CoachStats, review: GameReviewResult, won: boolean): CoachStats {
-  const tags = { ...stats.tags };
-  let turns = stats.turns;
-  for (const turn of review.turns) {
-    turns++;
-    const seen = new Set<string>();
-    for (const note of turn.notes) {
-      if (note.tag === "clean" || seen.has(note.tag)) continue;
-      seen.add(note.tag);
-      tags[note.tag] = (tags[note.tag] ?? 0) + 1;
-    }
+/** Pure: fold one reviewed game's grades into the running stats. */
+export function tallyGame(stats: CoachStats, grades: TurnGrade[]): CoachStats {
+  const g = { ...stats.grades };
+  let gapSum = stats.gapSum;
+  for (const t of grades) {
+    g[t.grade] = (g[t.grade] ?? 0) + 1;
+    gapSum += Math.max(0, t.bestPct - t.yourPct);
   }
-  return { games: stats.games + 1, turns, wins: stats.wins + (won ? 1 : 0), tags };
+  return { games: stats.games + 1, turns: stats.turns + grades.length, grades: g, gapSum };
 }
 
-export interface RankedLeak {
-  tag: LeakTag;
-  count: number;
-  rate: number; // share of turns
-  title: string;
-  fix: string;
+/** Share of turns played best-or-good. */
+export function accuracy(stats: CoachStats): number {
+  if (!stats.turns) return 0;
+  return Math.round(((stats.grades.best + stats.grades.good) / stats.turns) * 100);
 }
 
-/** Leaks ranked by how often they happen (most frequent first). */
-export function rankedLeaks(stats: CoachStats): RankedLeak[] {
-  return (Object.keys(LEAK_INFO) as LeakTag[])
-    .map((tag) => ({
-      tag,
-      count: stats.tags[tag] ?? 0,
-      rate: stats.turns ? (stats.tags[tag] ?? 0) / stats.turns : 0,
-      ...LEAK_INFO[tag],
-    }))
-    .filter((l) => l.count > 0)
-    .sort((a, b) => b.count - a.count);
+/** Average win% given up per turn. */
+export function avgGap(stats: CoachStats): number {
+  return stats.turns ? Number((stats.gapSum / stats.turns).toFixed(1)) : 0;
 }
 
 export function loadCoach(): CoachStats {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...emptyStats(), ...(JSON.parse(raw) as CoachStats) };
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<CoachStats>;
+      if (p.grades) return { ...emptyStats(), ...p, grades: { ...emptyStats().grades, ...p.grades } };
+    }
   } catch {
     /* ignore */
   }
@@ -91,14 +68,9 @@ export function resetCoach(): void {
   }
 }
 
-/** Record a finished round and return the updated stats. */
-export function recordGame(review: GameReviewResult, won: boolean): CoachStats {
-  const next = tallyGame(loadCoach(), review, won);
+/** Record a reviewed game's grades and return the updated stats. */
+export function recordAnalysis(grades: TurnGrade[]): CoachStats {
+  const next = tallyGame(loadCoach(), grades);
   saveCoach(next);
   return next;
-}
-
-/** Total count of a given tag (for "you've done this N times" annotations). */
-export function tagCount(stats: CoachStats, tag: NoteTag): number {
-  return tag === "clean" ? 0 : (stats.tags[tag] ?? 0);
 }

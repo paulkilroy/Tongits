@@ -1,48 +1,35 @@
 import { describe, it, expect } from "vitest";
-import { type GameReviewResult } from "../engine/review";
-import { emptyStats, tallyGame, rankedLeaks } from "./coachStore";
+import { type TurnGrade } from "../engine/analysis";
+import { emptyStats, tallyGame, accuracy, avgGap } from "./coachStore";
 
-function review(notesPerTurn: string[][]): GameReviewResult {
-  return {
-    summary: [],
-    turns: notesPerTurn.map((tags, i) => ({
-      turn: i + 1,
-      deadwoodPts: 0,
-      opponents: [],
-      draws: [],
-      notes: tags.map((tag) => ({ level: "warn" as const, tag: tag as never, text: tag })),
-    })),
-  };
-}
+const tg = (grade: TurnGrade["grade"], your: number, best: number): TurnGrade => ({
+  turn: 1,
+  grade,
+  yourPct: your,
+  bestPct: best,
+  reason: "",
+});
 
-describe("coach tally", () => {
-  it("counts each leak once per turn and tracks games/turns/wins", () => {
+describe("coach (grade) tally", () => {
+  it("counts grades, sums the win% given up, and derives accuracy + avg gap", () => {
     let s = emptyStats();
-    // Turn 1: high deadwood + missed sapaw. Turn 2: high deadwood (dup tag ignored within turn).
-    s = tallyGame(s, review([["high-deadwood", "missed-sapaw"], ["high-deadwood", "high-deadwood"]]), true);
+    s = tallyGame(s, [tg("best", 70, 70), tg("good", 65, 68), tg("mistake", 40, 60)]);
     expect(s.games).toBe(1);
-    expect(s.turns).toBe(2);
-    expect(s.wins).toBe(1);
-    expect(s.tags["high-deadwood"]).toBe(2); // once per turn, both turns
-    expect(s.tags["missed-sapaw"]).toBe(1);
-  });
-
-  it("ignores 'clean' turns and ranks leaks by frequency", () => {
-    let s = emptyStats();
-    s = tallyGame(s, review([["clean"], ["missed-sapaw"], ["missed-sapaw"], ["dead-draw"]]), false);
-    const ranked = rankedLeaks(s);
-    expect(ranked[0].tag).toBe("missed-sapaw");
-    expect(ranked[0].count).toBe(2);
-    expect(ranked.find((l) => l.tag === "dead-draw")?.count).toBe(1);
-    expect(ranked.some((l) => (l.tag as string) === "clean")).toBe(false);
+    expect(s.turns).toBe(3);
+    expect(s.grades.best).toBe(1);
+    expect(s.grades.good).toBe(1);
+    expect(s.grades.mistake).toBe(1);
+    expect(s.gapSum).toBe(23); // 0 + 3 + 20
+    expect(accuracy(s)).toBe(67); // 2 of 3 best/good
+    expect(avgGap(s)).toBe(7.7); // 23 / 3
   });
 
   it("accumulates across games", () => {
     let s = emptyStats();
-    s = tallyGame(s, review([["high-deadwood"]]), true);
-    s = tallyGame(s, review([["high-deadwood"]]), false);
+    s = tallyGame(s, [tg("best", 70, 70)]);
+    s = tallyGame(s, [tg("inaccuracy", 50, 58)]);
     expect(s.games).toBe(2);
-    expect(s.wins).toBe(1);
-    expect(s.tags["high-deadwood"]).toBe(2);
+    expect(s.turns).toBe(2);
+    expect(s.grades.inaccuracy).toBe(1);
   });
 });
