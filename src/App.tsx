@@ -684,6 +684,22 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
     }
   }, [grades]);
 
+  // ← / → step through the turns.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!grades || !grades.length) return;
+      if (e.key === "ArrowLeft") {
+        setStep((s) => Math.max(0, s - 1));
+        e.preventDefault();
+      } else if (e.key === "ArrowRight") {
+        setStep((s) => Math.min(grades.length - 1, s + 1));
+        e.preventDefault();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [grades]);
+
   function copy() {
     void navigator.clipboard?.writeText(reviewToText(result, grades));
     setCopied(true);

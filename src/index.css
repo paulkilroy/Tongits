@@ -1279,8 +1279,17 @@ h1 {
   padding: 0.1rem 0.3rem;
   margin: 0 -0.3rem;
 }
+/* Fixed card column so every bar starts and ends at the same x. */
+.rp-disc .mc {
+  box-sizing: border-box;
+  flex: 0 0 40px;
+  width: 40px;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
 .rp-disc-bar {
-  flex: 1;
+  flex: 0 0 150px;
   height: 9px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
