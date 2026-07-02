@@ -1178,6 +1178,9 @@ h1 {
 .wg-dot.grade-mistake {
   fill: #ff5a5a;
 }
+.wg-dot.grade-blunder {
+  fill: #c81e1e;
+}
 .wg-dot.clickable {
   cursor: pointer;
 }
@@ -1505,6 +1508,10 @@ h1 {
 .rv-grade.grade-mistake {
   background: #ff5a5a;
 }
+.rv-grade.grade-blunder {
+  background: #c81e1e;
+  color: #fff;
+}
 .rv-best {
   opacity: 0.7;
 }
@@ -1525,6 +1532,9 @@ h1 {
 }
 .leak-bar-fill.grade-mistake {
   background: #ff5a5a;
+}
+.leak-bar-fill.grade-blunder {
+  background: #c81e1e;
 }
 
 /* Coach */

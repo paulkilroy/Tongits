@@ -14,7 +14,7 @@ import { roundSegments } from "./review";
 // "reason" is derived from the diff between your line and the best — no hand-coded
 // rules. The win% of YOUR line per turn is also the graph.
 
-export type Grade = "best" | "good" | "inaccuracy" | "mistake";
+export type Grade = "best" | "good" | "inaccuracy" | "mistake" | "blunder";
 
 /** Per-discard Monte Carlo projection for the replay table. */
 export interface DiscardOption {
@@ -261,11 +261,11 @@ function candidatePlays(postDraw: GameState, seat: number, yourMeldSig: string):
   return out;
 }
 
-// Thresholds are deliberately forgiving: even at confirm resolution there's a
-// couple points of MC noise, so we only call something a "mistake" when the
-// best line beats your play by a confident margin (>12%).
+// Thresholds in win-% given up. Deliberately forgiving at the low end (a couple
+// points is MC noise), harsher at the top: giving up more than ~12% equity is a
+// blunder. The two-stage confirm makes gaps this large trustworthy.
 const gradeOf = (gap: number): Grade =>
-  gap <= 2 ? "best" : gap <= 6 ? "good" : gap <= 12 ? "inaccuracy" : "mistake";
+  gap <= 2 ? "best" : gap <= 6 ? "good" : gap <= 9 ? "inaccuracy" : gap <= 12 ? "mistake" : "blunder";
 
 function describe(
   yourEnd: GameState,

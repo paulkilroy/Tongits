@@ -404,6 +404,7 @@ const GRADE_LABEL: Record<Grade, string> = {
   good: "Good",
   inaccuracy: "Inaccuracy",
   mistake: "Mistake",
+  blunder: "Blunder",
 };
 
 function WinGraph({
@@ -1649,7 +1650,7 @@ function FriendsScreen({
   );
 }
 
-const GRADE_ORDER: Grade[] = ["best", "good", "inaccuracy", "mistake"];
+const GRADE_ORDER: Grade[] = ["best", "good", "inaccuracy", "mistake", "blunder"];
 
 function CoachScreen({ onBack }: { onBack: () => void }) {
   const [stats, setStats] = useState<CoachStats>(loadCoach);

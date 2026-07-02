@@ -14,7 +14,12 @@ export interface CoachStats {
 const KEY = "tongits.coach";
 
 export function emptyStats(): CoachStats {
-  return { games: 0, turns: 0, grades: { best: 0, good: 0, inaccuracy: 0, mistake: 0 }, gapSum: 0 };
+  return {
+    games: 0,
+    turns: 0,
+    grades: { best: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 },
+    gapSum: 0,
+  };
 }
 
 /** Pure: fold one reviewed game's grades into the running stats. */
