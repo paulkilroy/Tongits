@@ -423,15 +423,20 @@ export function analyzeTurns(
     const moreDiscards = rowFor.size - confirmedRows.length;
     const gap = bestPct - yourPct;
     const grade = gradeOf(gap);
+
+    // Only surface an actual "you should have…" correction when the gap is bigger
+    // than MC noise (inaccuracy or worse). A "good" turn is a within-noise near-tie,
+    // so a "discard X instead of Y" line there just dresses up a coin flip.
+    const corrected = grade !== "best" && grade !== "good";
     const differs =
-      grade !== "best" &&
+      corrected &&
       best.cand != null &&
       best.cand.discardCard != null &&
       yourDiscard != null &&
       cardId(best.cand.discardCard) !== cardId(yourDiscard) &&
       meldSig(seg.after) === meldSig(best.cand.end);
     const reason =
-      grade === "best" || !best.cand
+      !corrected || !best.cand
         ? ""
         : describe(seg.after, best.cand.end, yourDiscard, best.cand.discardCard, seat);
 
@@ -439,7 +444,7 @@ export function analyzeTurns(
     // decision than yours (a pure discard swap is already covered by `reason`).
     const meldDiffers = best.cand != null && meldSig(seg.after) !== meldSig(best.cand.end);
     const bestLine =
-      grade !== "best" && best.cand && meldDiffers && best.cand.moves.length
+      corrected && best.cand && meldDiffers && best.cand.moves.length
         ? lineText(best.cand.moves, best.cand.discardCard)
         : null;
 
