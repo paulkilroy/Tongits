@@ -4,7 +4,7 @@ import { type GameState, discard, layMeld, sapaw } from "./game";
 import { canLayOff } from "./melds";
 import { bestMelds, deadwood } from "./meldFinder";
 import { handDraws, type DrawOdds } from "./odds";
-import { estimateWinOdds } from "./winodds";
+import { estimateWinOdds, playoutOnce, lastDiscards } from "./winodds";
 import { roundSegments } from "./review";
 
 // Engine-graded play analysis (chess-engine style). For each of your turns we
@@ -458,4 +458,118 @@ export function analyzeTurns(
   });
 
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Deep dive: for ONE turn, run a big simulation on each of the top plays and
+// report not just the win %, but HOW the simulated rounds ended — so you can see
+// exactly which lines win and which lose.
+
+export interface DeepOutcome {
+  cardId: string | null;
+  /** Discard label, or a meld/sapaw line spelled out. */
+  label: string;
+  steps: string[];
+  isYours: boolean;
+  pct: number;
+  samples: number;
+  /** Fractions of all sims, summing to ~1. First three are wins, last three losses. */
+  youTongits: number;
+  youShowdownWin: number;
+  youStockWin: number;
+  oppTongits: number;
+  youShowdownLoss: number;
+  youStockLoss: number;
+  /** Average deadwood points you were behind by when you LOST a showdown. */
+  avgLossMargin: number;
+}
+
+/** How many distinct plays to autopsy in a deep dive (your play always included). */
+const DEEP_K = 3;
+
+function autopsy(cand: Candidate, seat: number, samples: number, seed: number, onStep: () => void): DeepOutcome {
+  const lastDisc = lastDiscards(cand.end, seat);
+  const rng = makeRng(seed);
+  const b = { youTongits: 0, youShowdownWin: 0, youStockWin: 0, oppTongits: 0, youShowdownLoss: 0, youStockLoss: 0 };
+  let wins = 0;
+  let marginSum = 0;
+  let showdownLosses = 0;
+  for (let i = 0; i < samples; i++) {
+    const r = playoutOnce(cand.end, seat, lastDisc, rng).result;
+    onStep();
+    if (!r) continue;
+    const won = r.winner === seat;
+    if (won) wins++;
+    if (r.reason === "tongits") won ? b.youTongits++ : b.oppTongits++;
+    else if (r.reason === "showdown") {
+      if (won) b.youShowdownWin++;
+      else {
+        b.youShowdownLoss++;
+        if (r.winner >= 0) {
+          marginSum += r.handPoints[seat] - r.handPoints[r.winner];
+          showdownLosses++;
+        }
+      }
+    } else won ? b.youStockWin++ : b.youStockLoss++;
+  }
+  const f = (n: number) => n / samples;
+  return {
+    cardId: cand.discardCard ? cardId(cand.discardCard) : null,
+    label: cand.discardCard ? cardLabel(cand.discardCard) : "meld out",
+    steps: cand.moves.length ? lineText(cand.moves, cand.discardCard) : [],
+    isYours: false,
+    pct: Math.round(f(wins) * 100),
+    samples,
+    youTongits: f(b.youTongits),
+    youShowdownWin: f(b.youShowdownWin),
+    youStockWin: f(b.youStockWin),
+    oppTongits: f(b.oppTongits),
+    youShowdownLoss: f(b.youShowdownLoss),
+    youStockLoss: f(b.youStockLoss),
+    avgLossMargin: showdownLosses ? Math.round(marginSum / showdownLosses) : 0,
+  };
+}
+
+/** Big-sim autopsy of one turn's top plays (plus your actual play). */
+export function deepDive(
+  history: readonly GameState[],
+  seat: number,
+  turn: number,
+  samples: number,
+  onProgress?: (fraction: number) => void,
+): DeepOutcome[] {
+  const seg = roundSegments(history, seat)[turn - 1];
+  if (!seg) return [];
+  const yourMeldSig = meldSig(seg.after);
+  const cands = candidatePlays(seg.first, seat, yourMeldSig);
+  const actualSig = sig(seg.after, seat);
+  const seedScreen = ((turn + 1) * 0x9e3779b1) >>> 0;
+  const seedDeep = ((turn + 1) * 0x85ebca77) >>> 0;
+
+  // Quickly screen to pick which plays are worth the big sim.
+  const screened = cands.map((c) => ({
+    cand: c,
+    pct: estimateWinOdds(c.end, seat, 40, makeRng(seedScreen)),
+    isYours: sig(c.end, seat) === actualSig,
+  }));
+  const chosen = new Set(
+    [...screened].sort((a, b) => b.pct - a.pct).slice(0, DEEP_K).map((s) => s.cand),
+  );
+  const yours = screened.find((s) => s.isYours);
+  if (yours) chosen.add(yours.cand);
+
+  const total = chosen.size * samples;
+  let done = 0;
+  const onStep = () => {
+    done++;
+    if (done % 64 === 0) onProgress?.(done / total);
+  };
+
+  const results = [...chosen].map((cand) => {
+    const o = autopsy(cand, seat, samples, seedDeep, onStep);
+    o.isYours = sig(cand.end, seat) === actualSig;
+    return o;
+  });
+  onProgress?.(1);
+  return results.sort((a, b) => b.pct - a.pct);
 }

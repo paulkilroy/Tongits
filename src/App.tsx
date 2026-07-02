@@ -31,7 +31,7 @@ import { addBalance, type Account } from "./online/auth";
 import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
 import { settlementDelta } from "./engine/wallet";
 import { reviewRound, roundSegments } from "./engine/review";
-import { type TurnGrade, type Grade } from "./engine/analysis";
+import { type TurnGrade, type Grade, type DeepOutcome } from "./engine/analysis";
 import {
   recordAnalysis,
   loadCoach,
@@ -478,6 +478,83 @@ function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[
   return out.join("\n");
 }
 
+interface DeepState {
+  turn: number;
+  progress: number;
+  outcomes: DeepOutcome[] | null;
+}
+
+// On-demand big-sim autopsy of one turn (spins its own worker per run).
+function useDeepDive(history: GameState[], me: number) {
+  const [state, setState] = useState<DeepState | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  useEffect(() => () => workerRef.current?.terminate(), []);
+  function run(turn: number) {
+    workerRef.current?.terminate();
+    const w = new Worker(new URL("./workers/analysis.worker.ts", import.meta.url), { type: "module" });
+    workerRef.current = w;
+    setState({ turn, progress: 0, outcomes: null });
+    w.onmessage = (e: MessageEvent) => {
+      const d = e.data;
+      if (d.type === "progress") setState((s) => (s && s.turn === turn ? { ...s, progress: d.fraction } : s));
+      else if (d.type === "deepdone") {
+        setState((s) => (s && s.turn === turn ? { ...s, outcomes: d.outcomes, progress: 1 } : s));
+        w.terminate();
+      }
+    };
+    w.postMessage({ mode: "deepdive", history, seat: me, turn, samples: 2000 });
+  }
+  return { state, run };
+}
+
+// The six ways a round can end, in stacked-bar order: three wins then three losses.
+const DEEP_SEGMENTS: { key: keyof DeepOutcome; label: string; cls: string; win: boolean }[] = [
+  { key: "youTongits", label: "you go out", cls: "w1", win: true },
+  { key: "youShowdownWin", label: "win Laban", cls: "w2", win: true },
+  { key: "youStockWin", label: "win on stock-out", cls: "w3", win: true },
+  { key: "oppTongits", label: "opponent goes out", cls: "l1", win: false },
+  { key: "youShowdownLoss", label: "lose Laban", cls: "l2", win: false },
+  { key: "youStockLoss", label: "lose on stock-out", cls: "l3", win: false },
+];
+
+function DeepDivePanel({ outcomes }: { outcomes: DeepOutcome[] }) {
+  return (
+    <div className="dd-panel">
+      {outcomes.map((o, i) => (
+        <div className={`dd-row ${o.isYours ? "you" : ""}`} key={i}>
+          <div className="dd-head">
+            <strong>{o.steps.length ? o.steps.join(" › ") : `Discard ${o.label}`}</strong>
+            <span className="dd-pct">{o.pct}% win</span>
+            {i === 0 && <span className="rp-disc-tag best">best</span>}
+            {o.isYours && <span className="rp-disc-tag you">you</span>}
+          </div>
+          <div className="dd-bar">
+            {DEEP_SEGMENTS.map((s) => {
+              const frac = o[s.key] as number;
+              return frac > 0 ? (
+                <div
+                  key={s.cls}
+                  className={`dd-seg ${s.cls}`}
+                  style={{ width: `${frac * 100}%` }}
+                  title={`${s.label}: ${Math.round(frac * 100)}%`}
+                />
+              ) : null;
+            })}
+          </div>
+          <div className="dd-legend">
+            wins — go out {Math.round(o.youTongits * 100)}% · Laban {Math.round(o.youShowdownWin * 100)}% · stock{" "}
+            {Math.round(o.youStockWin * 100)}%
+            <br />
+            losses — opp out {Math.round(o.oppTongits * 100)}% · Laban {Math.round(o.youShowdownLoss * 100)}% · stock{" "}
+            {Math.round(o.youStockLoss * 100)}%
+            {o.avgLossMargin > 0 && <> · lost Labans by ~{o.avgLossMargin} pts avg</>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Step through your turns: your full hand + melds and each opponent's melds, with
 // the engine's grade/reason for the play you actually made on that turn.
 function ReplayBoard({
@@ -509,6 +586,8 @@ function ReplayBoard({
   const handById = new Map(meP.hand.map((c) => [cardId(c), c] as const));
   const opponents = seg.first.players.map((p, pi) => ({ p, pi })).filter((x) => x.pi !== me);
   const [showMath, setShowMath] = useState(false);
+  const deep = useDeepDive(history, me);
+  const ddHere = deep.state && deep.state.turn === g.turn ? deep.state : null;
 
   return (
     <div className="replay">
@@ -605,6 +684,32 @@ function ReplayBoard({
           )}
         </div>
       )}
+
+      <div className="rp-section">
+        <div className="rp-label">
+          Deep dive
+          <button
+            className="dd-run"
+            onClick={() => deep.run(g.turn)}
+            disabled={!!ddHere && !ddHere.outcomes}
+          >
+            {ddHere && !ddHere.outcomes ? "running…" : "run 2000 sims"}
+          </button>
+        </div>
+        {!ddHere && (
+          <div className="rp-disc-more">
+            See how the sims actually end for this turn's top plays — which lines win, which lose.
+          </div>
+        )}
+        {ddHere && !ddHere.outcomes && (
+          <div className="wg-progress">
+            <div className="wg-bar">
+              <div className="wg-bar-fill" style={{ width: `${Math.round(ddHere.progress * 100)}%` }} />
+            </div>
+          </div>
+        )}
+        {ddHere?.outcomes && <DeepDivePanel outcomes={ddHere.outcomes} />}
+      </div>
 
       <div className="rp-section">
         <div className="rp-label">Your melds</div>

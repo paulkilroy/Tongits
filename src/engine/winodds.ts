@@ -37,7 +37,7 @@ function parseCard(label: string): Card | null {
 
 /** Each opponent's MOST RECENT discard, parsed from the log (or null). Their
  *  current hand shouldn't make that card meldable — they just chose to drop it. */
-function lastDiscards(state: GameState, seat: number): (Card | null)[] {
+export function lastDiscards(state: GameState, seat: number): (Card | null)[] {
   return state.players.map((p, i) => {
     if (i === seat) return null;
     const prefix = `${p.name} discards `;
@@ -51,12 +51,15 @@ function lastDiscards(state: GameState, seat: number): (Card | null)[] {
 
 const MAX_REDEALS = 12;
 
-function rolloutOnce(
+/** Deal the unseen cards one plausible way and play the round out with the AI;
+ *  returns the FINAL state (with .result). Exposed so the deep-dive can inspect
+ *  HOW each simulated round ended, not just whether `seat` won. */
+export function playoutOnce(
   state: GameState,
   seat: number,
   lastDisc: (Card | null)[],
   rng: () => number,
-): boolean {
+): GameState {
   let s = structuredClone(state);
   for (let attempt = 0; attempt < MAX_REDEALS; attempt++) {
     s = structuredClone(state);
@@ -83,7 +86,16 @@ function rolloutOnce(
     if (next === s) break;
     s = next;
   }
-  return s.result?.winner === seat;
+  return s;
+}
+
+function rolloutOnce(
+  state: GameState,
+  seat: number,
+  lastDisc: (Card | null)[],
+  rng: () => number,
+): boolean {
+  return playoutOnce(state, seat, lastDisc, rng).result?.winner === seat;
 }
 
 export function estimateWinOdds(

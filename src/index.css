@@ -1326,6 +1326,81 @@ h1 {
   opacity: 0.6 !important;
   font-size: 0.74rem;
 }
+.dd-run {
+  margin-left: 0.5rem;
+  border: 1px solid rgba(54, 196, 106, 0.5);
+  background: rgba(54, 196, 106, 0.16);
+  color: #cfe9d6;
+  border-radius: 6px;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.dd-run:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.dd-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.dd-row {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.dd-row.you {
+  background: rgba(255, 255, 255, 0.07);
+}
+.dd-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+.dd-pct {
+  font-weight: 800;
+}
+.dd-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.dd-seg {
+  height: 100%;
+}
+.dd-seg.w1 {
+  background: #2fb35f;
+}
+.dd-seg.w2 {
+  background: #62c77f;
+}
+.dd-seg.w3 {
+  background: #a7dcae;
+}
+.dd-seg.l1 {
+  background: #8a1414;
+}
+.dd-seg.l2 {
+  background: #d63535;
+}
+.dd-seg.l3 {
+  background: #f0a35a;
+}
+.dd-legend {
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  line-height: 1.5;
+}
 /* Fixed card column so every bar starts and ends at the same x. */
 .rp-disc .mc {
   box-sizing: border-box;
