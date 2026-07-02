@@ -464,14 +464,14 @@ function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[
     );
     if (g.reason) out.push(`  → ${g.reason}`);
     if (g.bestLine) out.push("  best line: " + g.bestLine.join(" › "));
-    if (g.discards.length > 1)
-      out.push(
-        "  discard: " +
-          g.discards
-            .map((d) => `${d.label} ${d.pct}%${d.cardId === g.yourDiscard ? "(you)" : ""}`)
-            .join("  ") +
-          (g.moreDiscards > 0 ? `  +${g.moreDiscards} weaker` : ""),
-      );
+    if (g.discards.length > 1) {
+      out.push("  discards:");
+      for (const d of g.discards)
+        out.push(
+          `    ${d.label} ${d.pct}%${d.cardId === g.yourDiscard ? " (you)" : ""}${d.note ? ` — ${d.note}` : ""}`,
+        );
+      if (g.moreDiscards > 0) out.push(`    +${g.moreDiscards} weaker`);
+    }
     if (t) for (const d of t.draws) out.push(`  ${d.held.map(cardLabel).join(" ")}  ${d.kind}  ${d.outsLive}/${d.outsMax} outs  ${Math.round(d.probability * 100)}%`);
     out.push("");
   }
@@ -508,6 +508,7 @@ function ReplayBoard({
   );
   const handById = new Map(meP.hand.map((c) => [cardId(c), c] as const));
   const opponents = seg.first.players.map((p, pi) => ({ p, pi })).filter((x) => x.pi !== me);
+  const [showMath, setShowMath] = useState(false);
 
   return (
     <div className="replay">
@@ -582,18 +583,19 @@ function ReplayBoard({
               const isBest = d.cardId === g.discards[0].cardId;
               return (
                 <div className={`rp-disc ${isYou ? "you" : ""}`} key={d.cardId}>
-                  {c && (
-                    <span className={`mc ${SUIT_CLASS[c.suit]}`}>{cardLabel(c)}</span>
-                  )}
-                  <div className="rp-disc-bar">
-                    <div
-                      className={`rp-disc-fill ${isBest ? "best" : ""}`}
-                      style={{ width: `${Math.max(2, d.pct)}%` }}
-                    />
+                  <div className="rp-disc-main">
+                    {c && <span className={`mc ${SUIT_CLASS[c.suit]}`}>{cardLabel(c)}</span>}
+                    <div className="rp-disc-bar">
+                      <div
+                        className={`rp-disc-fill ${isBest ? "best" : ""}`}
+                        style={{ width: `${Math.max(2, d.pct)}%` }}
+                      />
+                    </div>
+                    <span className="rp-disc-pct">{d.pct}%</span>
+                    {isBest && <span className="rp-disc-tag best">best</span>}
+                    {isYou && <span className="rp-disc-tag you">you</span>}
                   </div>
-                  <span className="rp-disc-pct">{d.pct}%</span>
-                  {isBest && <span className="rp-disc-tag best">best</span>}
-                  {isYou && <span className="rp-disc-tag you">you</span>}
+                  {d.note && <div className="rp-disc-note">{d.note}</div>}
                 </div>
               );
             })}
@@ -619,7 +621,31 @@ function ReplayBoard({
 
       {t && t.draws.length > 0 && (
         <div className="rp-section">
-          <div className="rp-label">Draws you're building</div>
+          <div className="rp-label">
+            Draws you're building
+            <button className="rp-info" onClick={() => setShowMath((v) => !v)} aria-label="How is this calculated?">
+              ⓘ
+            </button>
+          </div>
+          {showMath && (
+            <div className="rp-mathbox">
+              <strong>How the draw % is figured</strong>
+              <p>
+                The chance this draw completes before the round ends — roughly{" "}
+                <em>(draws you have left) ÷ (unseen cards)</em> per live out. One out (a gutshot) ≈
+                draws/unseen; two outs (a pair or open run) ≈ double that.
+              </p>
+              <p>
+                “Outs” are the cards that finish it that are still live; it drops as those cards get
+                discarded or melded. This is an <em>upper bound</em> — it assumes the round runs long,
+                but games usually end earlier, so treat it as optimistic.
+              </p>
+              <p className="rp-math-note">
+                Different from the discard %, which is a full-game simulation (how often you win), not
+                a single-draw odds.
+              </p>
+            </div>
+          )}
           <div className="rv-draws">
             {t.draws.map((d, di) => (
               <div className="rv-draw" key={di}>

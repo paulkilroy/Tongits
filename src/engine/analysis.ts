@@ -3,7 +3,7 @@ import { makeRng } from "./deck";
 import { type GameState, discard, layMeld, sapaw } from "./game";
 import { canLayOff } from "./melds";
 import { bestMelds, deadwood } from "./meldFinder";
-import { handDraws } from "./odds";
+import { handDraws, type DrawOdds } from "./odds";
 import { estimateWinOdds } from "./winodds";
 import { roundSegments } from "./review";
 
@@ -27,6 +27,8 @@ export interface DiscardOption {
   confirmed: boolean;
   /** This line also lays/sapaws a meld before discarding. */
   laidMeld: boolean;
+  /** Short "why", e.g. "breaks 9♥J♥ gutshot · dumps 9 pts" or "loose · dumps 7 pts". */
+  note: string;
 }
 
 export interface TurnGrade {
@@ -212,6 +214,19 @@ function naturalDiscard(state: GameState, seat: number): Card | null {
   return [...pool].sort((a, b) => cardPoints(b) - cardPoints(a))[0] ?? hand[0];
 }
 
+const drawWord = (kind: string) =>
+  kind === "set" ? "set" : kind === "run-open" ? "open run" : "gutshot";
+
+/** Short "why" for discarding a card: the live draw it breaks (if any) + points shed. */
+function discardNote(card: Card, draws: DrawOdds[]): string {
+  const pts = cardPoints(card);
+  const breaks = draws.find((d) => d.outsLive > 0 && d.held.some((h) => cardId(h) === cardId(card)));
+  const head = breaks
+    ? `breaks ${breaks.held.map(cardLabel).join("")} ${drawWord(breaks.kind)}`
+    : "loose";
+  return `${head} · dumps ${pts} pt${pts === 1 ? "" : "s"}`;
+}
+
 /** Spell out a line as human steps: lays, sapaws, then the discard. */
 function lineText(moves: Move[], discardCard: Card | null): string[] {
   const out = moves.map((m) =>
@@ -394,6 +409,7 @@ export function analyzeTurns(
     // Per-discard table: only confirmed rows (the noisy screen tail is dropped, with
     // a count, so an unconfirmed estimate can never out-rank your confirmed play).
     const confirmedRows = [...rowFor.values()].filter((s) => s.confirmed);
+    const firstDraws = handDraws(seg.first, seat);
     const discards: DiscardOption[] = confirmedRows
       .map((s) => ({
         cardId: s.discardId!,
@@ -401,6 +417,7 @@ export function analyzeTurns(
         pct: Math.round(s.pct * 100),
         confirmed: true,
         laidMeld: s.laidMeld,
+        note: s.cand.discardCard ? discardNote(s.cand.discardCard, firstDraws) : "",
       }))
       .sort((a, b) => b.pct - a.pct);
     const moreDiscards = rowFor.size - confirmedRows.length;
