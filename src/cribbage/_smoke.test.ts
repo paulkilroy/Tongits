@@ -26,7 +26,7 @@ describe("cribbage UI smoke", () => {
   });
   it("renders the hand review", () => {
     const review = reviewHand(playHand(11), 0, 40)!;
-    const html = renderToString(createElement(CribReview, { review, me: 0, onClose: () => {} }));
+    const html = renderToString(createElement(CribReview, { review, me: 0, oppName: "Bot", onClose: () => {} }));
     expect(html).toContain("Hand review");
     expect(html).toContain("Pegging");
   });

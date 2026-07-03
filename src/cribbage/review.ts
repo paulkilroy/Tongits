@@ -1,6 +1,7 @@
-import { type Card, cardId, cardPoints } from "../engine/cards";
-import { scorePlay, scoreShow, type ShowScore } from "./scoring";
+import { type Card, cardId, cardLabel } from "../engine/cards";
+import { scoreShow, describeShow, type ShowScore } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval, type CribGrade } from "./coach";
+import { analyzePegging } from "./pegAnalysis";
 import { type CribState } from "./game";
 
 // Post-hand review for one seat: grade the DISCARD (your keep vs the best, by EV)
@@ -11,9 +12,12 @@ export interface PegReviewPlay {
   by: number;
   card: Card;
   pts: number; // points this play actually scored
-  best: number; // most you could have scored here (your plays only)
-  missed: number; // best − pts (your plays only)
   total: number; // running total after the play
+  // MC pegging analysis (your plays only):
+  yourEV?: number; // expected net pegging (you − opp) of the card you played
+  bestLabel?: string; // the card the analysis would play
+  bestEV?: number;
+  evLost?: number; // bestEV − yourEV
 }
 
 export interface HandReview {
@@ -32,7 +36,7 @@ export interface HandReview {
   };
   pegging: PegReviewPlay[];
   yourPegPoints: number;
-  yourMissed: number;
+  yourEvLost: number; // total expected net pegging given up across your plays
 }
 
 /** Build the review for `seat` once the hand is over (starter cut, cards played). */
@@ -47,35 +51,26 @@ export function reviewHand(state: CribState, seat: number, samples = 200): HandR
   const evs = analyzeDiscard(me.deal, ownsCrib, samples);
   const { grade, lost } = gradeDiscard(evs, kept);
 
-  // Pegging: replay the log, evaluating your alternatives at each of your plays.
-  const remaining = state.players.map((p) =>
-    p.deal.filter((c) => !p.laidAway.some((l) => cardId(l) === cardId(c))),
-  );
-  let seq: Card[] = [];
+  // Pegging: Monte-Carlo net-EV analysis of each of your plays.
+  const decisions = analyzePegging(state, seat);
   const pegging: PegReviewPlay[] = [];
   let yourPegPoints = 0;
-  let yourMissed = 0;
-  for (const e of state.playLog) {
-    const v = cardPoints(e.card);
-    const before = e.total - v; // running total before this play
-    if (before === 0) seq = []; // first card of a fresh series
-    let best = e.pts;
-    let missed = 0;
+  let yourEvLost = 0;
+  state.playLog.forEach((e, i) => {
+    const play: PegReviewPlay = { by: e.by, card: e.card, pts: e.pts, total: e.total };
     if (e.by === seat) {
-      const legal = remaining[seat].filter((c) => before + cardPoints(c) <= 31);
-      const actual = scorePlay([...seq, e.card], e.total);
-      for (const c of legal) {
-        const s = scorePlay([...seq, c], before + cardPoints(c));
-        if (s > best) best = s;
-      }
-      missed = Math.max(0, best - actual);
       yourPegPoints += e.pts;
-      yourMissed += missed;
+      const d = decisions.get(i);
+      if (d) {
+        play.yourEV = d.yourEV;
+        play.bestLabel = d.bestLabel;
+        play.bestEV = d.bestEV;
+        play.evLost = d.evLost;
+        yourEvLost += d.evLost;
+      }
     }
-    seq.push(e.card);
-    remaining[e.by] = remaining[e.by].filter((c) => cardId(c) !== cardId(e.card));
-    pegging.push({ by: e.by, card: e.card, pts: e.pts, best, missed, total: e.total });
-  }
+    pegging.push(play);
+  });
 
   return {
     seat,
@@ -86,6 +81,38 @@ export function reviewHand(state: CribState, seat: number, samples = 200): HandR
     discard: { kept, discarded: me.laidAway, best: evs[0].keep, grade, lost, top: evs.slice(0, 5) },
     pegging,
     yourPegPoints,
-    yourMissed,
+    yourEvLost,
   };
+}
+
+/** Plain-text export of a hand review (for the Copy button). */
+export function reviewToText(r: HandReview, oppName: string): string {
+  const labels = (cs: Card[]) => cs.map(cardLabel).join(" ");
+  const out: string[] = ["Cribbage — Hand review", ""];
+  out.push(`Cut: ${cardLabel(r.starter)}${r.ownsCrib ? " · your crib" : ""}`, "");
+
+  out.push(`Discard — ${r.discard.grade}${r.discard.lost > 0.3 ? ` · gave up ${r.discard.lost.toFixed(1)} pts` : ""}`);
+  out.push(`  kept ${labels(r.discard.kept)} → crib ${labels(r.discard.discarded)}`);
+  for (const e of r.discard.top)
+    out.push(
+      `  ${labels(e.keep)}  net ${e.net.toFixed(1)} (hand ${e.handEV.toFixed(1)} · crib ${r.ownsCrib ? "+" : "−"}${e.cribEV.toFixed(1)})`,
+    );
+  out.push("");
+
+  out.push(`Pegging — you scored ${r.yourPegPoints}${r.yourEvLost > 0.3 ? ` · gave up ${r.yourEvLost.toFixed(1)} net` : ""}`);
+  for (const p of r.pegging) {
+    const who = p.by === r.seat ? "you" : oppName;
+    let line = `  ${who}: ${cardLabel(p.card)} (${p.total})${p.pts ? ` +${p.pts}` : ""}`;
+    if (p.by === r.seat && p.yourEV !== undefined) {
+      line += `  [EV ${p.yourEV >= 0 ? "+" : ""}${p.yourEV.toFixed(1)}`;
+      if (p.bestLabel && p.evLost && p.evLost > 0.2) line += ` · best ${p.bestLabel} ${p.bestEV! >= 0 ? "+" : ""}${p.bestEV!.toFixed(1)}`;
+      line += "]";
+    }
+    out.push(line);
+  }
+  out.push("");
+
+  out.push(`Your hand: ${r.handScore.total} — ${describeShow(r.handScore)}`);
+  if (r.cribScore) out.push(`Your crib: ${r.cribScore.total} — ${describeShow(r.cribScore)}`);
+  return out.join("\n");
 }

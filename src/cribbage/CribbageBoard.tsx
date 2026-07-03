@@ -137,7 +137,9 @@ export function CribbageBoard(props: BoardProps) {
 
   return (
     <main className="app screen cribbage">
-      {review && <CribReview review={review} me={me} onClose={() => setReview(null)} />}
+      {review && (
+        <CribReview review={review} me={me} oppName={g.players[opp].name} onClose={() => setReview(null)} />
+      )}
       <div className="screen-head">
         <BackButton onClick={props.onExit} />
         <h1>{props.title}</h1>

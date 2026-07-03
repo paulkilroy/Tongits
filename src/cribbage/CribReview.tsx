@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { cardId } from "../engine/cards";
-import { type HandReview } from "./review";
+import { type HandReview, reviewToText } from "./review";
 import { type CribGrade } from "./coach";
 import { describeShow } from "./scoring";
 import { CribCard } from "./CribbageBoard";
+
+const ev = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
 
 const GRADE_LABEL: Record<CribGrade, string> = { best: "Best", good: "Good", ok: "OK", loose: "Loose" };
 // Reuse the Tongits grade colours (grade-best/good/inaccuracy/mistake).
@@ -13,9 +16,25 @@ const GRADE_CLASS: Record<CribGrade, string> = {
   loose: "mistake",
 };
 
-export function CribReview({ review, me, onClose }: { review: HandReview; me: number; onClose: () => void }) {
+export function CribReview({
+  review,
+  me,
+  oppName,
+  onClose,
+}: {
+  review: HandReview;
+  me: number;
+  oppName: string;
+  onClose: () => void;
+}) {
   const r = review;
   const keptIds = new Set(r.discard.kept.map(cardId));
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    void navigator.clipboard?.writeText(reviewToText(r, oppName));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
   return (
     <div className="reveal-backdrop">
       <div className="reveal review cr-review">
@@ -66,22 +85,38 @@ export function CribReview({ review, me, onClose }: { review: HandReview; me: nu
           </div>
         </div>
 
-        {/* ---- pegging ---- */}
+        {/* ---- pegging (play-by-play MC) ---- */}
         <div className="cr-rv-sec">
           <div className="cr-rv-head">
             Pegging — you scored <strong>{r.yourPegPoints}</strong>
-            {r.yourMissed > 0 && <span className="cr-rv-lost"> · missed {r.yourMissed}</span>}
+            {r.yourEvLost > 0.3 && <span className="cr-rv-lost"> · gave up {r.yourEvLost.toFixed(1)} net</span>}
           </div>
-          <div className="cr-pegs">
-            {r.pegging.map((p, i) => (
-              <div className={`cr-peg ${p.by === me ? "mine" : "theirs"} ${p.by === me && p.missed > 0 ? "miss" : ""}`} key={i}>
-                <CribCard card={p.card} mini />
-                <span className="cr-peg-total">{p.total}</span>
-                {p.pts > 0 && <span className="cr-peg-pts">+{p.pts}</span>}
-                {p.by === me && p.missed > 0 && <span className="cr-peg-miss">missed +{p.missed}</span>}
-              </div>
-            ))}
+          <div className="cr-plays">
+            {r.pegging.map((p, i) => {
+              const mine = p.by === me;
+              const off = mine && p.evLost !== undefined && p.evLost > 0.5;
+              return (
+                <div className={`cr-play ${mine ? "mine" : "theirs"} ${off ? "off" : ""}`} key={i}>
+                  <span className="cr-play-who">{mine ? "You" : oppName}</span>
+                  <CribCard card={p.card} mini />
+                  <span className="cr-play-total">{p.total}</span>
+                  {p.pts > 0 && <span className="cr-peg-pts">+{p.pts}</span>}
+                  {mine && p.yourEV !== undefined && (
+                    <span className="cr-play-ev">
+                      net {ev(p.yourEV)}
+                      {off && p.bestLabel && (
+                        <span className="cr-play-best">
+                          {" "}
+                          · best {p.bestLabel} {ev(p.bestEV!)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          <div className="cr-lbl cr-play-note">net = expected pegging points you − opponent, over the rest of the play</div>
         </div>
 
         {/* ---- show ---- */}
@@ -102,6 +137,9 @@ export function CribReview({ review, me, onClose }: { review: HandReview; me: nu
         </div>
 
         <div className="review-actions">
+          <button className="reveal-secondary" onClick={copy}>
+            {copied ? "Copied!" : "Copy"}
+          </button>
           <button className="reveal-replay" onClick={onClose}>
             Close
           </button>

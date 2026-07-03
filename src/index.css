@@ -2121,3 +2121,50 @@ h1 {
   color: #ff9a9a;
   text-align: center;
 }
+
+/* cribbage review — play-by-play pegging */
+.cr-plays {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cr-play {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+}
+.cr-play.mine {
+  background: rgba(255, 214, 90, 0.1);
+}
+.cr-play.theirs {
+  opacity: 0.7;
+}
+.cr-play.off {
+  outline: 1px solid rgba(255, 122, 122, 0.6);
+}
+.cr-play-who {
+  min-width: 2.6rem;
+  opacity: 0.75;
+  font-size: 0.72rem;
+}
+.cr-play-total {
+  min-width: 1.4rem;
+  text-align: right;
+  opacity: 0.6;
+  font-size: 0.72rem;
+}
+.cr-play-ev {
+  margin-left: auto;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.cr-play-best {
+  color: #ffd27a;
+  font-weight: 600;
+}
+.cr-play-note {
+  margin-top: 0.4rem;
+}

@@ -32,15 +32,19 @@ describe("cribbage post-hand review", () => {
 
     // pegging: every card that was played is in the log, 8 total for a 2-hand round
     expect(r.pegging.length).toBe(8);
-    // reconstruction matches the recorded points exactly
     for (const p of r.pegging) {
       expect(p.pts).toBeGreaterThanOrEqual(0);
-      expect(p.missed).toBeGreaterThanOrEqual(0);
-      if (p.by === 0) expect(p.best).toBeGreaterThanOrEqual(p.pts);
+      if (p.by === 0) {
+        // your plays carry an MC net-EV analysis; you never beat the best
+        expect(p.yourEV).toBeDefined();
+        expect(p.evLost).toBeGreaterThanOrEqual(0);
+        expect(p.bestEV!).toBeGreaterThanOrEqual(p.yourEV! - 1e-6);
+      }
     }
     // your pegging total is the sum of your recorded plays
     const mine = r.pegging.filter((p) => p.by === 0).reduce((a, p) => a + p.pts, 0);
     expect(r.yourPegPoints).toBe(mine);
+    expect(r.yourEvLost).toBeGreaterThanOrEqual(0);
   });
 
   it("keeps the recorded deal/laid-away consistent with the played hand", () => {
