@@ -1710,3 +1710,167 @@ h1 {
   line-height: 1.5;
   min-height: 4rem;
 }
+
+/* ------------------------------ cribbage --------------------------------- */
+.cribbage .cr-scores {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+.cr-score {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid transparent;
+}
+.cr-score.active {
+  border-color: #ffd65a;
+}
+.cr-score-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+.cr-score-top strong {
+  font-size: 1.35rem;
+}
+.cr-dealer {
+  margin-left: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  background: #ffd65a;
+  color: #062b18;
+  border-radius: 4px;
+  padding: 0.02rem 0.28rem;
+  vertical-align: middle;
+}
+.cr-track {
+  margin-top: 0.35rem;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cr-track-fill {
+  height: 100%;
+  background: #36c46a;
+  transition: width 0.3s;
+}
+.cr-starter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-bottom: 0.7rem;
+}
+.cr-lbl {
+  font-size: 0.75rem;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cr-flash {
+  text-align: center;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.8rem;
+  min-height: 1.2rem;
+}
+.cr-phase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+.cr-instr {
+  margin: 0;
+  text-align: center;
+  opacity: 0.9;
+}
+.cr-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+.cr-play-total {
+  font-size: 1rem;
+}
+.cr-play-total strong {
+  font-size: 1.8rem;
+  color: #ffd65a;
+}
+.cr-seq {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  min-height: 2rem;
+  align-items: center;
+}
+.cr-oppline {
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+.cr-reveal {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+.cr-reveal-head {
+  font-size: 0.95rem;
+}
+.cr-over {
+  text-align: center;
+}
+.cr-over h2 {
+  margin: 0.3rem 0;
+}
+.cribbage .reveal-replay {
+  max-width: 320px;
+}
+
+/* ------------------------------ game picker ------------------------------ */
+.home-games {
+  margin-bottom: 0.4rem;
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+.picker-sub {
+  opacity: 0.8;
+  margin: 0 0 1.1rem;
+}
+.picker-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 1.1rem 1.2rem;
+  cursor: pointer;
+  border: none;
+  color: inherit;
+  font: inherit;
+}
+.picker-emoji {
+  font-size: 2rem;
+}
+.picker-name {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.picker-desc {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}

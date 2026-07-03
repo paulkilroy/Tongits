@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./engine/cards";
+import { CribbageGame } from "./cribbage/CribbageGame";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
@@ -1844,11 +1845,13 @@ function Lobby({
   initialCode,
   account,
   onUpdateProfile,
+  onExitToMenu,
 }: {
   onStart: (m: Mode) => void;
   initialCode?: string;
   account: Account | null;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
+  onExitToMenu: () => void;
 }) {
   const [screen, setScreen] = useState<"main" | "rules" | "friends" | "coach">("main");
   const [showAvatars, setShowAvatars] = useState(false);
@@ -1962,6 +1965,9 @@ function Lobby({
     <main className="app home">
       {prompt}
 
+      <button className="link-btn home-games" onClick={onExitToMenu}>
+        ‹ Games
+      </button>
       <header className="home-top">
         <h1>
           <Icon name="card" size={26} /> Tongits
@@ -2086,13 +2092,50 @@ function Lobby({
 
 /* --------------------------------- app ----------------------------------- */
 
+type GameChoice = "menu" | "tongits" | "cribbage";
+
+function GamePicker({ onPick }: { onPick: (g: GameChoice) => void }) {
+  return (
+    <main className="app screen picker">
+      <header className="home-top">
+        <h1>Game room</h1>
+      </header>
+      <p className="picker-sub">Pick a game to play with Ella or practice vs the AI.</p>
+      <div className="picker-grid">
+        <button className="panel picker-card" onClick={() => onPick("tongits")}>
+          <span className="picker-emoji">🀄</span>
+          <span className="picker-name">Tongits</span>
+          <span className="picker-desc">2–3 player rummy · online + AI + coach</span>
+        </button>
+        <button className="panel picker-card" onClick={() => onPick("cribbage")}>
+          <span className="picker-emoji">🎯</span>
+          <span className="picker-name">Cribbage</span>
+          <span className="picker-desc">Peg to 121 · vs AI (online soon)</span>
+        </button>
+      </div>
+    </main>
+  );
+}
+
 export function App() {
+  const [game, setGame] = useState<GameChoice>("menu");
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
   const { account, update, setBalance } = useAccount();
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
 
+  if (game === "menu") return <GamePicker onPick={setGame} />;
+  if (game === "cribbage") return <CribbageGame onExit={() => setGame("menu")} />;
+
   if (mode.kind === "lobby")
-    return <Lobby onStart={setMode} initialCode={joinCode} account={account} onUpdateProfile={update} />;
+    return (
+      <Lobby
+        onStart={setMode}
+        initialCode={joinCode}
+        account={account}
+        onUpdateProfile={update}
+        onExitToMenu={() => setGame("menu")}
+      />
+    );
   if (mode.kind === "local") return <LocalGame onExit={() => setMode({ kind: "lobby" })} />;
   return (
     <OnlineGame
