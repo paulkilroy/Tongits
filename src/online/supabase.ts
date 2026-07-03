@@ -89,6 +89,24 @@ export async function pushRoomData<T>(code: string, data: T): Promise<void> {
   if (error) throw error;
 }
 
+/** Compare-and-swap write: only succeeds if the row's current data.version still
+ *  equals `expectedVersion`. Lets two clients act on the SAME state (e.g. both
+ *  discarding at once) without one silently clobbering the other. */
+export async function pushRoomDataVersioned<T>(
+  code: string,
+  data: T,
+  expectedVersion: number,
+): Promise<boolean> {
+  const { data: rows, error } = await supabase()
+    .from("rooms")
+    .update({ data })
+    .eq("code", code)
+    .eq("data->>version", String(expectedVersion))
+    .select("code");
+  if (error) throw error;
+  return (rows?.length ?? 0) > 0;
+}
+
 export function subscribeRoomData<T>(code: string, onData: (data: T) => void): () => void {
   const channel = supabase()
     .channel(`room:${code}`)

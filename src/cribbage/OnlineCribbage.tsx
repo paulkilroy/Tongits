@@ -1,15 +1,6 @@
 import { useEffect } from "react";
 import { type Card } from "../engine/cards";
-import {
-  newRound,
-  discardToCrib,
-  playCard,
-  go,
-  nextShow,
-  discardTurn,
-  roundComplete,
-  STANDARD_CRIB_RULES,
-} from "./game";
+import { newRound, playCard, go, nextShow, roundComplete, STANDARD_CRIB_RULES } from "./game";
 import { CribbageBoard } from "./CribbageBoard";
 import { useOnlineCribbage } from "./online";
 import { BackButton } from "../ui/Icon";
@@ -18,7 +9,7 @@ const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 
 /** A live 2-player cribbage game over a Supabase room. Host is seat 0. */
 export function OnlineCribbage({ code, isHost, onExit }: { code: string; isHost: boolean; onExit: () => void }) {
-  const { game: g, connected, write } = useOnlineCribbage(code, isHost);
+  const { game: g, connected, write, discard } = useOnlineCribbage(code, isHost);
   const me = isHost ? 0 : 1;
 
   // Host drives the show: count each hand out on a timer so both watch it flow.
@@ -50,14 +41,12 @@ export function OnlineCribbage({ code, isHost, onExit }: { code: string; isHost:
   }
 
   const oppName = g.players[(me + 1) % 2].name;
-  const myDiscardStep = discardTurn(g) === me;
   const myTurn = g.phase === "play" && g.current === me;
 
   let waiting: string | null = null;
   if (!connected) waiting = "Reconnecting…";
-  else if (g.phase === "discard" && !myDiscardStep && g.players[me].discarded)
+  else if (g.phase === "discard" && g.players[me].discarded)
     waiting = `Waiting for ${oppName} to lay away…`;
-  else if (g.phase === "play" && !myTurn) waiting = null; // board already shows "their turn"
 
   const dealNext = () =>
     write(
@@ -78,10 +67,10 @@ export function OnlineCribbage({ code, isHost, onExit }: { code: string; isHost:
       title="Cribbage · online"
       onExit={onExit}
       coach
-      canDiscard={g.phase === "discard" && myDiscardStep && !g.players[me].discarded}
+      canDiscard={g.phase === "discard" && !g.players[me].discarded}
       waiting={waiting}
       onDiscard={(cards: Card[]) => {
-        if (myDiscardStep) write(discardToCrib(g, me, cards));
+        if (g.phase === "discard" && !g.players[me].discarded) void discard(me, cards);
       }}
       onPlay={(c) => {
         if (myTurn) write(playCard(g, c));

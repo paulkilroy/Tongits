@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type CribState, newRound, STANDARD_CRIB_RULES } from "./game";
-import { createRoomData, fetchRoomData, makeCode, pushRoomData, subscribeRoomData } from "../online/supabase";
+import { type Card } from "../engine/cards";
+import { type CribState, discardToCrib, newRound, STANDARD_CRIB_RULES } from "./game";
+import {
+  createRoomData,
+  fetchRoomData,
+  makeCode,
+  pushRoomData,
+  pushRoomDataVersioned,
+  subscribeRoomData,
+} from "../online/supabase";
 
 const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 
@@ -31,10 +39,12 @@ export function useOnlineCribbage(code: string, isHost: boolean) {
   const [room, setRoom] = useState<CribRoom | null>(null);
   const [connected, setConnected] = useState(false);
   const versionRef = useRef(0);
+  const roomRef = useRef<CribRoom | null>(null);
 
   const apply = useCallback((d: CribRoom) => {
     if (d.version < versionRef.current) return;
     versionRef.current = d.version;
+    roomRef.current = d;
     setRoom(d);
   }, []);
 
@@ -42,10 +52,35 @@ export function useOnlineCribbage(code: string, isHost: boolean) {
     (game: CribState) => {
       const data: CribRoom = { kind: "cribbage", game, version: versionRef.current + 1 };
       versionRef.current = data.version;
+      roomRef.current = data;
       setRoom(data);
       void pushRoomData(code, data).catch((e) => console.error("cribbage pushRoom failed", e));
     },
     [code],
+  );
+
+  // Discards can happen SIMULTANEOUSLY, so they use a compare-and-swap write:
+  // if the other player got in first, re-fetch and re-apply your lay-away on top
+  // (so neither is clobbered), then retry.
+  const discard = useCallback(
+    async (seat: number, cards: Card[]) => {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const cur = roomRef.current;
+        if (!cur || cur.game.players[seat].discarded) return;
+        const nextGame = discardToCrib(cur.game, seat, cards);
+        if (nextGame === cur.game) return; // illegal / already applied
+        const data: CribRoom = { kind: "cribbage", game: nextGame, version: cur.version + 1 };
+        const ok = await pushRoomDataVersioned(code, data, cur.version).catch(() => false);
+        if (ok) {
+          apply(data);
+          return;
+        }
+        const fresh = await fetchRoomData<CribRoom>(code).catch(() => null);
+        if (fresh) apply(fresh);
+        else return;
+      }
+    },
+    [code, apply],
   );
 
   useEffect(() => {
@@ -65,5 +100,5 @@ export function useOnlineCribbage(code: string, isHost: boolean) {
     };
   }, [code, apply]);
 
-  return { game: room?.game ?? null, connected, write, isHost };
+  return { game: room?.game ?? null, connected, write, discard, isHost };
 }
