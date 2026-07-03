@@ -15,6 +15,16 @@ export interface CribPlayer {
   played: Card[]; // laid during the play (all 4 by the show)
   score: number;
   discarded: boolean; // has this player put 2 in the crib yet?
+  deal: Card[]; // the 6 originally dealt this hand (kept for the review)
+  laidAway: Card[]; // the 2 this player put in the crib (kept for the review)
+}
+
+/** One pegging play, recorded across the whole hand for the post-hand review. */
+export interface PlayLogEntry {
+  by: number;
+  card: Card;
+  pts: number; // pegging points this play scored
+  total: number; // running total AFTER the play (first card of a series == its value)
 }
 
 export interface ShowReveal {
@@ -39,6 +49,7 @@ export interface CribState {
   seq: Card[]; // cards in the current pegging series (since the last 31/reset)
   seqBy: number[]; // who laid each card in `seq` (parallel array)
   total: number; // running total of `seq`
+  playLog: PlayLogEntry[]; // every card played this hand, for the review
   passCount: number; // consecutive "go"s; two in a row ends the series
   lastPlayer: number | null; // who laid the last card (takes the go / last-card point)
   showStage: number; // 0 pone hand · 1 dealer hand · 2 crib · 3 done
@@ -76,9 +87,12 @@ export function newRound(
     played: [],
     score: scores[i] ?? 0,
     discarded: false,
+    deal: [],
+    laidAway: [],
   }));
   const p0 = other(dealer); // pone dealt first
   for (let i = 0; i < 12; i++) players[(p0 + i) % 2].hand.push(deck[i]);
+  players.forEach((p) => (p.deal = [...p.hand])); // remember the original 6
   return {
     players,
     dealer,
@@ -90,6 +104,7 @@ export function newRound(
     seq: [],
     seqBy: [],
     total: 0,
+    playLog: [],
     passCount: 0,
     lastPlayer: null,
     showStage: 0,
@@ -125,6 +140,7 @@ export function discardToCrib(state: CribState, player: number, cards: Card[]): 
   const me = s.players[player];
   me.hand = me.hand.filter((c) => !ids.has(`${c.rank}-${c.suit}`));
   me.discarded = true;
+  me.laidAway = [...cards];
   s.crib.push(...cards);
   note(s, `${me.name} lays 2 in the crib.`);
 
@@ -177,6 +193,7 @@ export function playCard(state: CribState, card: Card): CribState {
   note(s, `${me.name} plays ${cardLabel(card)} (${s.total}).`);
 
   const pts = scorePlay(s.seq, s.total);
+  s.playLog.push({ by: P, card, pts, total: s.total });
   if (pts && addScore(s, P, pts, "pegging")) return s;
 
   if (s.total === 31) {

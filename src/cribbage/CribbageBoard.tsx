@@ -3,6 +3,8 @@ import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
 import { type CribState, legalPlays, canPlay, pone, roundComplete } from "./game";
 import { describeShow } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval } from "./coach";
+import { reviewHand, type HandReview } from "./review";
+import { CribReview } from "./CribReview";
 import { BackButton } from "../ui/Icon";
 
 const SUIT_CLASS: Record<Suit, string> = {
@@ -84,6 +86,7 @@ export function CribbageBoard(props: BoardProps) {
   const opp = (me + 1) % 2;
   const [sel, setSel] = useState<Card[]>([]);
   const [showCoach, setShowCoach] = useState(false);
+  const [review, setReview] = useState<HandReview | null>(null);
   const seenLog = useRef(0);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -134,6 +137,7 @@ export function CribbageBoard(props: BoardProps) {
 
   return (
     <main className="app screen cribbage">
+      {review && <CribReview review={review} me={me} onClose={() => setReview(null)} />}
       <div className="screen-head">
         <BackButton onClick={props.onExit} />
         <h1>{props.title}</h1>
@@ -281,12 +285,19 @@ export function CribbageBoard(props: BoardProps) {
               ) : (
                 <div className="cr-lbl">counting…</div>
               )
-            ) : onNextRound ? (
-              <button className="reveal-replay" onClick={onNextRound}>
-                Next hand
-              </button>
             ) : (
-              <div className="cr-lbl">{waiting ?? "waiting for next hand…"}</div>
+              <div className="cr-row2">
+                <button className="cr-coach-btn" onClick={() => setReview(reviewHand(g, me))}>
+                  🔍 Review hand
+                </button>
+                {onNextRound ? (
+                  <button className="reveal-replay cr-discard-btn" onClick={onNextRound}>
+                    Next hand
+                  </button>
+                ) : (
+                  <div className="cr-lbl">{waiting ?? "waiting for next hand…"}</div>
+                )}
+              </div>
             )}
           </div>
         )}

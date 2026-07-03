@@ -2043,3 +2043,81 @@ h1 {
   opacity: 0.35;
   cursor: default;
 }
+
+/* --------------------------- cribbage hand review ------------------------ */
+.cr-review .cr-rv-starter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 0.6rem;
+}
+.cr-rv-sec {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.6rem;
+  text-align: left;
+}
+.cr-rv-head {
+  font-size: 0.92rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.45rem;
+}
+.cr-rv-lost {
+  font-weight: 400;
+  opacity: 0.8;
+}
+.cr-rv-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.2rem 0;
+  font-size: 0.85rem;
+}
+.cr-rv-desc {
+  opacity: 0.75;
+  font-size: 0.8rem;
+}
+.cr-pegs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.cr-peg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  padding: 0.25rem 0.3rem;
+  border-radius: 8px;
+  min-width: 2.7rem;
+}
+.cr-peg.mine {
+  background: rgba(255, 214, 90, 0.12);
+}
+.cr-peg.theirs {
+  opacity: 0.7;
+}
+.cr-peg.miss {
+  outline: 1px solid #ff7a7a;
+}
+.cr-peg-total {
+  font-size: 0.68rem;
+  opacity: 0.6;
+}
+.cr-peg-pts {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #36c46a;
+}
+.cr-peg-miss {
+  font-size: 0.62rem;
+  color: #ff9a9a;
+  text-align: center;
+}
