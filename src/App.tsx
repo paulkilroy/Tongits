@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./engine/cards";
-import { CribbageGame } from "./cribbage/CribbageGame";
+import { CribbageHome } from "./cribbage/CribbageHome";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
@@ -2124,7 +2124,8 @@ export function App() {
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
 
   if (game === "menu") return <GamePicker onPick={setGame} />;
-  if (game === "cribbage") return <CribbageGame onExit={() => setGame("menu")} />;
+  if (game === "cribbage")
+    return <CribbageHome name={account?.name ?? "You"} onExit={() => setGame("menu")} />;
 
   if (mode.kind === "lobby")
     return (

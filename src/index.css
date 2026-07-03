@@ -1980,3 +1980,11 @@ h1 {
   font-size: 0.66rem;
   opacity: 0.6;
 }
+
+.cr-waiting {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #ffd65a;
+  opacity: 0.9;
+  min-height: 1.1rem;
+}

@@ -257,3 +257,13 @@ export function nextShow(state: CribState): CribState {
 
 /** True once the show is fully counted and the round can advance. */
 export const roundComplete = (s: CribState): boolean => s.phase === "show" && s.showStage >= 3;
+
+/** Whose turn it is to lay away, in a fixed order (pone first, then dealer), so
+ *  online play serialises the two discards and never drops one to a race. */
+export function discardTurn(s: CribState): number | null {
+  if (s.phase !== "discard") return null;
+  const p = pone(s);
+  if (!s.players[p].discarded) return p;
+  if (!s.players[s.dealer].discarded) return s.dealer;
+  return null;
+}

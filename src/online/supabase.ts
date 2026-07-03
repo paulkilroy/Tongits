@@ -56,13 +56,38 @@ export async function pushRoom(code: string, data: RoomData): Promise<void> {
 
 /** Subscribe to live updates for a room. Returns an unsubscribe function. */
 export function subscribeRoom(code: string, onData: (data: RoomData) => void): () => void {
+  return subscribeRoomData(code, onData);
+}
+
+// ---- generic variants (any jsonb payload) — used by other games (cribbage) ----
+// The `rooms.data` column is opaque jsonb, so a room can carry any game's shape.
+// Rooms are keyed by code, and a client only ever reads its own room, so Tongits
+// and cribbage rooms coexist safely in the same table.
+
+export async function createRoomData<T>(code: string, data: T): Promise<void> {
+  const { error } = await supabase().from("rooms").insert({ code, data });
+  if (error) throw error;
+}
+
+export async function fetchRoomData<T>(code: string): Promise<T | null> {
+  const { data, error } = await supabase().from("rooms").select("data").eq("code", code).maybeSingle();
+  if (error) throw error;
+  return (data?.data as T) ?? null;
+}
+
+export async function pushRoomData<T>(code: string, data: T): Promise<void> {
+  const { error } = await supabase().from("rooms").update({ data }).eq("code", code);
+  if (error) throw error;
+}
+
+export function subscribeRoomData<T>(code: string, onData: (data: T) => void): () => void {
   const channel = supabase()
     .channel(`room:${code}`)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "rooms", filter: `code=eq.${code}` },
       (payload) => {
-        const row = payload.new as { data?: RoomData } | null;
+        const row = payload.new as { data?: T } | null;
         if (row?.data) onData(row.data);
       },
     )

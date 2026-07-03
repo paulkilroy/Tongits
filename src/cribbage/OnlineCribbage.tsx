@@ -1,0 +1,105 @@
+import { useEffect } from "react";
+import { type Card } from "../engine/cards";
+import {
+  newRound,
+  discardToCrib,
+  playCard,
+  go,
+  nextShow,
+  discardTurn,
+  roundComplete,
+  STANDARD_CRIB_RULES,
+} from "./game";
+import { CribbageBoard } from "./CribbageBoard";
+import { useOnlineCribbage } from "./online";
+
+const randSeed = () => Math.floor(Math.random() * 2 ** 31);
+
+/** A live 2-player cribbage game over a Supabase room. Host is seat 0. */
+export function OnlineCribbage({ code, isHost, onExit }: { code: string; isHost: boolean; onExit: () => void }) {
+  const { game: g, connected, write } = useOnlineCribbage(code, isHost);
+  const me = isHost ? 0 : 1;
+
+  // Host drives the show: count each hand out on a timer so both watch it flow.
+  useEffect(() => {
+    if (!isHost || !g) return;
+    if (g.phase === "show" && !roundComplete(g)) {
+      const t = setTimeout(() => write(nextShow(g)), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [isHost, g, write]);
+
+  if (!g) {
+    return (
+      <main className="app screen cribbage">
+        <div className="screen-head">
+          <button className="back-btn" onClick={onExit} aria-label="Back">
+            ‹
+          </button>
+          <h1>Cribbage · online</h1>
+          <span />
+        </div>
+        <div className="screen-body">
+          <p className="cr-instr">
+            {connected ? "Waiting for the room…" : "Connecting…"}
+            <br />
+            <span className="cr-lbl">Share code: {code}</span>
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const oppName = g.players[(me + 1) % 2].name;
+  const myDiscardStep = discardTurn(g) === me;
+  const myTurn = g.phase === "play" && g.current === me;
+
+  let waiting: string | null = null;
+  if (!connected) waiting = "Reconnecting…";
+  else if (g.phase === "discard" && !myDiscardStep && g.players[me].discarded)
+    waiting = `Waiting for ${oppName} to lay away…`;
+  else if (g.phase === "play" && !myTurn) waiting = null; // board already shows "their turn"
+
+  const dealNext = () =>
+    write(
+      newRound(
+        STANDARD_CRIB_RULES,
+        randSeed(),
+        g.players.map((p) => p.name),
+        [false, false],
+        (g.dealer + 1) % 2,
+        g.players.map((p) => p.score),
+      ),
+    );
+
+  return (
+    <CribbageBoard
+      g={g}
+      me={me}
+      title="Cribbage · online"
+      onExit={onExit}
+      coach
+      canDiscard={g.phase === "discard" && myDiscardStep && !g.players[me].discarded}
+      waiting={waiting}
+      onDiscard={(cards: Card[]) => {
+        if (myDiscardStep) write(discardToCrib(g, me, cards));
+      }}
+      onPlay={(c) => {
+        if (myTurn) write(playCard(g, c));
+      }}
+      onGo={() => {
+        if (myTurn) write(go(g));
+      }}
+      // Host paces structural steps; guest waits.
+      onNextRound={isHost && roundComplete(g) ? dealNext : undefined}
+      onNewGame={
+        isHost && g.phase === "gameOver"
+          ? () =>
+              write(
+                newRound(STANDARD_CRIB_RULES, randSeed(), g.players.map((p) => p.name), [false, false], 0, [0, 0]),
+              )
+          : undefined
+      }
+    />
+  );
+}
