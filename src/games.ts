@@ -32,8 +32,8 @@ export const GAMES: Record<GameKind, GameMeta> = {
     kind: "pressyourluck",
     name: "Press Your Luck",
     emoji: "🎲",
-    desc: "Push-your-luck dice · Farkle / Zilch · vs AI + coach",
-    online: false,
+    desc: "Push-your-luck dice · Farkle / Zilch · online + AI + coach",
+    online: true,
   },
 };
 

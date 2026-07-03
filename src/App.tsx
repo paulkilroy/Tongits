@@ -11,7 +11,11 @@ import { CribbageMenu } from "./cribbage/CribbageMenu";
 import { CribbageGame } from "./cribbage/CribbageGame";
 import { OnlineCribbage } from "./cribbage/OnlineCribbage";
 import { hostCribbageRoom } from "./cribbage/online";
-import { FarkleHome } from "./farkle/FarkleHome";
+import { FarkleMenu } from "./farkle/FarkleMenu";
+import { FarkleGame } from "./farkle/FarkleGame";
+import { OnlineFarkle } from "./farkle/OnlineFarkle";
+import { hostFarkleRoom } from "./farkle/online";
+import { RULESETS, type FarkleRules } from "./farkle/rules";
 import { GAME_LIST, type GameKind } from "./games";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
@@ -1960,6 +1964,10 @@ function Lobby({
 
 type GameChoice = "menu" | GameKind;
 type CribMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string; isHost: boolean };
+type FarkMode =
+  | { k: "menu" }
+  | { k: "local"; rules: FarkleRules }
+  | { k: "online"; code: string; isHost: boolean };
 
 function GamePicker({
   fr,
@@ -2077,8 +2085,10 @@ export function App() {
   const [game, setGame] = useState<GameChoice>("menu");
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
   const [crib, setCrib] = useState<CribMode>({ k: "menu" });
+  const [fark, setFark] = useState<FarkMode>({ k: "menu" });
   const [busy, setBusy] = useState(false);
   const [cribErr, setCribErr] = useState<string | null>(null);
+  const [farkErr, setFarkErr] = useState<string | null>(null);
   const { account, update, setBalance } = useAccount();
   const fr = useFriends(account);
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
@@ -2096,6 +2106,12 @@ export function App() {
       setCrib({ k: "online", code: ch.room_code, isHost: false });
       return;
     }
+    if (kind === "pressyourluck") {
+      await respondChallenge(ch.id, "accepted");
+      setGame("pressyourluck");
+      setFark({ k: "online", code: ch.room_code, isHost: false });
+      return;
+    }
     if (await joinRoomAs(ch.room_code, myProfile())) {
       await respondChallenge(ch.id, "accepted");
       setGame("tongits");
@@ -2109,7 +2125,12 @@ export function App() {
   async function invite(friendId: string, kind: GameKind) {
     setBusy(true);
     try {
-      if (kind === "cribbage") {
+      if (kind === "pressyourluck") {
+        const code = await hostFarkleRoom(account?.name ?? "You", RULESETS.classic);
+        await createChallenge(friendId, code);
+        setGame("pressyourluck");
+        setFark({ k: "online", code, isHost: true });
+      } else if (kind === "cribbage") {
         const code = await hostCribbageRoom(account?.name ?? "You");
         await createChallenge(friendId, code);
         setGame("cribbage");
@@ -2134,6 +2155,18 @@ export function App() {
       setCrib({ k: "online", code: await hostCribbageRoom(account?.name ?? "You"), isHost: true });
     } catch (e) {
       setCribErr((e as Error).message ?? "Could not create the room.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hostFarkle(rules: FarkleRules) {
+    setBusy(true);
+    setFarkErr(null);
+    try {
+      setFark({ k: "online", code: await hostFarkleRoom(account?.name ?? "You", rules), isHost: true });
+    } catch (e) {
+      setFarkErr((e as Error).message ?? "Could not create the room.");
     } finally {
       setBusy(false);
     }
@@ -2167,7 +2200,20 @@ export function App() {
       />
     );
   } else if (game === "pressyourluck") {
-    view = <FarkleHome onExit={() => setGame("menu")} />;
+    if (fark.k === "local") view = <FarkleGame rules={fark.rules} onExit={() => setFark({ k: "menu" })} />;
+    else if (fark.k === "online")
+      view = <OnlineFarkle code={fark.code} isHost={fark.isHost} onExit={() => setFark({ k: "menu" })} />;
+    else
+      view = (
+        <FarkleMenu
+          onLocal={(rules) => setFark({ k: "local", rules })}
+          onHost={hostFarkle}
+          onJoin={(c) => c.length >= 4 && setFark({ k: "online", code: c, isHost: false })}
+          onExit={() => setGame("menu")}
+          busy={busy}
+          error={farkErr}
+        />
+      );
   } else if (game === "cribbage") {
     if (crib.k === "local") view = <CribbageGame onExit={() => setCrib({ k: "menu" })} />;
     else if (crib.k === "online")

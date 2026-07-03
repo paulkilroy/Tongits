@@ -2245,10 +2245,13 @@ h1 {
   opacity: 0.75;
 }
 .cr-turn.you {
-  color: #062b18;
-  background: #ffd65a;
-  border-radius: 999px;
-  padding: 0.22rem 0.9rem;
+  color: #ffd65a;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: rgba(255, 214, 90, 0.12);
+  border-left: 3px solid #ffd65a;
+  border-radius: 4px;
+  padding: 0.28rem 0.75rem;
   opacity: 1;
 }
 

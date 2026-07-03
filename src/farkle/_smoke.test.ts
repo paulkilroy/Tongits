@@ -1,13 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { FarkleHome } from "./FarkleHome";
+import { FarkleMenu } from "./FarkleMenu";
 import { FarkleGame } from "./FarkleGame";
 import { CLASSIC } from "./rules";
 
 describe("farkle UI smoke", () => {
   it("renders the ruleset menu", () => {
-    const html = renderToString(createElement(FarkleHome, { onExit: () => {} }));
+    const html = renderToString(
+      createElement(FarkleMenu, {
+        onLocal: () => {},
+        onHost: () => {},
+        onJoin: () => {},
+        onExit: () => {},
+        busy: false,
+        error: null,
+      }),
+    );
     expect(html).toContain("Press Your Luck");
     expect(html).toContain("Play vs AI");
   });
