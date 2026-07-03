@@ -2238,3 +2238,16 @@ h1 {
   outline: 2px dashed rgba(255, 214, 90, 0.75);
   outline-offset: 2px;
 }
+
+.cr-turn {
+  font-size: 0.9rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+.cr-turn.you {
+  color: #062b18;
+  background: #ffd65a;
+  border-radius: 999px;
+  padding: 0.22rem 0.9rem;
+  opacity: 1;
+}

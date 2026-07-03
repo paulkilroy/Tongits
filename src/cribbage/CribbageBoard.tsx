@@ -268,9 +268,11 @@ export function CribbageBoard(props: BoardProps) {
                 )}
               </div>
             </div>
+            <div className={`cr-turn ${myTurn ? "you" : ""}`}>
+              {myTurn ? (canPlay(g, me) ? "Your turn" : "Your turn — say “Go”") : `Waiting for ${g.players[opp].name}…`}
+            </div>
             <div className="cr-oppline">
               {g.players[opp].name}: {g.players[opp].hand.length} card{g.players[opp].hand.length === 1 ? "" : "s"} left
-              {!myTurn && " · their turn"}
             </div>
             <div className="cr-hand">
               {myHand.map((c) => (
