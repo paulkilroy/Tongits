@@ -16,29 +16,13 @@ const GRADE_CLASS: Record<CribGrade, string> = {
   loose: "mistake",
 };
 
-export function CribReview({
-  review,
-  me,
-  oppName,
-  onClose,
-}: {
-  review: HandReview;
-  me: number;
-  oppName: string;
-  onClose: () => void;
-}) {
+/** The review content for one hand (no modal chrome). Shared by the single-hand
+ *  review and the game review stepper. */
+export function HandReviewBody({ review, me, oppName }: { review: HandReview; me: number; oppName: string }) {
   const r = review;
   const keptIds = new Set(r.discard.kept.map(cardId));
-  const [copied, setCopied] = useState(false);
-  function copy() {
-    void navigator.clipboard?.writeText(reviewToText(r, oppName));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
   return (
-    <div className="reveal-backdrop">
-      <div className="reveal review cr-review">
-        <h2 className="reveal-title">Hand review</h2>
+    <>
         <div className="cr-rv-starter">
           <span className="cr-lbl">cut</span>
           <CribCard card={r.starter} mini />
@@ -139,7 +123,32 @@ export function CribReview({
             </div>
           )}
         </div>
+    </>
+  );
+}
 
+export function CribReview({
+  review,
+  me,
+  oppName,
+  onClose,
+}: {
+  review: HandReview;
+  me: number;
+  oppName: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    void navigator.clipboard?.writeText(reviewToText(review, oppName));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+  return (
+    <div className="reveal-backdrop">
+      <div className="reveal review cr-review">
+        <h2 className="reveal-title">Hand review</h2>
+        <HandReviewBody review={review} me={me} oppName={oppName} />
         <div className="review-actions">
           <button className="reveal-secondary" onClick={copy}>
             {copied ? "Copied!" : "Copy"}

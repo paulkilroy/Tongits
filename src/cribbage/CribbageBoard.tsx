@@ -5,6 +5,7 @@ import { describeShow } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval } from "./coach";
 import { reviewHand, type HandReview } from "./review";
 import { CribReview } from "./CribReview";
+import { CribGameReview } from "./CribGameReview";
 import { BackButton } from "../ui/Icon";
 
 const SUIT_CLASS: Record<Suit, string> = {
@@ -87,8 +88,21 @@ export function CribbageBoard(props: BoardProps) {
   const [sel, setSel] = useState<Card[]>([]);
   const [showCoach, setShowCoach] = useState(false);
   const [review, setReview] = useState<HandReview | null>(null);
+  const [gameReview, setGameReview] = useState(false);
+  const [history, setHistory] = useState<{ state: CribState; sig: string }[]>([]);
   const seenLog = useRef(0);
   const [flash, setFlash] = useState<string | null>(null);
+
+  // Record each finished hand (deduped/updated by its deal) for the game review.
+  useEffect(() => {
+    if (!(roundComplete(g) || g.phase === "gameOver")) return;
+    const sig = g.players[me].deal.map(cardId).join(",");
+    setHistory((h) => {
+      const entry = { state: structuredClone(g), sig };
+      if (h.length && h[h.length - 1].sig === sig) return [...h.slice(0, -1), entry];
+      return [...h, entry];
+    });
+  }, [g, me]);
 
   useEffect(() => {
     if (g.log.length > seenLog.current) {
@@ -139,6 +153,14 @@ export function CribbageBoard(props: BoardProps) {
     <main className="app screen cribbage">
       {review && (
         <CribReview review={review} me={me} oppName={g.players[opp].name} onClose={() => setReview(null)} />
+      )}
+      {gameReview && history.length > 0 && (
+        <CribGameReview
+          hands={history.map((h) => h.state)}
+          me={me}
+          oppName={g.players[opp].name}
+          onClose={() => setGameReview(false)}
+        />
       )}
       <div className="screen-head">
         <BackButton onClick={props.onExit} />
@@ -311,11 +333,18 @@ export function CribbageBoard(props: BoardProps) {
             <div className="cr-lbl">
               {g.players[me].score} – {g.players[opp].score}
             </div>
-            {onNewGame && (
-              <button className="reveal-replay" onClick={onNewGame}>
-                New game
-              </button>
-            )}
+            <div className="cr-row2">
+              {history.length > 0 && (
+                <button className="cr-coach-btn" onClick={() => setGameReview(true)}>
+                  🎬 Game review
+                </button>
+              )}
+              {onNewGame && (
+                <button className="reveal-replay cr-discard-btn" onClick={onNewGame}>
+                  New game
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

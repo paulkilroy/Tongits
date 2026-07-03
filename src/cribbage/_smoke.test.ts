@@ -4,6 +4,7 @@ import { renderToString } from "react-dom/server";
 import { CribbageMenu } from "./CribbageMenu";
 import { CribbageGame } from "./CribbageGame";
 import { CribReview } from "./CribReview";
+import { CribGameReview } from "./CribGameReview";
 import { reviewHand } from "./review";
 import { newRound, discardToCrib, playCard, go, nextShow, legalPlays, roundComplete, STANDARD_CRIB_RULES, type CribState } from "./game";
 
@@ -29,5 +30,11 @@ describe("cribbage UI smoke", () => {
     const html = renderToString(createElement(CribReview, { review, me: 0, oppName: "Bot", onClose: () => {} }));
     expect(html).toContain("Hand review");
     expect(html).toContain("Pegging");
+  });
+  it("renders the game review stepper", () => {
+    const hands = [playHand(11), playHand(23)];
+    const html = renderToString(createElement(CribGameReview, { hands, me: 0, oppName: "Bot", onClose: () => {} }));
+    expect(html).toContain("Game review");
+    expect(html).toContain("cr-gr-nav");
   });
 });
