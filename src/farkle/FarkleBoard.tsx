@@ -113,11 +113,35 @@ export function FarkleBoard({
                   {i === me ? "You" : p.name}
                   {!p.onBoard && <span className="fk-off" title="not on the board yet">•</span>}
                 </span>
-                <strong>{p.score}</strong>
+                <strong className="fk-total">
+                  {p.last && p.last.banked > 0 ? (
+                    <>
+                      <span className="fk-old">{p.score - p.last.banked}</span>
+                      <span className="fk-gain">+{p.last.banked}</span>
+                    </>
+                  ) : (
+                    p.score
+                  )}
+                </strong>
               </div>
               <div className="cr-track">
                 <div className="cr-track-fill" style={{ width: `${Math.min(100, (p.score / g.rules.target) * 100)}%` }} />
               </div>
+              {p.last && (p.last.chunks.length > 0 || p.last.farkled) && (
+                <div className="fk-lastturn" title="last turn">
+                  {p.last.chunks.map((c, ci) => (
+                    <span className="fk-chunk" key={ci}>
+                      {c.gain}
+                      {c.hot && <span className="fk-fire">🔥</span>}
+                    </span>
+                  ))}
+                  {p.last.farkled ? (
+                    <span className="fk-skull">☠️</span>
+                  ) : (
+                    <span className="fk-arrow">→ {p.last.banked}</span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

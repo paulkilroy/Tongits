@@ -8,12 +8,26 @@ import { scoreDice, hasScore, isLegalKeep } from "./scoring";
 
 export type FarklePhase = "roll" | "pick" | "farkle" | "gameOver";
 
+/** One set-aside within a turn (its points, and whether it triggered hot dice). */
+export interface TurnChunk {
+  gain: number;
+  hot: boolean;
+}
+
+/** A finished turn's summary, shown on the scoreboard. */
+export interface LastTurn {
+  chunks: TurnChunk[];
+  farkled: boolean;
+  banked: number; // 0 if farkled
+}
+
 export interface FarklePlayer {
   name: string;
   isAI: boolean;
   score: number;
   onBoard: boolean;
   farkleStreak: number;
+  last: LastTurn | null;
 }
 
 export interface FarkleState {
@@ -22,6 +36,7 @@ export interface FarkleState {
   dice: number[]; // the dice just rolled, still on the table (choose from these)
   kept: number[]; // dice set aside so far this turn (display)
   turnScore: number;
+  turnEvents: TurnChunk[]; // set-asides so far this turn
   diceLeft: number; // how many dice the next roll uses
   phase: FarklePhase;
   lastFarkle: boolean; // the previous roll farkled
@@ -39,11 +54,19 @@ const clone = (s: FarkleState): FarkleState => structuredClone(s);
 
 export function newGame(rules: FarkleRules, names: string[], ai: boolean[]): FarkleState {
   return {
-    players: names.map((name, i) => ({ name, isAI: ai[i] ?? false, score: 0, onBoard: false, farkleStreak: 0 })),
+    players: names.map((name, i) => ({
+      name,
+      isAI: ai[i] ?? false,
+      score: 0,
+      onBoard: false,
+      farkleStreak: 0,
+      last: null,
+    })),
     current: 0,
     dice: [],
     kept: [],
     turnScore: 0,
+    turnEvents: [],
     diceLeft: 6,
     phase: "roll",
     lastFarkle: false,
@@ -56,6 +79,7 @@ export function newGame(rules: FarkleRules, names: string[], ai: boolean[]): Far
 
 function startTurn(s: FarkleState): void {
   s.turnScore = 0;
+  s.turnEvents = [];
   s.dice = [];
   s.kept = [];
   s.diceLeft = 6;
@@ -95,6 +119,7 @@ export function nextTurn(state: FarkleState): FarkleState {
   if (state.phase !== "farkle") return state;
   const s = clone(state);
   const p = currentPlayer(s);
+  p.last = { chunks: s.turnEvents, farkled: true, banked: 0 };
   p.farkleStreak += 1;
   if (s.rules.farkleStreakPenalty && p.farkleStreak >= s.rules.farkleStreakLen) {
     p.score = Math.max(0, p.score - s.rules.farkleStreakPenalty);
@@ -109,12 +134,14 @@ export function nextTurn(state: FarkleState): FarkleState {
 export function setAside(state: FarkleState, keep: number[]): FarkleState {
   if (state.phase !== "pick" || !isLegalKeep(state.dice, keep, state.rules)) return state;
   const s = clone(state);
-  s.turnScore += scoreDice(keep, s.rules).score;
+  const gained = scoreDice(keep, s.rules).score;
+  s.turnScore += gained;
 
   const remaining = [...s.dice];
   for (const d of keep) remaining.splice(remaining.indexOf(d), 1);
   s.kept = [...s.kept, ...keep];
   s.dice = [];
+  s.turnEvents = [...s.turnEvents, { gain: gained, hot: remaining.length === 0 }];
 
   if (remaining.length === 0) {
     // Hot dice — roll all six again.
@@ -143,6 +170,7 @@ export function bank(state: FarkleState): FarkleState {
   p.score += s.turnScore;
   p.onBoard = true;
   p.farkleStreak = 0;
+  p.last = { chunks: s.turnEvents, farkled: false, banked: s.turnScore };
   note(s, `${p.name} banks ${s.turnScore} (total ${p.score}).`);
   if (p.score >= s.rules.target) {
     s.result = { winner: s.current };

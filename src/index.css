@@ -2389,3 +2389,39 @@ h1 {
   font-weight: 800;
   font-size: 1rem;
 }
+
+/* farkle scoreboard: last-turn strip + shaded gain */
+.fk-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+.fk-old {
+  opacity: 0.55;
+}
+.fk-gain {
+  color: #36c46a;
+  font-size: 0.85em;
+}
+.fk-lastturn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+.fk-chunk {
+  color: #cfe9d6;
+}
+.fk-fire {
+  margin-left: 0.05rem;
+}
+.fk-arrow {
+  color: #ffd65a;
+  font-weight: 700;
+}
+.fk-skull {
+  filter: grayscale(0.1);
+}
