@@ -1,15 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="14" fill="#0b6e3b" />
-  <!-- two-card outline, matching the home-page icon -->
+  <!-- two hearts (a couple) — the LDR mark, in the same line-art style -->
   <g
-    transform="translate(8 8) scale(2)"
+    transform="translate(9 13) scale(1.4)"
     fill="#0b6e3b"
     stroke="#ffffff"
     stroke-width="2"
     stroke-linejoin="round"
     stroke-linecap="round"
   >
-    <rect x="3" y="6" width="11" height="15" rx="2" transform="rotate(-9 8.5 13.5)" />
-    <rect x="10" y="3" width="11" height="15" rx="2" transform="rotate(8 15.5 10.5)" />
+    <path
+      transform="rotate(-9 8 8)"
+      d="M8 14.5 C8 14.5 1 9.2 1 5 A3.5 3.5 0 0 1 8 3.6 A3.5 3.5 0 0 1 15 5 C15 9.2 8 14.5 8 14.5 Z"
+    />
+    <path
+      transform="translate(11 2) rotate(9 8 8)"
+      d="M8 14.5 C8 14.5 1 9.2 1 5 A3.5 3.5 0 0 1 8 3.6 A3.5 3.5 0 0 1 15 5 C15 9.2 8 14.5 8 14.5 Z"
+    />
   </g>
 </svg>

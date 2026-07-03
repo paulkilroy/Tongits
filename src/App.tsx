@@ -99,7 +99,7 @@ function Icon({
   name,
   size = 22,
 }: {
-  name: "card" | "cribbage" | "gear" | "chart" | "people" | "back";
+  name: "card" | "cribbage" | "hearts" | "gear" | "chart" | "people" | "back";
   size?: number;
 }) {
   const svg = (children: ReactNode) => (
@@ -123,6 +123,20 @@ function Icon({
         <>
           <rect x="3" y="6" width="11" height="15" rx="2" transform="rotate(-9 8.5 13.5)" />
           <rect x="10" y="3" width="11" height="15" rx="2" transform="rotate(8 15.5 10.5)" />
+        </>,
+      );
+    case "hearts":
+      // Two hearts (a couple) — the LDR mark.
+      return svg(
+        <>
+          <path
+            transform="translate(1 4) rotate(-9 5 5)"
+            d="M5 9 C5 9 1 6 1 3.4 A2.2 2.2 0 0 1 5 2.5 A2.2 2.2 0 0 1 9 3.4 C9 6 5 9 5 9 Z"
+          />
+          <path
+            transform="translate(10 6) rotate(9 5 5)"
+            d="M5 9 C5 9 1 6 1 3.4 A2.2 2.2 0 0 1 5 2.5 A2.2 2.2 0 0 1 9 3.4 C9 6 5 9 5 9 Z"
+          />
         </>,
       );
     case "cribbage":
@@ -1867,32 +1881,26 @@ function Lobby({
   onStart,
   initialCode,
   account,
-  onUpdateProfile,
   onExitToMenu,
   fr,
 }: {
   onStart: (m: Mode) => void;
   initialCode?: string;
   account: Account | null;
-  onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
   onExitToMenu: () => void;
   fr: FriendsHook;
 }) {
   const [screen, setScreen] = useState<"main" | "rules" | "friends" | "coach">("main");
-  const [showAvatars, setShowAvatars] = useState(false);
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Identity (name/avatar) is edited on the home screen; here we just mirror it
+  // from the account so hosting/joining carries the current name + avatar.
   useEffect(() => {
     if (account) setProfile({ name: account.name, avatar: account.avatar });
   }, [account]);
-
-  function localUpdate(p: Profile) {
-    setProfile(p);
-    saveProfile(p);
-  }
 
   async function host(withBot: boolean) {
     setBusy(true);
@@ -1947,51 +1955,15 @@ function Lobby({
 
   return (
     <main className="app home">
-      <button className="link-btn home-games" onClick={onExitToMenu}>
-        ‹ Games
-      </button>
       <header className="home-top">
+        <button className="back-btn" onClick={onExitToMenu} aria-label="Back to games">
+          ‹
+        </button>
         <h1>
           <Icon name="card" size={26} /> Tongits
         </h1>
         <span className="wallet-chip">{account ? `₱${account.balance.toLocaleString()}` : "₱ ⋯"}</span>
       </header>
-
-      <section className="panel identity">
-        <button
-          className="avatar-big"
-          onClick={() => setShowAvatars((v) => !v)}
-          aria-label="Change avatar"
-        >
-          {profile.avatar}
-        </button>
-        <input
-          className="name-input"
-          placeholder="Your name"
-          value={profile.name}
-          onChange={(e) => localUpdate({ ...profile, name: e.target.value })}
-          onBlur={() => onUpdateProfile({ name: profile.name })}
-          maxLength={12}
-        />
-      </section>
-
-      {showAvatars && (
-        <div className="panel avatar-grid">
-          {AVATARS.map((a) => (
-            <button
-              key={a}
-              className={`avatar ${profile.avatar === a ? "on" : ""}`}
-              onClick={() => {
-                localUpdate({ ...profile, avatar: a });
-                onUpdateProfile({ avatar: a });
-                setShowAvatars(false);
-              }}
-            >
-              {a}
-            </button>
-          ))}
-        </div>
-      )}
 
       <section className="panel play">
         <button className="big play-primary" onClick={() => onStart({ kind: "local" })}>
@@ -2082,20 +2054,68 @@ function GamePicker({
   onPick,
   onInvite,
   busy,
+  account,
+  onUpdateProfile,
 }: {
   fr: FriendsHook;
   onPick: (g: GameChoice) => void;
   onInvite: (friendId: string, kind: GameKind) => void;
   busy: boolean;
+  account: Account | null;
+  onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
   const onlineCount = fr.friends.filter((f) => f.online).length;
   const gameIcon: Record<GameKind, "card" | "cribbage"> = { tongits: "card", cribbage: "cribbage" };
+  const [profile, setProfile] = useState<Profile>(loadProfile);
+  const [showAvatars, setShowAvatars] = useState(false);
+  useEffect(() => {
+    if (account) setProfile({ name: account.name, avatar: account.avatar });
+  }, [account]);
+  function localUpdate(p: Profile) {
+    setProfile(p);
+    saveProfile(p);
+  }
   return (
-    <main className="app screen picker">
+    <main className="app home picker">
       <header className="home-top">
-        <h1>Game room</h1>
+        <h1>
+          <Icon name="hearts" size={26} /> LDR Games
+        </h1>
+        <span className="wallet-chip">{account ? `₱${account.balance.toLocaleString()}` : "₱ ⋯"}</span>
       </header>
-      <p className="picker-sub">Pick a game to play with Ella or practice vs the AI.</p>
+
+      <section className="panel identity">
+        <button className="avatar-big" onClick={() => setShowAvatars((v) => !v)} aria-label="Change avatar">
+          {profile.avatar}
+        </button>
+        <input
+          className="name-input"
+          placeholder="Your name"
+          value={profile.name}
+          onChange={(e) => localUpdate({ ...profile, name: e.target.value })}
+          onBlur={() => onUpdateProfile({ name: profile.name })}
+          maxLength={12}
+        />
+      </section>
+      {showAvatars && (
+        <div className="panel avatar-grid">
+          {AVATARS.map((a) => (
+            <button
+              key={a}
+              className={`avatar ${profile.avatar === a ? "on" : ""}`}
+              onClick={() => {
+                localUpdate({ ...profile, avatar: a });
+                onUpdateProfile({ avatar: a });
+                setShowAvatars(false);
+              }}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="picker-sub">Long-distance relationship games — play together or vs the AI.</p>
       <div className="picker-grid">
         {GAME_LIST.map((g) => (
           <button key={g.kind} className="panel picker-card" onClick={() => onPick(g.kind)}>
@@ -2220,7 +2240,16 @@ export function App() {
 
   let view: ReactNode;
   if (game === "menu") {
-    view = <GamePicker fr={fr} onPick={setGame} onInvite={invite} busy={busy} />;
+    view = (
+      <GamePicker
+        fr={fr}
+        onPick={setGame}
+        onInvite={invite}
+        busy={busy}
+        account={account}
+        onUpdateProfile={update}
+      />
+    );
   } else if (game === "cribbage") {
     if (crib.k === "local") view = <CribbageGame onExit={() => setCrib({ k: "menu" })} />;
     else if (crib.k === "online")
@@ -2242,7 +2271,6 @@ export function App() {
         onStart={setMode}
         initialCode={joinCode}
         account={account}
-        onUpdateProfile={update}
         onExitToMenu={() => setGame("menu")}
         fr={fr}
       />
