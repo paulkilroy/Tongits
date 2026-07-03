@@ -73,8 +73,11 @@ export function FarkleGame({ rules, onExit }: { rules: FarkleRules; onExit: () =
   const canSet = myTurn && g.phase === "pick" && selValues.length > 0 && selScore.allScoring;
   const best = g.phase === "pick" ? bestKeep(g.dice, g.rules) : { keep: [], score: 0 };
 
-  const pFarkle = Math.round(rollStats(g.diceLeft, g.rules).pFarkle * 100);
-  const ev = rollEV(g.turnScore, g.diceLeft, g.rules);
+  // Only compute the odds when the roll advice is actually shown (keeps the odds
+  // enumeration off the interaction path — e.g. clicking "Play vs AI" at mount).
+  const showAdvice = myTurn && g.phase === "roll" && g.turnScore > 0;
+  const pFarkle = showAdvice ? Math.round(rollStats(g.diceLeft, g.rules).pFarkle * 100) : 0;
+  const ev = showAdvice ? rollEV(g.turnScore, g.diceLeft, g.rules) : 0;
 
   function toggle(i: number) {
     setSel((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));

@@ -13,16 +13,27 @@ export interface RollStats {
 const cache = new Map<string, RollStats>();
 const key = (k: number, r: FarkleRules) => `${k}|${r.nOfKind}|${r.straight}|${r.threePairs}|${r.twoTriplets}`;
 
-function enumRolls(k: number, cb: (dice: number[]) => void): void {
+const FACT = [1, 1, 2, 6, 24, 120, 720];
+
+/** Enumerate the distinct dice multisets of size k (nondecreasing), with the
+ *  number of ordered rolls each represents (multinomial weight). ~462 for k=6. */
+function enumMultisets(k: number, cb: (dice: number[], weight: number) => void): void {
   const dice = new Array<number>(k);
-  const rec = (i: number) => {
-    if (i === k) return cb(dice);
-    for (let v = 1; v <= 6; v++) {
-      dice[i] = v;
-      rec(i + 1);
+  const rec = (pos: number, start: number) => {
+    if (pos === k) {
+      const counts = [0, 0, 0, 0, 0, 0, 0];
+      for (const d of dice) counts[d]++;
+      let w = FACT[k];
+      for (let v = 1; v <= 6; v++) w /= FACT[counts[v]];
+      cb(dice, w);
+      return;
+    }
+    for (let v = start; v <= 6; v++) {
+      dice[pos] = v;
+      rec(pos + 1, v);
     }
   };
-  rec(0);
+  rec(0, 1);
 }
 
 export function rollStats(k: number, rules: FarkleRules): RollStats {
@@ -33,10 +44,10 @@ export function rollStats(k: number, rules: FarkleRules): RollStats {
   let total = 0;
   let farkle = 0;
   let gain = 0;
-  enumRolls(k, (d) => {
-    total++;
-    if (!hasScore(d, rules)) farkle++;
-    else gain += bestKeep(d, rules).score;
+  enumMultisets(k, (d, w) => {
+    total += w;
+    if (!hasScore(d, rules)) farkle += w;
+    else gain += w * bestKeep(d, rules).score;
   });
   const stats = { pFarkle: farkle / total, avgGain: total > farkle ? gain / (total - farkle) : 0 };
   cache.set(ck, stats);
