@@ -4,6 +4,8 @@ import { fetchRoomData, pushRoomData, subscribeRoomData } from "../online/supaba
 
 /** The whole cribbage game, mirrored to a room row (opaque jsonb). */
 export interface CribRoom {
+  /** Tags the room so cross-game challenges open the right board. */
+  kind: "cribbage";
   game: CribState;
   /** Bumped on every write so clients ignore their own stale echoes. */
   version: number;
@@ -28,7 +30,7 @@ export function useOnlineCribbage(code: string, isHost: boolean) {
 
   const write = useCallback(
     (game: CribState) => {
-      const data: CribRoom = { game, version: versionRef.current + 1 };
+      const data: CribRoom = { kind: "cribbage", game, version: versionRef.current + 1 };
       versionRef.current = data.version;
       setRoom(data);
       void pushRoomData(code, data).catch((e) => console.error("cribbage pushRoom failed", e));

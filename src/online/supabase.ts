@@ -12,12 +12,21 @@ export { onlineConfigured } from "./client";
 
 /** The whole match, mirrored to the room row. */
 export interface RoomData {
+  /** Which game this room is — lets challenges route to the right board. */
+  kind?: "tongits";
   game: GameState;
   wins: number[];
   /** Identifies the current round, so wallets settle exactly once per game. */
   gameId: number;
   /** Bumped on every write so clients can ignore their own stale echoes. */
   version: number;
+}
+
+/** Read just the game kind of a room (defaults to tongits for legacy rooms). */
+export async function fetchRoomKind(code: string): Promise<string | null> {
+  const room = await fetchRoomData<{ kind?: string }>(code);
+  if (!room) return null;
+  return room.kind ?? "tongits";
 }
 
 const supabase = getClient;

@@ -26,7 +26,7 @@ export function CribbageHome({ name, onExit }: { name: string; onExit: () => voi
     try {
       const roomCode = makeCode(randSeed());
       const game = newRound(STANDARD_CRIB_RULES, randSeed(), [name || "You", "Opponent"], [false, false], 0);
-      await createRoomData(roomCode, { game, version: 1 });
+      await createRoomData(roomCode, { kind: "cribbage", game, version: 1 });
       setScreen({ kind: "online", code: roomCode, isHost: true });
     } catch (e) {
       setError((e as Error).message ?? "Could not create the room.");

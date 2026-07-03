@@ -1615,7 +1615,7 @@ async function hostRoom(profile: Profile, withBot: boolean): Promise<string> {
     0,
     avatars,
   );
-  await createRoom(roomCode, { game, wins: names.map(() => 0), gameId: 1, version: 1 });
+  await createRoom(roomCode, { kind: "tongits", game, wins: names.map(() => 0), gameId: 1, version: 1 });
   return roomCode;
 }
 
