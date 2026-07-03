@@ -2383,3 +2383,9 @@ h1 {
   font-size: 1.1rem;
   font-weight: 800;
 }
+
+.fk-farkle-msg {
+  color: #ff7a4a;
+  font-weight: 800;
+  font-size: 1rem;
+}

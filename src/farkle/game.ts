@@ -6,7 +6,7 @@ import { scoreDice, hasScore, isLegalKeep } from "./scoring";
 // A roll with no scoring die is a FARKLE: you lose the turn's points. Setting
 // aside all six dice is HOT DICE: roll all six again and keep going.
 
-export type FarklePhase = "roll" | "pick" | "gameOver";
+export type FarklePhase = "roll" | "pick" | "farkle" | "gameOver";
 
 export interface FarklePlayer {
   name: string;
@@ -79,21 +79,29 @@ export function roll(state: FarkleState, rng: () => number = Math.random): Farkl
   note(s, `${currentPlayer(s).name} rolls ${dice.join(" ")}.`);
 
   if (!hasScore(dice, s.rules)) {
-    // Farkle — the turn's points are gone.
-    const p = currentPlayer(s);
-    p.farkleStreak += 1;
-    note(s, `Farkle! ${p.name} loses ${s.turnScore}.`);
-    if (s.rules.farkleStreakPenalty && p.farkleStreak >= s.rules.farkleStreakLen) {
-      p.score = Math.max(0, p.score - s.rules.farkleStreakPenalty);
-      p.farkleStreak = 0;
-      note(s, `${p.name} −${s.rules.farkleStreakPenalty} (${s.rules.farkleStreakLen} farkles in a row).`);
-    }
+    // Farkle — hold on the reveal so the dice stay visible; nextTurn resolves it.
+    note(s, `Farkle! ${currentPlayer(s).name} loses ${s.turnScore}.`);
     s.lastFarkle = true;
-    advance(s);
+    s.phase = "farkle";
     return s;
   }
   s.lastFarkle = false;
   s.phase = "pick";
+  return s;
+}
+
+/** Resolve a farkle reveal: apply any streak penalty and pass the dice. */
+export function nextTurn(state: FarkleState): FarkleState {
+  if (state.phase !== "farkle") return state;
+  const s = clone(state);
+  const p = currentPlayer(s);
+  p.farkleStreak += 1;
+  if (s.rules.farkleStreakPenalty && p.farkleStreak >= s.rules.farkleStreakLen) {
+    p.score = Math.max(0, p.score - s.rules.farkleStreakPenalty);
+    p.farkleStreak = 0;
+    note(s, `${p.name} −${s.rules.farkleStreakPenalty} (${s.rules.farkleStreakLen} farkles in a row).`);
+  }
+  advance(s);
   return s;
 }
 

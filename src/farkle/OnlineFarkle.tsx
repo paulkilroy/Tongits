@@ -1,4 +1,4 @@
-import { newGame, roll, setAside, bank } from "./game";
+import { newGame, roll, setAside, bank, nextTurn } from "./game";
 import { FarkleBoard } from "./FarkleBoard";
 import { useOnlineFarkle } from "./online";
 
@@ -37,8 +37,9 @@ export function OnlineFarkle({ code, isHost, onExit }: { code: string; isHost: b
       title="Press Your Luck · online"
       waiting={!connected ? "Reconnecting…" : null}
       onRoll={() => myTurn && write(roll(g, Math.random))}
-      onSetAside={(values) => myTurn && write(setAside(g, values))}
-      onBank={() => myTurn && write(bank(g))}
+      onPress={(keep) => myTurn && write(roll(setAside(g, keep), Math.random))}
+      onBank={(keep) => myTurn && write(bank(setAside(g, keep)))}
+      onNextTurn={() => myTurn && write(nextTurn(g))}
       onNewGame={
         isHost && g.result
           ? () => write(newGame(g.rules, g.players.map((p) => p.name), [false, false]))

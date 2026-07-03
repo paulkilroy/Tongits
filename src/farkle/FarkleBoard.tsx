@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BackButton } from "../ui/Icon";
 import { scoreDice, bestKeep } from "./scoring";
 import { rollStats, rollEV } from "./odds";
-import { canBank, type FarkleState } from "./game";
+import { type FarkleState } from "./game";
 
 const PIPS: Record<number, number[]> = {
   1: [5],
@@ -44,15 +44,27 @@ export interface FarkleBoardProps {
   g: FarkleState;
   me: number;
   title: string;
-  onRoll: () => void;
-  onSetAside: (values: number[]) => void;
-  onBank: () => void;
+  onRoll: () => void; // initial roll of the turn
+  onPress: (keep: number[]) => void; // set aside + roll again
+  onBank: (keep: number[]) => void; // set aside + bank the turn
+  onNextTurn: () => void; // resolve a farkle reveal
   onExit: () => void;
   onNewGame?: () => void;
   waiting?: string | null;
 }
 
-export function FarkleBoard({ g, me, title, onRoll, onSetAside, onBank, onExit, onNewGame, waiting }: FarkleBoardProps) {
+export function FarkleBoard({
+  g,
+  me,
+  title,
+  onRoll,
+  onPress,
+  onBank,
+  onNextTurn,
+  onExit,
+  onNewGame,
+  waiting,
+}: FarkleBoardProps) {
   const [sel, setSel] = useState<number[]>([]);
   const seenLog = useRef(0);
   const [flash, setFlash] = useState<string | null>(null);
@@ -66,18 +78,21 @@ export function FarkleBoard({ g, me, title, onRoll, onSetAside, onBank, onExit, 
       seenLog.current = g.log.length;
     }
   }, [g.log]);
-  // Clear a stale selection whenever the roll changes.
   useEffect(() => setSel([]), [g.dice, g.current, g.phase]);
 
   const myTurn = g.current === me && !g.result;
   const selValues = sel.map((i) => g.dice[i]);
   const selScore = selValues.length ? scoreDice(selValues, g.rules) : { score: 0, allScoring: false };
-  const canSet = myTurn && g.phase === "pick" && selValues.length > 0 && selScore.allScoring;
+  const valid = myTurn && g.phase === "pick" && selValues.length > 0 && selScore.allScoring;
   const best = myTurn && g.phase === "pick" ? bestKeep(g.dice, g.rules) : { keep: [], score: 0 };
 
-  const showAdvice = myTurn && g.phase === "roll" && g.turnScore > 0;
-  const pFarkle = showAdvice ? Math.round(rollStats(g.diceLeft, g.rules).pFarkle * 100) : 0;
-  const ev = showAdvice ? rollEV(g.turnScore, g.diceLeft, g.rules) : 0;
+  // After keeping this selection: new turn total, dice left, and the odds of pressing.
+  const newTurn = g.turnScore + selScore.score;
+  const remaining = g.dice.length - selValues.length;
+  const nextDice = remaining === 0 ? 6 : remaining; // 0 ⇒ hot dice, roll all six
+  const pFarkleNext = valid ? Math.round(rollStats(nextDice, g.rules).pFarkle * 100) : 0;
+  const pressEV = valid ? rollEV(newTurn, nextDice, g.rules) : 0;
+  const bankOk = valid && (g.players[me].onBoard || newTurn >= g.rules.onBoardMin);
 
   const toggle = (i: number) => setSel((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
 
@@ -149,52 +164,52 @@ export function FarkleBoard({ g, me, title, onRoll, onSetAside, onBank, onExit, 
               </button>
             )}
           </div>
+        ) : g.phase === "farkle" ? (
+          <div className="fk-actions">
+            <div className="fk-coach fk-farkle-msg">
+              💥 {g.current === me ? "You" : g.players[g.current].name} farkled
+              {g.turnScore > 0 ? ` — lost ${g.turnScore}` : ""}!
+            </div>
+            {g.current === me && (
+              <button className="reveal-replay" onClick={onNextTurn}>
+                Next player
+              </button>
+            )}
+          </div>
         ) : !myTurn ? (
           <div className="cr-turn">{g.players[g.current].name} is rolling…</div>
         ) : g.phase === "pick" ? (
           <div className="fk-actions">
             <div className="fk-coach">
-              {selValues.length ? (
-                selScore.allScoring ? (
-                  <>
-                    selection scores <strong>{selScore.score}</strong>
-                  </>
-                ) : (
-                  <span className="fk-warn">that set includes a non-scoring die</span>
-                )
-              ) : (
-                <>tap the scoring dice to set aside · best keep {best.score}</>
-              )}
-            </div>
-            <button className="reveal-replay" disabled={!canSet} onClick={() => onSetAside(selValues)}>
-              Set aside {canSet ? selScore.score : ""}
-            </button>
-          </div>
-        ) : (
-          <div className="fk-actions">
-            <div className="fk-coach">
-              {g.turnScore === 0 ? (
-                <>Your turn — roll to start.</>
+              {selValues.length === 0 ? (
+                <>tap the scoring dice to keep · best keep {best.score}</>
+              ) : !selScore.allScoring ? (
+                <span className="fk-warn">that set includes a non-scoring die</span>
               ) : (
                 <>
-                  {g.diceLeft} dice · <strong>{pFarkle}%</strong> farkle ·{" "}
-                  <span className={ev > 0 ? "fk-good" : "fk-bad"}>{ev > 0 ? "rolling is +EV" : "bank it"}</span>
+                  keep <strong>{selScore.score}</strong> · then {nextDice} dice, {pFarkleNext}% farkle —{" "}
+                  <span className={pressEV > 0 ? "fk-good" : "fk-bad"}>{pressEV > 0 ? "press is +EV" : "bank it"}</span>
                 </>
               )}
             </div>
             <div className="cr-row2">
-              <button className="reveal-replay cr-discard-btn" onClick={onRoll}>
-                Roll {g.turnScore > 0 ? g.diceLeft : 6}
+              <button className="reveal-replay cr-discard-btn" disabled={!valid} onClick={() => onPress(selValues)}>
+                Press my luck
               </button>
-              {canBank(g) && (
-                <button className="cr-coach-btn" onClick={onBank}>
-                  Bank {g.turnScore}
-                </button>
-              )}
+              <button className="cr-coach-btn" disabled={!bankOk} onClick={() => onBank(selValues)}>
+                Bank {valid ? newTurn : g.turnScore}
+              </button>
             </div>
-            {!canBank(g) && g.turnScore > 0 && (
-              <div className="cr-lbl">need {g.rules.onBoardMin} to get on the board</div>
+            {valid && !bankOk && (
+              <div className="cr-lbl">need {g.rules.onBoardMin} in a turn to get on the board</div>
             )}
+          </div>
+        ) : (
+          <div className="fk-actions">
+            <div className="fk-coach">Your turn — roll to start.</div>
+            <button className="reveal-replay" onClick={onRoll}>
+              Roll
+            </button>
           </div>
         )}
       </div>

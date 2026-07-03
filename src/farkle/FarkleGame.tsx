@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { type FarkleRules } from "./rules";
-import { newGame, roll, setAside, bank, type FarkleState } from "./game";
+import { newGame, roll, setAside, bank, nextTurn, type FarkleState } from "./game";
 import { aiStep } from "./ai";
 import { FarkleBoard } from "./FarkleBoard";
 
@@ -11,7 +11,8 @@ export function FarkleGame({ rules, onExit }: { rules: FarkleRules; onExit: () =
 
   useEffect(() => {
     if (g.result || !g.players[g.current].isAI) return;
-    const t = setTimeout(() => setG((s) => aiStep(s)), 700);
+    // Slow the bot enough to follow each roll / set-aside / bank.
+    const t = setTimeout(() => setG((s) => aiStep(s)), 1200);
     return () => clearTimeout(t);
   }, [g]);
 
@@ -21,8 +22,9 @@ export function FarkleGame({ rules, onExit }: { rules: FarkleRules; onExit: () =
       me={0}
       title="Press Your Luck"
       onRoll={() => setG((s) => roll(s, Math.random))}
-      onSetAside={(values) => setG((s) => setAside(s, values))}
-      onBank={() => setG((s) => bank(s))}
+      onPress={(keep) => setG((s) => roll(setAside(s, keep), Math.random))}
+      onBank={(keep) => setG((s) => bank(setAside(s, keep)))}
+      onNextTurn={() => setG((s) => nextTurn(s))}
       onNewGame={() => setG(fresh())}
       onExit={onExit}
     />

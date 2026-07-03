@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeRng } from "../engine/deck";
 import { CLASSIC, ZILCH } from "./rules";
 import { bestKeep } from "./scoring";
-import { newGame, roll, setAside, bank, canBank, type FarkleState } from "./game";
+import { newGame, roll, setAside, bank, canBank, nextTurn, type FarkleState } from "./game";
 
 /** Greedy auto-player: keep the max scoring dice, bank at ≥ threshold else press. */
 function autoTurn(s: FarkleState, rng: () => number, bankAt = 400): FarkleState {
@@ -15,6 +15,8 @@ function autoTurn(s: FarkleState, rng: () => number, bankAt = 400): FarkleState 
     } else if (s.phase === "pick") {
       const { keep } = bestKeep(s.dice, s.rules);
       s = setAside(s, keep);
+    } else if (s.phase === "farkle") {
+      s = nextTurn(s);
     } else break;
   }
   return s;
@@ -73,8 +75,10 @@ describe("farkle game flow", () => {
     for (let seed = 1; seed < 500; seed++) {
       const test = roll({ ...s, diceLeft: 3 }, makeRng(seed));
       if (test.lastFarkle) {
-        expect(test.current).toBe(1); // turn passed on
-        expect(test.turnScore).toBe(0);
+        expect(test.phase).toBe("farkle"); // dice held on the reveal
+        expect(test.current).toBe(0); // not passed yet
+        const after = nextTurn(test);
+        expect(after.current).toBe(1); // resolved → next player
         return;
       }
     }
