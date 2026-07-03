@@ -11,6 +11,7 @@ import { CribbageMenu } from "./cribbage/CribbageMenu";
 import { CribbageGame } from "./cribbage/CribbageGame";
 import { OnlineCribbage } from "./cribbage/OnlineCribbage";
 import { hostCribbageRoom } from "./cribbage/online";
+import { FarkleHome } from "./farkle/FarkleHome";
 import { GAME_LIST, type GameKind } from "./games";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
@@ -1957,7 +1958,7 @@ function Lobby({
 
 /* --------------------------------- app ----------------------------------- */
 
-type GameChoice = "menu" | "tongits" | "cribbage";
+type GameChoice = "menu" | GameKind;
 type CribMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string; isHost: boolean };
 
 function GamePicker({
@@ -1976,7 +1977,11 @@ function GamePicker({
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
   const onlineCount = fr.friends.filter((f) => f.online).length;
-  const gameIcon: Record<GameKind, "card" | "cribbage"> = { tongits: "card", cribbage: "cribbage" };
+  const gameIcon: Record<GameKind, "card" | "cribbage" | "dice"> = {
+    tongits: "card",
+    cribbage: "cribbage",
+    pressyourluck: "dice",
+  };
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [showAvatars, setShowAvatars] = useState(false);
   useEffect(() => {
@@ -2049,7 +2054,7 @@ function GamePicker({
                 {profile.avatar} {profile.name}
               </span>
               <span className="hub-invite">
-                {GAME_LIST.map((g) => (
+                {GAME_LIST.filter((g) => g.online).map((g) => (
                   <button
                     key={g.kind}
                     disabled={!online || busy}
@@ -2161,6 +2166,8 @@ export function App() {
         onUpdateProfile={update}
       />
     );
+  } else if (game === "pressyourluck") {
+    view = <FarkleHome onExit={() => setGame("menu")} />;
   } else if (game === "cribbage") {
     if (crib.k === "local") view = <CribbageGame onExit={() => setCrib({ k: "menu" })} />;
     else if (crib.k === "online")

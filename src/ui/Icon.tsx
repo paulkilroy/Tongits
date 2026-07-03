@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 
 // Shared line-art icon set (used across the game shell and both games).
-export type IconName = "card" | "cribbage" | "hearts" | "gear" | "chart" | "people" | "back";
+export type IconName = "card" | "cribbage" | "hearts" | "dice" | "gear" | "chart" | "people" | "back";
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const svg = (children: ReactNode) => (
@@ -51,6 +51,22 @@ export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
               <circle cx={cx} cy="10" r="0.85" fill="currentColor" stroke="none" />
               <circle cx={cx} cy="14" r="0.85" fill="currentColor" stroke="none" />
             </g>
+          ))}
+        </>,
+      );
+    case "dice":
+      // A die showing five pips.
+      return svg(
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="4" />
+          {[
+            [8, 8],
+            [16, 8],
+            [12, 12],
+            [8, 16],
+            [16, 16],
+          ].map(([cx, cy]) => (
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.5" fill="currentColor" stroke="none" />
           ))}
         </>,
       );

@@ -2258,3 +2258,125 @@ h1 {
   padding-left: 2.9rem;
   line-height: 1.4;
 }
+
+/* ---------------------------- press your luck ---------------------------- */
+.fk-target {
+  text-align: center;
+  margin-top: -0.4rem;
+}
+.fk-off {
+  margin-left: 0.3rem;
+  color: #ffb24a;
+}
+.fk-turn {
+  text-align: center;
+  font-size: 1rem;
+}
+.fk-turn strong {
+  font-size: 1.5rem;
+  color: #ffd65a;
+}
+.fk-hot {
+  color: #ff884a;
+  font-weight: 700;
+}
+.fk-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.fk-dice.kept {
+  gap: 0.3rem;
+}
+.die {
+  width: 2.7rem;
+  height: 2.7rem;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  padding: 0.32rem;
+  background: #fff;
+  border: 2px solid transparent;
+  border-radius: 11px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.die:disabled {
+  cursor: default;
+}
+.die.sel {
+  border-color: #1f8fff;
+  transform: translateY(-5px);
+}
+.die.dim {
+  width: 1.7rem;
+  height: 1.7rem;
+  opacity: 0.55;
+  box-shadow: none;
+  padding: 0.2rem;
+}
+.pip {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+}
+.die.dim .pip {
+  width: 0.26rem;
+  height: 0.26rem;
+}
+.pip.on {
+  background: #1a1a1a;
+}
+.fk-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.fk-coach {
+  text-align: center;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  min-height: 1.2rem;
+}
+.fk-good {
+  color: #36c46a;
+  font-weight: 700;
+}
+.fk-bad {
+  color: #ffb24a;
+  font-weight: 700;
+}
+.fk-warn {
+  color: #ff7a7a;
+}
+.fk-actions .reveal-replay,
+.fk-actions .cr-row2 {
+  max-width: 340px;
+  width: 100%;
+}
+.fk-rulesets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.fk-ruleset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  border: 2px solid transparent;
+}
+.fk-ruleset.on {
+  border-color: #ffd65a;
+}
+.fk-ruleset-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
