@@ -19,6 +19,7 @@ export interface PegReviewPlay {
   bestEV?: number;
   evLost?: number; // bestEV − yourEV
   options?: PegOption[]; // every legal card ranked by net EV
+  reason?: string; // plain-English why the best beats your play
 }
 
 export interface HandReview {
@@ -68,6 +69,7 @@ export function reviewHand(state: CribState, seat: number, samples = 200): HandR
         play.bestEV = d.bestEV;
         play.evLost = d.evLost;
         play.options = d.options;
+        play.reason = d.reason;
         yourEvLost += d.evLost;
       }
     }
@@ -111,6 +113,7 @@ export function reviewToText(r: HandReview, oppName: string): string {
         "      play: " +
           p.options.map((o) => `${o.label} ${sign(o.ev)}${o.id === cardId(p.card) ? "(you)" : ""}`).join("  "),
       );
+      if (p.evLost && p.evLost > 0.5 && p.reason) out.push(`      → ${p.reason}`);
     }
   }
   out.push("");

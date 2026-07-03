@@ -1,4 +1,4 @@
-import { type Card, cardId, cardLabel, cardPoints } from "../engine/cards";
+import { type Card, cardId, cardLabel, cardPoints, rankOrder } from "../engine/cards";
 import { freshDeck, makeRng, shuffle } from "../engine/deck";
 import { scorePlay } from "./scoring";
 import { type CribState } from "./game";
@@ -10,6 +10,67 @@ import { type CribState } from "./game";
 
 const val = cardPoints;
 const rm = (hand: Card[], c: Card) => hand.filter((x) => cardId(x) !== cardId(c));
+
+/** Trailing same-rank count of a sequence (2 = a pair, 3 = pair royal…). */
+function trailingPair(seq: Card[]): number {
+  const last = seq[seq.length - 1];
+  let k = 0;
+  for (let i = seq.length - 1; i >= 0 && seq[i].rank === last.rank; i--) k++;
+  return k;
+}
+
+/** Longest trailing run (≥3) that includes the last card. */
+function trailingRun(seq: Card[]): number {
+  let best = 0;
+  for (let k = 3; k <= seq.length; k++) {
+    const tail = seq.slice(seq.length - k);
+    const o = tail.map((c) => rankOrder(c.rank));
+    if (new Set(o).size === k && Math.max(...o) - Math.min(...o) === k - 1) best = k;
+  }
+  return best;
+}
+
+/** What the last card of `seq` scores, in words ("the 15", "the pair", "a run of 3"). */
+function whatScored(seq: Card[], total: number): string {
+  if (total === 15) return "the 15";
+  if (total === 31) return "31";
+  const pr = trailingPair(seq);
+  if (pr === 4) return "four of a kind";
+  if (pr === 3) return "the pair royal";
+  if (pr === 2) return "the pair";
+  const rn = trailingRun(seq);
+  if (rn >= 3) return `a run of ${rn}`;
+  return "";
+}
+
+/** A plain-English reason the best card beats what you played. */
+function explainPeg(seq: Card[], before: number, your: Card, best: Card): string {
+  if (cardId(your) === cardId(best)) return "";
+  const yTot = before + val(your);
+  const bTot = before + val(best);
+  const yPts = scorePlay([...seq, your], yTot);
+  const bPts = scorePlay([...seq, best], bTot);
+  const bl = cardLabel(best);
+
+  // 1. The best card scores points you missed.
+  if (bPts > yPts) {
+    const what = whatScored([...seq, best], bTot);
+    return `${bl} would score ${what || `+${bPts}`} — you left ${bPts - yPts} on the table.`;
+  }
+  // 2. Your card parks the count on a spot the opponent loves.
+  if (yTot === 5 || yTot === 21) {
+    return `${cardLabel(your)} leaves the count at ${yTot} — a ten-card makes ${yTot === 5 ? 15 : 31} for them.`;
+  }
+  // 3. On a lead, keep the count down (and off the easiest pair).
+  if (seq.length === 0) {
+    if (val(best) < val(your))
+      return `lead low — the ${cardLabel(your)} pushes the count up and is the easiest card to get paired.`;
+    if (val(your) >= 5) return `leading the ${cardLabel(your)} lets a ${15 - val(your)} make 15 on you.`;
+  }
+  // 4. Otherwise it's a safer count.
+  if (bTot < yTot) return `${bl} keeps the count lower — safer against a 15 or 31.`;
+  return `${bl} holds up a little better here.`;
+}
 
 /** Optimal net pegging (hero − villain) from a position to the end of the play. */
 function solve(h: Card[], v: Card[], seq: Card[], total: number, turn: number, passes: number, last: number): number {
@@ -57,6 +118,7 @@ export interface PegDecision {
   bestEV: number;
   evLost: number;
   options: PegOption[]; // every legal card, best net EV first
+  reason: string; // plain-English why the best beats what you played
 }
 
 const kept = (s: CribState, seat: number): Card[] =>
@@ -101,6 +163,7 @@ export function analyzePegging(state: CribState, seat: number, samples = 60): Ma
       }
       options.sort((a, b) => b.ev - a.ev);
       const best = options[0];
+      const bestCard = heroHand.find((c) => cardId(c) === best.id)!;
       out.set(idx, {
         yourEV,
         bestLabel: best.label,
@@ -108,6 +171,7 @@ export function analyzePegging(state: CribState, seat: number, samples = 60): Ma
         bestEV: best.ev,
         evLost: Math.max(0, best.ev - yourEV),
         options,
+        reason: explainPeg(seq, before, e.card, bestCard),
       });
     }
 

@@ -105,6 +105,7 @@ export function HandReviewBody({ review, me, oppName }: { review: HandReview; me
                       ))}
                     </div>
                   )}
+                  {off && p.reason && <div className="cr-play-why">{p.reason}</div>}
                 </div>
               );
             })}

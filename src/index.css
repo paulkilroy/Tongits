@@ -2251,3 +2251,10 @@ h1 {
   padding: 0.22rem 0.9rem;
   opacity: 1;
 }
+
+.cr-play-why {
+  font-size: 0.74rem;
+  color: #ffe1a8;
+  padding-left: 2.9rem;
+  line-height: 1.4;
+}
