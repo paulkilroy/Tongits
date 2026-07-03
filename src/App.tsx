@@ -2110,7 +2110,7 @@ function GamePicker({ onPick }: { onPick: (g: GameChoice) => void }) {
         <button className="panel picker-card" onClick={() => onPick("cribbage")}>
           <span className="picker-emoji">🎯</span>
           <span className="picker-name">Cribbage</span>
-          <span className="picker-desc">Peg to 121 · vs AI (online soon)</span>
+          <span className="picker-desc">Peg to 121 · online + AI + discard coach</span>
         </button>
       </div>
     </main>
