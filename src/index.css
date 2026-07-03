@@ -2425,3 +2425,15 @@ h1 {
 .fk-skull {
   filter: grayscale(0.1);
 }
+
+.fk-luck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.05rem;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+.fk-luck .fk-skull {
+  opacity: 0.85;
+}

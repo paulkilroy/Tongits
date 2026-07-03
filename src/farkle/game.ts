@@ -28,6 +28,8 @@ export interface FarklePlayer {
   onBoard: boolean;
   farkleStreak: number;
   last: LastTurn | null;
+  hots: number; // cumulative hot-dice this game (good luck)
+  farkles: number; // cumulative farkles this game (bad luck)
 }
 
 export interface FarkleState {
@@ -61,6 +63,8 @@ export function newGame(rules: FarkleRules, names: string[], ai: boolean[]): Far
       onBoard: false,
       farkleStreak: 0,
       last: null,
+      hots: 0,
+      farkles: 0,
     })),
     current: 0,
     dice: [],
@@ -120,6 +124,7 @@ export function nextTurn(state: FarkleState): FarkleState {
   const s = clone(state);
   const p = currentPlayer(s);
   p.last = { chunks: s.turnEvents, farkled: true, banked: 0 };
+  p.farkles += 1;
   p.farkleStreak += 1;
   if (s.rules.farkleStreakPenalty && p.farkleStreak >= s.rules.farkleStreakLen) {
     p.score = Math.max(0, p.score - s.rules.farkleStreakPenalty);
@@ -141,7 +146,9 @@ export function setAside(state: FarkleState, keep: number[]): FarkleState {
   for (const d of keep) remaining.splice(remaining.indexOf(d), 1);
   s.kept = [...s.kept, ...keep];
   s.dice = [];
-  s.turnEvents = [...s.turnEvents, { gain: gained, hot: remaining.length === 0 }];
+  const hot = remaining.length === 0;
+  s.turnEvents = [...s.turnEvents, { gain: gained, hot }];
+  if (hot) currentPlayer(s).hots += 1;
 
   if (remaining.length === 0) {
     // Hot dice — roll all six again.
