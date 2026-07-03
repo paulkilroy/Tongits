@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeRng } from "../engine/deck";
 import { CLASSIC, ZILCH } from "./rules";
 import { bestKeep } from "./scoring";
-import { newGame, roll, setAside, bank, canBank, currentPlayer, type FarkleState } from "./game";
+import { newGame, roll, setAside, bank, canBank, type FarkleState } from "./game";
 
 /** Greedy auto-player: keep the max scoring dice, bank at ≥ threshold else press. */
 function autoTurn(s: FarkleState, rng: () => number, bankAt = 400): FarkleState {
