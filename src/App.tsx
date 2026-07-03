@@ -95,7 +95,13 @@ function applyCustomOrder(hand: readonly Card[], order: string[]): Card[] {
 
 /* --------------------------------- icons --------------------------------- */
 // Consistent line icons (Feather-style: 24×24, stroke = currentColor).
-function Icon({ name, size = 22 }: { name: "card" | "gear" | "chart" | "people" | "back"; size?: number }) {
+function Icon({
+  name,
+  size = 22,
+}: {
+  name: "card" | "cribbage" | "gear" | "chart" | "people" | "back";
+  size?: number;
+}) {
   const svg = (children: ReactNode) => (
     <svg
       width={size}
@@ -117,6 +123,19 @@ function Icon({ name, size = 22 }: { name: "card" | "gear" | "chart" | "people" 
         <>
           <rect x="3" y="6" width="11" height="15" rx="2" transform="rotate(-9 8.5 13.5)" />
           <rect x="10" y="3" width="11" height="15" rx="2" transform="rotate(8 15.5 10.5)" />
+        </>,
+      );
+    case "cribbage":
+      // A cribbage board: rounded track with two rows of peg holes.
+      return svg(
+        <>
+          <rect x="2.5" y="5" width="19" height="14" rx="3.5" />
+          {[8, 11.5, 15, 18.5].map((cx) => (
+            <g key={cx}>
+              <circle cx={cx} cy="10" r="0.85" fill="currentColor" stroke="none" />
+              <circle cx={cx} cy="14" r="0.85" fill="currentColor" stroke="none" />
+            </g>
+          ))}
         </>,
       );
     case "gear":
@@ -2070,6 +2089,7 @@ function GamePicker({
   busy: boolean;
 }) {
   const onlineCount = fr.friends.filter((f) => f.online).length;
+  const gameIcon: Record<GameKind, "card" | "cribbage"> = { tongits: "card", cribbage: "cribbage" };
   return (
     <main className="app screen picker">
       <header className="home-top">
@@ -2079,7 +2099,9 @@ function GamePicker({
       <div className="picker-grid">
         {GAME_LIST.map((g) => (
           <button key={g.kind} className="panel picker-card" onClick={() => onPick(g.kind)}>
-            <span className="picker-emoji">{g.emoji}</span>
+            <span className="picker-icon">
+              <Icon name={gameIcon[g.kind]} size={38} />
+            </span>
             <span className="picker-name">{g.name}</span>
             <span className="picker-desc">{g.desc}</span>
           </button>
@@ -2103,7 +2125,7 @@ function GamePicker({
                     title={`Invite to ${g.name}`}
                     onClick={() => onInvite(profile.id, g.kind)}
                   >
-                    {g.emoji}
+                    <Icon name={gameIcon[g.kind]} size={18} />
                   </button>
                 ))}
               </span>

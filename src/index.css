@@ -1888,8 +1888,10 @@ h1 {
   color: inherit;
   font: inherit;
 }
-.picker-emoji {
-  font-size: 2rem;
+.picker-icon {
+  display: inline-flex;
+  color: #ffd65a;
+  margin-bottom: 0.15rem;
 }
 .picker-name {
   font-size: 1.3rem;
