@@ -842,6 +842,7 @@ function Table({
   onNext,
   onNewMatch,
   onExit,
+  onBack,
   canControlMatch,
   headerExtra,
   statusNote,
@@ -858,6 +859,8 @@ function Table({
   onNext: () => void;
   onNewMatch: () => void;
   onExit: () => void;
+  /** Header back button handler (defaults to onExit; online routes it through a confirm). */
+  onBack?: () => void;
   canControlMatch: boolean;
   headerExtra?: ReactNode;
   statusNote?: string;
@@ -1020,7 +1023,10 @@ function Table({
       {event && <div className="event-toast">🔥 {event}</div>}
 
       <header className="top">
-        <h1>Tongits</h1>
+        <div className="top-left">
+          <BackButton onClick={onBack ?? onExit} label="Leave game" />
+          <h1>Tongits</h1>
+        </div>
         <div className="newgame">{headerExtra}</div>
       </header>
 
@@ -1212,7 +1218,6 @@ function LocalGame({ onExit }: { onExit: () => void }) {
         <>
           <button onClick={() => newMatch(1)}>1 bot</button>
           <button onClick={() => newMatch(2)}>2 bots</button>
-          <button onClick={onExit}>Exit</button>
         </>
       }
     />
@@ -1380,6 +1385,7 @@ function OnlineGame({
       onNext={nextGame}
       onNewMatch={newMatch}
       onExit={onExit}
+      onBack={leave}
       canControlMatch={isHost}
       statusNote={waiting}
       balance={account?.balance}
@@ -1400,7 +1406,6 @@ function OnlineGame({
             Code <strong>{code}</strong>
           </span>
           <ShareControls code={code} />
-          <button onClick={leave}>Leave</button>
         </>
       }
       />
