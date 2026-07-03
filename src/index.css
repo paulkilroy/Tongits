@@ -2208,3 +2208,33 @@ h1 {
   text-align: center;
   font-size: 0.9rem;
 }
+
+/* cribbage visual polish */
+.cr-coach-toss {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: 0.4rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+.cr-coach-toss .mc {
+  opacity: 0.4;
+}
+.cr-board {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  border: 2px solid rgba(255, 214, 90, 0.5);
+  border-radius: 14px;
+  padding: 0.7rem 0.6rem;
+  background: rgba(255, 214, 90, 0.04);
+}
+.cr-rv-cut {
+  margin-left: 0.7rem;
+}
+.cr-rv-cut .mc {
+  outline: 2px dashed rgba(255, 214, 90, 0.75);
+  outline-offset: 2px;
+}

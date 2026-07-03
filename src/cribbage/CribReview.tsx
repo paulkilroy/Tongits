@@ -55,6 +55,11 @@ export function HandReviewBody({ review, me, oppName }: { review: HandReview; me
                     {e.keep.map((c) => (
                       <CribCard key={cardId(c)} card={c} mini />
                     ))}
+                    <span className="cr-coach-toss" title="into the crib">
+                      {e.discard.map((c) => (
+                        <CribCard key={cardId(c)} card={c} mini />
+                      ))}
+                    </span>
                   </span>
                   <span className="cr-coach-ev">
                     <strong>{e.net.toFixed(1)}</strong>

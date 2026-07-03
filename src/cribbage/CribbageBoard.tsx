@@ -217,6 +217,11 @@ export function CribbageBoard(props: BoardProps) {
                           {e.keep.map((c) => (
                             <CribCard key={cardId(c)} card={c} mini />
                           ))}
+                          <span className="cr-coach-toss" title="into the crib">
+                            {e.discard.map((c) => (
+                              <CribCard key={cardId(c)} card={c} mini />
+                            ))}
+                          </span>
                         </span>
                         <span className="cr-coach-ev">
                           <strong>{e.net.toFixed(1)}</strong>
@@ -241,25 +246,27 @@ export function CribbageBoard(props: BoardProps) {
         {/* ---- play ---- */}
         {g.phase === "play" && (
           <div className="cr-phase">
-            <div className="cr-play-total">
-              count <strong>{g.total}</strong> / 31
-            </div>
-            {g.starter && (
-              <div className="cr-cut">
-                <CribCard card={g.starter} mini />
-                <span className="cr-lbl">cut</span>
+            <div className="cr-board">
+              <div className="cr-play-total">
+                count <strong>{g.total}</strong> / 31
               </div>
-            )}
-            <div className="cr-lanes">
-              {g.seq.length ? (
-                g.seq.map((c, i) => (
-                  <div key={i} className={`cr-laid ${g.seqBy[i] === me ? "mine" : "theirs"}`}>
-                    <CribCard card={c} mini />
-                  </div>
-                ))
-              ) : (
-                <span className="cr-lbl">fresh count</span>
+              {g.starter && (
+                <div className="cr-cut">
+                  <CribCard card={g.starter} mini />
+                  <span className="cr-lbl">cut</span>
+                </div>
               )}
+              <div className="cr-lanes">
+                {g.seq.length ? (
+                  g.seq.map((c, i) => (
+                    <div key={i} className={`cr-laid ${g.seqBy[i] === me ? "mine" : "theirs"}`}>
+                      <CribCard card={c} mini />
+                    </div>
+                  ))
+                ) : (
+                  <span className="cr-lbl">fresh count</span>
+                )}
+              </div>
             </div>
             <div className="cr-oppline">
               {g.players[opp].name}: {g.players[opp].hand.length} card{g.players[opp].hand.length === 1 ? "" : "s"} left
@@ -296,7 +303,11 @@ export function CribbageBoard(props: BoardProps) {
                   {g.lastReveal.hand.map((c) => (
                     <CribCard key={cardId(c)} card={c} mini />
                   ))}
-                  {g.starter && <CribCard card={g.starter} mini />}
+                  {g.starter && (
+                    <span className="cr-rv-cut">
+                      <CribCard card={g.starter} mini />
+                    </span>
+                  )}
                 </div>
                 <div className="cr-lbl">{describeShow(g.lastReveal.score)}</div>
               </div>
