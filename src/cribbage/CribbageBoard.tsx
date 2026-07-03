@@ -3,6 +3,7 @@ import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
 import { type CribState, legalPlays, canPlay, pone, roundComplete } from "./game";
 import { describeShow } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval } from "./coach";
+import { BackButton } from "../ui/Icon";
 
 const SUIT_CLASS: Record<Suit, string> = {
   clubs: "s-club",
@@ -134,9 +135,7 @@ export function CribbageBoard(props: BoardProps) {
   return (
     <main className="app screen cribbage">
       <div className="screen-head">
-        <button className="back-btn" onClick={props.onExit} aria-label="Back">
-          ‹
-        </button>
+        <BackButton onClick={props.onExit} />
         <h1>{props.title}</h1>
         <span />
       </div>

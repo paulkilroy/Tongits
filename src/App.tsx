@@ -12,6 +12,7 @@ import { CribbageGame } from "./cribbage/CribbageGame";
 import { OnlineCribbage } from "./cribbage/OnlineCribbage";
 import { hostCribbageRoom } from "./cribbage/online";
 import { GAME_LIST, type GameKind } from "./games";
+import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
@@ -95,97 +96,6 @@ function applyCustomOrder(hand: readonly Card[], order: string[]): Card[] {
 
 /* --------------------------------- icons --------------------------------- */
 // Consistent line icons (Feather-style: 24×24, stroke = currentColor).
-function Icon({
-  name,
-  size = 22,
-}: {
-  name: "card" | "cribbage" | "hearts" | "gear" | "chart" | "people" | "back";
-  size?: number;
-}) {
-  const svg = (children: ReactNode) => (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
-  switch (name) {
-    case "card":
-      return svg(
-        <>
-          <rect x="3" y="6" width="11" height="15" rx="2" transform="rotate(-9 8.5 13.5)" />
-          <rect x="10" y="3" width="11" height="15" rx="2" transform="rotate(8 15.5 10.5)" />
-        </>,
-      );
-    case "hearts":
-      // Two hearts (a couple) — the LDR mark.
-      return svg(
-        <>
-          <path
-            transform="translate(1 4) rotate(-9 5 5)"
-            d="M5 9 C5 9 1 6 1 3.4 A2.2 2.2 0 0 1 5 2.5 A2.2 2.2 0 0 1 9 3.4 C9 6 5 9 5 9 Z"
-          />
-          <path
-            transform="translate(10 6) rotate(9 5 5)"
-            d="M5 9 C5 9 1 6 1 3.4 A2.2 2.2 0 0 1 5 2.5 A2.2 2.2 0 0 1 9 3.4 C9 6 5 9 5 9 Z"
-          />
-        </>,
-      );
-    case "cribbage":
-      // A cribbage board: rounded track with two rows of peg holes.
-      return svg(
-        <>
-          <rect x="2.5" y="5" width="19" height="14" rx="3.5" />
-          {[8, 11.5, 15, 18.5].map((cx) => (
-            <g key={cx}>
-              <circle cx={cx} cy="10" r="0.85" fill="currentColor" stroke="none" />
-              <circle cx={cx} cy="14" r="0.85" fill="currentColor" stroke="none" />
-            </g>
-          ))}
-        </>,
-      );
-    case "gear":
-      return svg(
-        <>
-          <circle cx="12" cy="12" r="3.2" />
-          <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" />
-        </>,
-      );
-    case "chart":
-      return svg(
-        <>
-          <line x1="6" y1="20" x2="6" y2="13" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="18" y1="20" x2="18" y2="9" />
-        </>,
-      );
-    case "people":
-      return svg(
-        <>
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </>,
-      );
-    case "back":
-      return svg(
-        <>
-          <line x1="19" y1="12" x2="5" y2="12" />
-          <polyline points="12 19 5 12 12 5" />
-        </>,
-      );
-  }
-}
-
 function CardView({
   card,
   selected,
@@ -1510,9 +1420,7 @@ type Mode =
 function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <header className="screen-head">
-      <button className="back-btn" onClick={onBack} aria-label="Back">
-        <Icon name="back" size={20} />
-      </button>
+      <BackButton onClick={onBack} />
       <h1>{title}</h1>
     </header>
   );
@@ -1956,9 +1864,7 @@ function Lobby({
   return (
     <main className="app home">
       <header className="home-top">
-        <button className="back-btn" onClick={onExitToMenu} aria-label="Back to games">
-          ‹
-        </button>
+        <BackButton onClick={onExitToMenu} label="Back to games" />
         <h1>
           <Icon name="card" size={26} /> Tongits
         </h1>

@@ -12,6 +12,7 @@ import {
 } from "./game";
 import { CribbageBoard } from "./CribbageBoard";
 import { useOnlineCribbage } from "./online";
+import { BackButton } from "../ui/Icon";
 
 const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 
@@ -33,9 +34,7 @@ export function OnlineCribbage({ code, isHost, onExit }: { code: string; isHost:
     return (
       <main className="app screen cribbage">
         <div className="screen-head">
-          <button className="back-btn" onClick={onExit} aria-label="Back">
-            ‹
-          </button>
+          <BackButton onClick={onExit} />
           <h1>Cribbage · online</h1>
           <span />
         </div>

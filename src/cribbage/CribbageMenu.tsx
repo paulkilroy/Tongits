@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { onlineConfigured } from "../online/supabase";
+import { BackButton } from "../ui/Icon";
 
 /** Cribbage entry menu: play the bot, host an online game, or join by code.
  *  Routing (local/online) is owned by the App so cross-game challenges can open
@@ -23,9 +24,7 @@ export function CribbageMenu({
   return (
     <main className="app screen cribbage">
       <div className="screen-head">
-        <button className="back-btn" onClick={onExit} aria-label="Back to games">
-          ‹
-        </button>
+        <BackButton onClick={onExit} label="Back to games" />
         <h1>Cribbage</h1>
         <span />
       </div>
