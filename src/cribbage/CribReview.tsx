@@ -97,20 +97,24 @@ export function CribReview({
               const off = mine && p.evLost !== undefined && p.evLost > 0.5;
               return (
                 <div className={`cr-play ${mine ? "mine" : "theirs"} ${off ? "off" : ""}`} key={i}>
-                  <span className="cr-play-who">{mine ? "You" : oppName}</span>
-                  <CribCard card={p.card} mini />
-                  <span className="cr-play-total">{p.total}</span>
-                  {p.pts > 0 && <span className="cr-peg-pts">+{p.pts}</span>}
-                  {mine && p.yourEV !== undefined && (
-                    <span className="cr-play-ev">
-                      net {ev(p.yourEV)}
-                      {off && p.bestLabel && (
-                        <span className="cr-play-best">
-                          {" "}
-                          · best {p.bestLabel} {ev(p.bestEV!)}
+                  <div className="cr-play-main">
+                    <span className="cr-play-who">{mine ? "You" : oppName}</span>
+                    <CribCard card={p.card} mini />
+                    <span className="cr-play-total">{p.total}</span>
+                    {p.pts > 0 && <span className="cr-peg-pts">+{p.pts}</span>}
+                    {mine && p.yourEV !== undefined && <span className="cr-play-ev">net {ev(p.yourEV)}</span>}
+                  </div>
+                  {mine && p.options && p.options.length > 1 && (
+                    <div className="cr-play-opts">
+                      {p.options.map((o) => (
+                        <span
+                          key={o.id}
+                          className={`cr-opt ${o.id === p.options![0].id ? "best" : ""} ${o.id === cardId(p.card) ? "you" : ""}`}
+                        >
+                          {o.label} {ev(o.ev)}
                         </span>
-                      )}
-                    </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               );

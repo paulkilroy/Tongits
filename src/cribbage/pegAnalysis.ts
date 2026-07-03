@@ -44,12 +44,19 @@ function afterPlay(h: Card[], v: Card[], seq: Card[], total: number, turn: numbe
   return signed + solve(nh, nv, nseq, ntot, turn === 0 ? 1 : 0, 0, turn);
 }
 
+export interface PegOption {
+  id: string;
+  label: string;
+  ev: number; // expected net pegging (you − opp) over the rest of the play
+}
+
 export interface PegDecision {
   yourEV: number;
   bestLabel: string;
   bestId: string;
   bestEV: number;
   evLost: number;
+  options: PegOption[]; // every legal card, best net EV first
 }
 
 const kept = (s: CribState, seat: number): Card[] =>
@@ -84,20 +91,23 @@ export function analyzePegging(state: CribState, seat: number, samples = 60): Ma
 
       const legal = heroHand.filter((c) => before + val(c) <= 31);
       let yourEV = 0;
-      let best = { id: "", label: "", ev: -Infinity };
+      const options: PegOption[] = [];
       for (const c of legal) {
         let sum = 0;
         for (const vh of villHands) sum += afterPlay(heroHand, vh, seq, before, 0, c);
         const ev = sum / villHands.length;
         if (cardId(c) === cardId(e.card)) yourEV = ev;
-        if (ev > best.ev) best = { id: cardId(c), label: cardLabel(c), ev };
+        options.push({ id: cardId(c), label: cardLabel(c), ev });
       }
+      options.sort((a, b) => b.ev - a.ev);
+      const best = options[0];
       out.set(idx, {
         yourEV,
         bestLabel: best.label,
         bestId: best.id,
         bestEV: best.ev,
         evLost: Math.max(0, best.ev - yourEV),
+        options,
       });
     }
 

@@ -1,7 +1,7 @@
 import { type Card, cardId, cardLabel } from "../engine/cards";
 import { scoreShow, describeShow, type ShowScore } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval, type CribGrade } from "./coach";
-import { analyzePegging } from "./pegAnalysis";
+import { analyzePegging, type PegOption } from "./pegAnalysis";
 import { type CribState } from "./game";
 
 // Post-hand review for one seat: grade the DISCARD (your keep vs the best, by EV)
@@ -18,6 +18,7 @@ export interface PegReviewPlay {
   bestLabel?: string; // the card the analysis would play
   bestEV?: number;
   evLost?: number; // bestEV − yourEV
+  options?: PegOption[]; // every legal card ranked by net EV
 }
 
 export interface HandReview {
@@ -66,6 +67,7 @@ export function reviewHand(state: CribState, seat: number, samples = 200): HandR
         play.bestLabel = d.bestLabel;
         play.bestEV = d.bestEV;
         play.evLost = d.evLost;
+        play.options = d.options;
         yourEvLost += d.evLost;
       }
     }
@@ -102,13 +104,14 @@ export function reviewToText(r: HandReview, oppName: string): string {
   out.push(`Pegging — you scored ${r.yourPegPoints}${r.yourEvLost > 0.3 ? ` · gave up ${r.yourEvLost.toFixed(1)} net` : ""}`);
   for (const p of r.pegging) {
     const who = p.by === r.seat ? "you" : oppName;
-    let line = `  ${who}: ${cardLabel(p.card)} (${p.total})${p.pts ? ` +${p.pts}` : ""}`;
-    if (p.by === r.seat && p.yourEV !== undefined) {
-      line += `  [EV ${p.yourEV >= 0 ? "+" : ""}${p.yourEV.toFixed(1)}`;
-      if (p.bestLabel && p.evLost && p.evLost > 0.2) line += ` · best ${p.bestLabel} ${p.bestEV! >= 0 ? "+" : ""}${p.bestEV!.toFixed(1)}`;
-      line += "]";
+    out.push(`  ${who}: ${cardLabel(p.card)} (${p.total})${p.pts ? ` +${p.pts}` : ""}`);
+    if (p.by === r.seat && p.options && p.options.length > 1) {
+      const sign = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
+      out.push(
+        "      play: " +
+          p.options.map((o) => `${o.label} ${sign(o.ev)}${o.id === cardId(p.card) ? "(you)" : ""}`).join("  "),
+      );
     }
-    out.push(line);
   }
   out.push("");
 

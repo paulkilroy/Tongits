@@ -2130,11 +2130,16 @@ h1 {
 }
 .cr-play {
   display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+}
+.cr-play-main {
+  display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.82rem;
-  padding: 0.2rem 0.35rem;
-  border-radius: 6px;
 }
 .cr-play.mine {
   background: rgba(255, 214, 90, 0.1);
@@ -2144,6 +2149,28 @@ h1 {
 }
 .cr-play.off {
   outline: 1px solid rgba(255, 122, 122, 0.6);
+}
+.cr-play-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-left: 2.9rem;
+}
+.cr-opt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.8;
+}
+.cr-opt.best {
+  background: rgba(54, 196, 106, 0.28);
+  opacity: 1;
+}
+.cr-opt.you {
+  outline: 1px solid #ffd65a;
+  opacity: 1;
 }
 .cr-play-who {
   min-width: 2.6rem;
