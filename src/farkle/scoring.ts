@@ -53,3 +53,28 @@ export function scoreDice(dice: number[], rules: FarkleRules): DiceScore {
 export function hasScore(roll: number[], rules: FarkleRules): boolean {
   return scoreDice(roll, rules).score > 0;
 }
+
+/** The highest-scoring all-scoring subset of a roll (≤6 dice → brute force). */
+export function bestKeep(dice: number[], rules: FarkleRules): { keep: number[]; score: number } {
+  let best = { keep: [] as number[], score: 0 };
+  const n = dice.length;
+  for (let mask = 1; mask < 1 << n; mask++) {
+    const sub: number[] = [];
+    for (let i = 0; i < n; i++) if (mask & (1 << i)) sub.push(dice[i]);
+    const s = scoreDice(sub, rules);
+    if (s.allScoring && s.score > best.score) best = { keep: sub, score: s.score };
+  }
+  return best;
+}
+
+/** Is `keep` a legal set-aside from `roll` (a sub-multiset that all scores)? */
+export function isLegalKeep(roll: number[], keep: number[], rules: FarkleRules): boolean {
+  if (keep.length === 0) return false;
+  const pool = [...roll];
+  for (const d of keep) {
+    const i = pool.indexOf(d);
+    if (i < 0) return false;
+    pool.splice(i, 1);
+  }
+  return scoreDice(keep, rules).allScoring;
+}
