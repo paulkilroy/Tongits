@@ -2077,9 +2077,18 @@ function GamePicker({
           ))}
         </div>
       )}
+
+      <div className="build-stamp">updated {BUILD_TIME}</div>
     </main>
   );
 }
+
+const BUILD_TIME = new Date(__BUILD_DATE__).toLocaleString(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 export function App() {
   const [game, setGame] = useState<GameChoice>("menu");

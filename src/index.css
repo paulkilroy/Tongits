@@ -2437,3 +2437,11 @@ h1 {
 .fk-luck .fk-skull {
   opacity: 0.85;
 }
+
+.build-stamp {
+  margin-top: auto;
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 0.68rem;
+  opacity: 0.4;
+}
