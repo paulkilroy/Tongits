@@ -147,13 +147,6 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
       <div className="screen-body">
         <ScoreBoard g={g} />
 
-        {g.starter && (
-          <div className="cr-starter">
-            <span className="cr-lbl">starter</span>
-            <CribCard card={g.starter} />
-          </div>
-        )}
-
         {flash && <div className="cr-flash">{flash}</div>}
 
         {/* ---- discard ---- */}
@@ -184,9 +177,19 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
             <div className="cr-play-total">
               count <strong>{g.total}</strong> / 31
             </div>
-            <div className="cr-seq">
+            {g.starter && (
+              <div className="cr-cut">
+                <CribCard card={g.starter} mini />
+                <span className="cr-lbl">cut</span>
+              </div>
+            )}
+            <div className="cr-lanes">
               {g.seq.length ? (
-                g.seq.map((c, i) => <CribCard key={i} card={c} mini />)
+                g.seq.map((c, i) => (
+                  <div key={i} className={`cr-laid ${g.seqBy[i] === HUMAN ? "mine" : "theirs"}`}>
+                    <CribCard card={c} mini />
+                  </div>
+                ))
               ) : (
                 <span className="cr-lbl">fresh count</span>
               )}

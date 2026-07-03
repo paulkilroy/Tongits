@@ -37,6 +37,7 @@ export interface CribState {
   crib: Card[];
   current: number; // whose turn during the play
   seq: Card[]; // cards in the current pegging series (since the last 31/reset)
+  seqBy: number[]; // who laid each card in `seq` (parallel array)
   total: number; // running total of `seq`
   passCount: number; // consecutive "go"s; two in a row ends the series
   lastPlayer: number | null; // who laid the last card (takes the go / last-card point)
@@ -87,6 +88,7 @@ export function newRound(
     crib: [],
     current: p0,
     seq: [],
+    seqBy: [],
     total: 0,
     passCount: 0,
     lastPlayer: null,
@@ -151,6 +153,7 @@ function toShow(s: CribState): void {
   s.phase = "show";
   s.showStage = 0;
   s.seq = [];
+  s.seqBy = [];
   s.total = 0;
   note(s, "The show.");
 }
@@ -167,6 +170,7 @@ export function playCard(state: CribState, card: Card): CribState {
   me.hand = me.hand.filter((c) => !(c.rank === card.rank && c.suit === card.suit));
   me.played.push(card);
   s.seq.push(card);
+  s.seqBy.push(P);
   s.total += cardPoints(card);
   s.lastPlayer = P;
   s.passCount = 0;
@@ -177,6 +181,7 @@ export function playCard(state: CribState, card: Card): CribState {
 
   if (s.total === 31) {
     s.seq = [];
+    s.seqBy = [];
     s.total = 0;
     if (bothEmpty(s)) toShow(s);
     else s.current = other(P);
@@ -205,6 +210,7 @@ export function go(state: CribState): CribState {
     const last = s.lastPlayer ?? other(P);
     if (addScore(s, last, 1, "go")) return s;
     s.seq = [];
+    s.seqBy = [];
     s.total = 0;
     s.passCount = 0;
     if (bothEmpty(s)) toShow(s);

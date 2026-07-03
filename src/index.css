@@ -1758,12 +1758,15 @@ h1 {
   background: #36c46a;
   transition: width 0.3s;
 }
-.cr-starter {
+.cr-cut {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  justify-content: center;
-  margin-bottom: 0.7rem;
+  gap: 0.15rem;
+}
+.cr-cut .mc {
+  outline: 2px dashed rgba(255, 214, 90, 0.75);
+  outline-offset: 2px;
 }
 .cr-lbl {
   font-size: 0.75rem;
@@ -1811,6 +1814,28 @@ h1 {
   justify-content: center;
   min-height: 2rem;
   align-items: center;
+}
+/* Pegging lanes: opponent's cards ride high, yours ride low, in play order. */
+.cr-lanes {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 4.8rem;
+  width: 100%;
+}
+.cr-laid.mine {
+  align-self: flex-end;
+}
+.cr-laid.theirs {
+  align-self: flex-start;
+}
+.cr-laid.mine .mc {
+  box-shadow: 0 3px 0 -1px #ffd65a;
+}
+.cr-laid.theirs .mc {
+  opacity: 0.92;
 }
 .cr-oppline {
   font-size: 0.82rem;
