@@ -1,12 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { CribbageHome } from "./CribbageHome";
+import { CribbageMenu } from "./CribbageMenu";
 import { CribbageGame } from "./CribbageGame";
 
 describe("cribbage UI smoke", () => {
-  it("renders the cribbage home without throwing", () => {
-    const html = renderToString(createElement(CribbageHome, { name: "You", onExit: () => {} }));
+  it("renders the cribbage menu without throwing", () => {
+    const html = renderToString(
+      createElement(CribbageMenu, {
+        onLocal: () => {},
+        onHost: () => {},
+        onJoin: () => {},
+        onExit: () => {},
+        busy: false,
+        error: null,
+      }),
+    );
     expect(html).toContain("Cribbage");
     expect(html).toContain("Play vs AI");
   });

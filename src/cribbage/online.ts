@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type CribState } from "./game";
-import { fetchRoomData, pushRoomData, subscribeRoomData } from "../online/supabase";
+import { type CribState, newRound, STANDARD_CRIB_RULES } from "./game";
+import { createRoomData, fetchRoomData, makeCode, pushRoomData, subscribeRoomData } from "../online/supabase";
+
+const randSeed = () => Math.floor(Math.random() * 2 ** 31);
+
+/** Create a fresh online cribbage room (host = seat 0) and return its code. */
+export async function hostCribbageRoom(name: string): Promise<string> {
+  const code = makeCode(randSeed());
+  const game = newRound(STANDARD_CRIB_RULES, randSeed(), [name || "You", "Opponent"], [false, false], 0);
+  await createRoomData(code, { kind: "cribbage", game, version: 1 } satisfies CribRoom);
+  return code;
+}
 
 /** The whole cribbage game, mirrored to a room row (opaque jsonb). */
 export interface CribRoom {

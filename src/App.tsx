@@ -7,7 +7,11 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./engine/cards";
-import { CribbageHome } from "./cribbage/CribbageHome";
+import { CribbageMenu } from "./cribbage/CribbageMenu";
+import { CribbageGame } from "./cribbage/CribbageGame";
+import { OnlineCribbage } from "./cribbage/OnlineCribbage";
+import { hostCribbageRoom } from "./cribbage/online";
+import { GAME_LIST, type GameKind } from "./games";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
@@ -43,7 +47,7 @@ import {
 } from "./ui/coachStore";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
-import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom } from "./online/supabase";
+import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom, fetchRoomKind } from "./online/supabase";
 
 /* ----------------------------- card helpers ------------------------------ */
 
@@ -1846,12 +1850,14 @@ function Lobby({
   account,
   onUpdateProfile,
   onExitToMenu,
+  fr,
 }: {
   onStart: (m: Mode) => void;
   initialCode?: string;
   account: Account | null;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
   onExitToMenu: () => void;
+  fr: FriendsHook;
 }) {
   const [screen, setScreen] = useState<"main" | "rules" | "friends" | "coach">("main");
   const [showAvatars, setShowAvatars] = useState(false);
@@ -1859,7 +1865,6 @@ function Lobby({
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fr = useFriends(account);
 
   useEffect(() => {
     if (account) setProfile({ name: account.name, avatar: account.avatar });
@@ -1910,61 +1915,19 @@ function Lobby({
     }
   }
 
-  async function acceptChallenge() {
-    const ch = fr.challenge;
-    if (!ch) return;
-    fr.clearChallenge();
-    if (await joinRoomAs(ch.room_code, profile)) {
-      await respondChallenge(ch.id, "accepted");
-      onStart({ kind: "online", code: ch.room_code, isHost: false, me: 1 });
-    } else {
-      await respondChallenge(ch.id, "declined");
-    }
-  }
-
-  const challenger = fr.challenge
-    ? fr.friends.find((f) => f.profile.id === fr.challenge!.from_id)?.profile
-    : null;
-  const prompt = fr.challenge ? (
-    <ChallengePrompt
-      name={challenger?.name ?? "A friend"}
-      avatar={challenger?.avatar ?? "👤"}
-      onAccept={acceptChallenge}
-      onDecline={() => {
-        void respondChallenge(fr.challenge!.id, "declined");
-        fr.clearChallenge();
-      }}
-    />
-  ) : null;
-
-  if (screen === "rules")
-    return (
-      <>
-        {prompt}
-        <RulesEditor onBack={() => setScreen("main")} />
-      </>
-    );
+  // Incoming challenges are handled globally by App (cross-game); the lobby only
+  // manages friends + sends Tongits invites.
+  if (screen === "rules") return <RulesEditor onBack={() => setScreen("main")} />;
   if (screen === "friends")
     return (
-      <>
-        {prompt}
-        <FriendsScreen account={account} fr={fr} busy={busy} onBack={() => setScreen("main")} onChallenge={challenge} />
-      </>
+      <FriendsScreen account={account} fr={fr} busy={busy} onBack={() => setScreen("main")} onChallenge={challenge} />
     );
-  if (screen === "coach")
-    return (
-      <>
-        {prompt}
-        <CoachScreen onBack={() => setScreen("main")} />
-      </>
-    );
+  if (screen === "coach") return <CoachScreen onBack={() => setScreen("main")} />;
 
   const onlineFriends = fr.friends.filter((f) => f.online).length;
 
   return (
     <main className="app home">
-      {prompt}
-
       <button className="link-btn home-games" onClick={onExitToMenu}>
         ‹ Games
       </button>
@@ -2093,8 +2056,20 @@ function Lobby({
 /* --------------------------------- app ----------------------------------- */
 
 type GameChoice = "menu" | "tongits" | "cribbage";
+type CribMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string; isHost: boolean };
 
-function GamePicker({ onPick }: { onPick: (g: GameChoice) => void }) {
+function GamePicker({
+  fr,
+  onPick,
+  onInvite,
+  busy,
+}: {
+  fr: FriendsHook;
+  onPick: (g: GameChoice) => void;
+  onInvite: (friendId: string, kind: GameKind) => void;
+  busy: boolean;
+}) {
+  const onlineCount = fr.friends.filter((f) => f.online).length;
   return (
     <main className="app screen picker">
       <header className="home-top">
@@ -2102,17 +2077,40 @@ function GamePicker({ onPick }: { onPick: (g: GameChoice) => void }) {
       </header>
       <p className="picker-sub">Pick a game to play with Ella or practice vs the AI.</p>
       <div className="picker-grid">
-        <button className="panel picker-card" onClick={() => onPick("tongits")}>
-          <span className="picker-emoji">🀄</span>
-          <span className="picker-name">Tongits</span>
-          <span className="picker-desc">2–3 player rummy · online + AI + coach</span>
-        </button>
-        <button className="panel picker-card" onClick={() => onPick("cribbage")}>
-          <span className="picker-emoji">🎯</span>
-          <span className="picker-name">Cribbage</span>
-          <span className="picker-desc">Peg to 121 · online + AI + discard coach</span>
-        </button>
+        {GAME_LIST.map((g) => (
+          <button key={g.kind} className="panel picker-card" onClick={() => onPick(g.kind)}>
+            <span className="picker-emoji">{g.emoji}</span>
+            <span className="picker-name">{g.name}</span>
+            <span className="picker-desc">{g.desc}</span>
+          </button>
+        ))}
       </div>
+
+      {fr.friends.length > 0 && (
+        <div className="panel hub-friends">
+          <div className="of-label">Friends{onlineCount ? ` · ${onlineCount} online` : ""} · invite to a game</div>
+          {fr.friends.map(({ profile, online }) => (
+            <div className="hub-friend" key={profile.id}>
+              <span className={`hub-dot ${online ? "on" : ""}`} />
+              <span className="hub-name">
+                {profile.avatar} {profile.name}
+              </span>
+              <span className="hub-invite">
+                {GAME_LIST.map((g) => (
+                  <button
+                    key={g.kind}
+                    disabled={!online || busy}
+                    title={`Invite to ${g.name}`}
+                    onClick={() => onInvite(profile.id, g.kind)}
+                  >
+                    {g.emoji}
+                  </button>
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
@@ -2120,32 +2118,132 @@ function GamePicker({ onPick }: { onPick: (g: GameChoice) => void }) {
 export function App() {
   const [game, setGame] = useState<GameChoice>("menu");
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
+  const [crib, setCrib] = useState<CribMode>({ k: "menu" });
+  const [busy, setBusy] = useState(false);
+  const [cribErr, setCribErr] = useState<string | null>(null);
   const { account, update, setBalance } = useAccount();
+  const fr = useFriends(account);
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
+  const myProfile = (): Profile => (account ? { name: account.name, avatar: account.avatar } : loadProfile());
 
-  if (game === "menu") return <GamePicker onPick={setGame} />;
-  if (game === "cribbage")
-    return <CribbageHome name={account?.name ?? "You"} onExit={() => setGame("menu")} />;
+  // Accept an incoming challenge → open the right game joined to its room.
+  async function acceptChallenge() {
+    const ch = fr.challenge;
+    if (!ch) return;
+    fr.clearChallenge();
+    const kind = await fetchRoomKind(ch.room_code).catch(() => null);
+    if (kind === "cribbage") {
+      await respondChallenge(ch.id, "accepted");
+      setGame("cribbage");
+      setCrib({ k: "online", code: ch.room_code, isHost: false });
+      return;
+    }
+    if (await joinRoomAs(ch.room_code, myProfile())) {
+      await respondChallenge(ch.id, "accepted");
+      setGame("tongits");
+      setMode({ kind: "online", code: ch.room_code, isHost: false, me: 1 });
+    } else {
+      await respondChallenge(ch.id, "declined");
+    }
+  }
 
-  if (mode.kind === "lobby")
-    return (
+  // Invite a friend to a specific game: host a room, send the challenge, open it.
+  async function invite(friendId: string, kind: GameKind) {
+    setBusy(true);
+    try {
+      if (kind === "cribbage") {
+        const code = await hostCribbageRoom(account?.name ?? "You");
+        await createChallenge(friendId, code);
+        setGame("cribbage");
+        setCrib({ k: "online", code, isHost: true });
+      } else {
+        const code = await hostRoom(myProfile(), false);
+        await createChallenge(friendId, code);
+        setGame("tongits");
+        setMode({ kind: "online", code, isHost: true, me: 0 });
+      }
+    } catch (e) {
+      console.error("invite failed", e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hostCribbage() {
+    setBusy(true);
+    setCribErr(null);
+    try {
+      setCrib({ k: "online", code: await hostCribbageRoom(account?.name ?? "You"), isHost: true });
+    } catch (e) {
+      setCribErr((e as Error).message ?? "Could not create the room.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const challenger = fr.challenge
+    ? fr.friends.find((f) => f.profile.id === fr.challenge!.from_id)?.profile
+    : null;
+  const modal = fr.challenge ? (
+    <ChallengePrompt
+      name={challenger?.name ?? "A friend"}
+      avatar={challenger?.avatar ?? "👤"}
+      onAccept={acceptChallenge}
+      onDecline={() => {
+        void respondChallenge(fr.challenge!.id, "declined");
+        fr.clearChallenge();
+      }}
+    />
+  ) : null;
+
+  let view: ReactNode;
+  if (game === "menu") {
+    view = <GamePicker fr={fr} onPick={setGame} onInvite={invite} busy={busy} />;
+  } else if (game === "cribbage") {
+    if (crib.k === "local") view = <CribbageGame onExit={() => setCrib({ k: "menu" })} />;
+    else if (crib.k === "online")
+      view = <OnlineCribbage code={crib.code} isHost={crib.isHost} onExit={() => setCrib({ k: "menu" })} />;
+    else
+      view = (
+        <CribbageMenu
+          onLocal={() => setCrib({ k: "local" })}
+          onHost={hostCribbage}
+          onJoin={(c) => c.length >= 4 && setCrib({ k: "online", code: c, isHost: false })}
+          onExit={() => setGame("menu")}
+          busy={busy}
+          error={cribErr}
+        />
+      );
+  } else if (mode.kind === "lobby") {
+    view = (
       <Lobby
         onStart={setMode}
         initialCode={joinCode}
         account={account}
         onUpdateProfile={update}
         onExitToMenu={() => setGame("menu")}
+        fr={fr}
       />
     );
-  if (mode.kind === "local") return <LocalGame onExit={() => setMode({ kind: "lobby" })} />;
+  } else if (mode.kind === "local") {
+    view = <LocalGame onExit={() => setMode({ kind: "lobby" })} />;
+  } else {
+    view = (
+      <OnlineGame
+        code={mode.code}
+        isHost={mode.isHost}
+        me={mode.me}
+        account={account}
+        onBalance={setBalance}
+        onExit={() => setMode({ kind: "lobby" })}
+      />
+    );
+  }
+
   return (
-    <OnlineGame
-      code={mode.code}
-      isHost={mode.isHost}
-      me={mode.me}
-      account={account}
-      onBalance={setBalance}
-      onExit={() => setMode({ kind: "lobby" })}
-    />
+    <>
+      {modal}
+      {view}
+    </>
   );
 }

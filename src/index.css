@@ -1988,3 +1988,51 @@ h1 {
   opacity: 0.9;
   min-height: 1.1rem;
 }
+
+/* -------------------------- game-room friends hub ------------------------ */
+.hub-friends {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.hub-friend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.hub-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+.hub-dot.on {
+  background: #36c46a;
+  box-shadow: 0 0 6px #36c46a;
+}
+.hub-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-invite {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.hub-invite button {
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.3rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+.hub-invite button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
