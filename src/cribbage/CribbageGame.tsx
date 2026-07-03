@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
+import { analyzeDiscard, gradeDiscard, type DiscardEval } from "./coach";
 import {
   type CribState,
   newRound,
@@ -77,6 +78,7 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
     newRound(STANDARD_CRIB_RULES, randSeed(), ["You", "Bot"], [false, true], 0),
   );
   const [sel, setSel] = useState<Card[]>([]);
+  const [showCoach, setShowCoach] = useState(false);
   const seenLog = useRef(0);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -102,6 +104,16 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
   const me = g.players[HUMAN];
   const myLegal = new Set(legalPlays(g, HUMAN).map(cardId));
   const myTurn = g.phase === "play" && g.current === HUMAN;
+  const ownsCrib = g.dealer === HUMAN;
+  const handKey = me.hand.map(cardId).join(",");
+  const discardEvs = useMemo<DiscardEval[]>(
+    () => (g.phase === "discard" ? analyzeDiscard(me.hand, ownsCrib) : []),
+    // hand is stable through the discard phase; handKey captures its contents
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [g.phase, handKey, ownsCrib],
+  );
+  const myKeep = sel.length === 2 ? me.hand.filter((c) => !sel.some((s) => cardId(s) === cardId(c))) : null;
+  const myGrade = myKeep && discardEvs.length ? gradeDiscard(discardEvs, myKeep) : null;
 
   function toggle(c: Card) {
     const id = cardId(c);
@@ -165,9 +177,46 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
                 />
               ))}
             </div>
-            <button className="reveal-replay" disabled={sel.length !== 2} onClick={confirmDiscard}>
-              Discard {sel.length}/2
-            </button>
+            {myGrade && (
+              <div className={`cr-mychoice grade-${myGrade.grade}`}>
+                Your keep · {myGrade.grade}
+                {myGrade.lost > 0.3 && <> · gives up {myGrade.lost.toFixed(1)} pts</>}
+              </div>
+            )}
+            <div className="cr-row2">
+              <button className="cr-coach-btn" onClick={() => setShowCoach((v) => !v)}>
+                {showCoach ? "Hide coach" : "💡 Coach"}
+              </button>
+              <button className="reveal-replay cr-discard-btn" disabled={sel.length !== 2} onClick={confirmDiscard}>
+                Discard {sel.length}/2
+              </button>
+            </div>
+            {showCoach && (
+              <div className="cr-coach">
+                <div className="cr-lbl">
+                  keep these 4 · net EV {ownsCrib ? "(your crib +)" : "(their crib −)"}
+                </div>
+                {discardEvs.slice(0, 6).map((e, i) => {
+                  const isMine = myKeep && e.keep.every((c) => myKeep.some((k) => cardId(k) === cardId(c)));
+                  return (
+                    <div className={`cr-coach-row ${i === 0 ? "best" : ""} ${isMine ? "mine" : ""}`} key={i}>
+                      <span className="cr-coach-keep">
+                        {e.keep.map((c) => (
+                          <CribCard key={cardId(c)} card={c} mini />
+                        ))}
+                      </span>
+                      <span className="cr-coach-ev">
+                        <strong>{e.net.toFixed(1)}</strong>
+                        <span className="cr-coach-split">
+                          hand {e.handEV.toFixed(1)} · crib {ownsCrib ? "+" : "−"}
+                          {e.cribEV.toFixed(1)}
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

@@ -1899,3 +1899,84 @@ h1 {
   opacity: 0.7;
   font-size: 0.85rem;
 }
+
+/* --------------------------- cribbage coach ------------------------------ */
+.cr-row2 {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 340px;
+}
+.cr-coach-btn {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 700;
+  color: #cfe9d6;
+  background: rgba(54, 196, 106, 0.16);
+  border: 1px solid rgba(54, 196, 106, 0.5);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+}
+.cr-discard-btn {
+  flex: 1;
+}
+.cr-mychoice {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+}
+.cr-mychoice.grade-best {
+  color: #36c46a;
+}
+.cr-mychoice.grade-good {
+  color: #8fd14f;
+}
+.cr-mychoice.grade-ok {
+  color: #ffb24a;
+}
+.cr-mychoice.grade-loose {
+  color: #ff7a7a;
+}
+.cr-coach {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.cr-coach-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+}
+.cr-coach-row.best {
+  background: rgba(54, 196, 106, 0.15);
+}
+.cr-coach-row.mine {
+  outline: 1px solid rgba(255, 214, 90, 0.6);
+}
+.cr-coach-keep {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+.cr-coach-ev {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+.cr-coach-ev strong {
+  font-size: 1rem;
+}
+.cr-coach-split {
+  font-size: 0.66rem;
+  opacity: 0.6;
+}
