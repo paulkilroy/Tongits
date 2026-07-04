@@ -15,7 +15,7 @@ const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 /** Create an online Press Your Luck room (host = seat 0) and return its code. */
 export async function hostFarkleRoom(name: string, rules: FarkleRules): Promise<string> {
   const code = makeCode(randSeed());
-  const game = newGame(rules, [name || "You", "Opponent"], [false, false]);
+  const game = newGame(rules, [name || "You", GUEST_PLACEHOLDER], [false, false]);
   await createRoomData(code, { kind: "pressyourluck", game, version: 1 } satisfies FarkleRoom);
   return code;
 }
@@ -25,7 +25,10 @@ export async function hostFarkleRoom(name: string, rules: FarkleRules): Promise<
  * only the active player writes — so there's no host-special logic; whoever's
  * turn it is rolls/sets aside/banks and the write syncs to the other device.
  */
-export function useOnlineFarkle(code: string, isHost: boolean) {
+/** Placeholder name the host seats the guest under until they join and sync. */
+export const GUEST_PLACEHOLDER = "Opponent";
+
+export function useOnlineFarkle(code: string, isHost: boolean, myName?: string) {
   const [room, setRoom] = useState<FarkleRoom | null>(null);
   const [connected, setConnected] = useState(false);
   const versionRef = useRef(0);
@@ -45,6 +48,18 @@ export function useOnlineFarkle(code: string, isHost: boolean) {
     },
     [code],
   );
+
+  // Guest announces its real name once joined: the host seats it as "Opponent",
+  // so on the first synced room we write our name back (merged onto the latest
+  // game so we never clobber the host's progress). Self-heals if a write races a
+  // host action — the placeholder stays until a named write survives.
+  useEffect(() => {
+    if (isHost || !room || !myName) return;
+    if (room.game.players[1].name !== GUEST_PLACEHOLDER) return;
+    const game = structuredClone(room.game);
+    game.players[1].name = myName;
+    write(game);
+  }, [isHost, room, myName, write]);
 
   useEffect(() => {
     let active = true;

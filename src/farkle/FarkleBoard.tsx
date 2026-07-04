@@ -78,7 +78,11 @@ export function FarkleBoard({
       seenLog.current = g.log.length;
     }
   }, [g.log]);
-  useEffect(() => setSel([]), [g.dice, g.current, g.phase]);
+  // Clear the selection only when the roll actually changes — key on dice VALUES,
+  // not the array reference, so online re-syncs (which rebuild g every poll with
+  // identical dice) don't wipe what the player is mid-picking.
+  const rollKey = `${g.dice.join(",")}|${g.current}|${g.phase}`;
+  useEffect(() => setSel([]), [rollKey]);
 
   const myTurn = g.current === me && !g.result;
   const selValues = sel.map((i) => g.dice[i]);

@@ -2156,7 +2156,14 @@ export function App() {
   } else if (game === "pressyourluck") {
     if (fark.k === "local") view = <FarkleGame rules={fark.rules} onExit={() => setFark({ k: "menu" })} />;
     else if (fark.k === "online")
-      view = <OnlineFarkle code={fark.code} isHost={fark.isHost} onExit={() => setFark({ k: "menu" })} />;
+      view = (
+        <OnlineFarkle
+          code={fark.code}
+          isHost={fark.isHost}
+          myName={account?.name}
+          onExit={() => setFark({ k: "menu" })}
+        />
+      );
     else
       view = (
         <FarkleMenu

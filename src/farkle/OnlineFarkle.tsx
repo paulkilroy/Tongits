@@ -1,10 +1,20 @@
 import { newGame, roll, setAside, bank, nextTurn } from "./game";
 import { FarkleBoard } from "./FarkleBoard";
-import { useOnlineFarkle } from "./online";
+import { useOnlineFarkle, GUEST_PLACEHOLDER } from "./online";
 
 /** A live 2-player Press Your Luck game over a Supabase room. Host is seat 0. */
-export function OnlineFarkle({ code, isHost, onExit }: { code: string; isHost: boolean; onExit: () => void }) {
-  const { game: g, connected, write } = useOnlineFarkle(code, isHost);
+export function OnlineFarkle({
+  code,
+  isHost,
+  myName,
+  onExit,
+}: {
+  code: string;
+  isHost: boolean;
+  myName?: string;
+  onExit: () => void;
+}) {
+  const { game: g, connected, write } = useOnlineFarkle(code, isHost, myName);
   const me = isHost ? 0 : 1;
 
   if (!g) {
@@ -29,13 +39,18 @@ export function OnlineFarkle({ code, isHost, onExit }: { code: string; isHost: b
   }
 
   const myTurn = g.current === me && !g.result;
+  const oppJoined = g.players[(me + 1) % g.players.length].name !== GUEST_PLACEHOLDER;
+
+  let waiting: string | null = null;
+  if (!connected) waiting = "Reconnecting…";
+  else if (isHost && !oppJoined) waiting = `Waiting for opponent to join · share code ${code}`;
 
   return (
     <FarkleBoard
       g={g}
       me={me}
       title="Press Your Luck · online"
-      waiting={!connected ? "Reconnecting…" : null}
+      waiting={waiting}
       onRoll={() => myTurn && write(roll(g, Math.random))}
       onPress={(keep) => myTurn && write(roll(setAside(g, keep), Math.random))}
       onBank={(keep) => myTurn && write(bank(setAside(g, keep)))}
