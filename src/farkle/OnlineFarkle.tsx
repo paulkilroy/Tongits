@@ -2,6 +2,7 @@ import { roll, setAside, bank, nextTurn, takePiggyback } from "./game";
 import { FarkleBoard } from "./FarkleBoard";
 import { useOnlineFarkle, MIN_FARKLE_SEATS, MAX_FARKLE_SEATS } from "./online";
 import { Lobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
+import { useTurnAlert } from "../ui/useTurnAlert";
 
 /** A live 2–6 player Press Your Luck game over a Supabase room. */
 export function OnlineFarkle({
@@ -23,6 +24,10 @@ export function OnlineFarkle({
     code,
     me,
   );
+
+  const seat = meIndex >= 0 ? meIndex : 0;
+  const myTurn = started && !!g && g.current === seat && !g.result;
+  useTurnAlert(myTurn, `${gameName}: your roll`);
 
   if (!room) {
     return (
@@ -63,9 +68,6 @@ export function OnlineFarkle({
       />
     );
   }
-
-  const seat = meIndex >= 0 ? meIndex : 0;
-  const myTurn = g.current === seat && !g.result;
 
   return (
     <FarkleBoard

@@ -4,6 +4,7 @@ import { newRound, playCard, go, nextShow, roundComplete, STANDARD_CRIB_RULES } 
 import { CribbageBoard } from "./CribbageBoard";
 import { useOnlineCribbage } from "./online";
 import { BackButton } from "../ui/Icon";
+import { useTurnAlert } from "../ui/useTurnAlert";
 
 const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 
@@ -11,6 +12,9 @@ const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 export function OnlineCribbage({ code, isHost, onExit }: { code: string; isHost: boolean; onExit: () => void }) {
   const { game: g, connected, write, discard } = useOnlineCribbage(code, isHost);
   const me = isHost ? 0 : 1;
+
+  const needsMe = !!g && ((g.phase === "play" && g.current === me) || (g.phase === "discard" && !g.players[me].discarded));
+  useTurnAlert(needsMe, "Cribbage: your turn");
 
   // Host drives the show: count each hand out on a timer so both watch it flow.
   useEffect(() => {

@@ -36,6 +36,7 @@ import {
 } from "./engine/game";
 import { useGame } from "./ui/useGame";
 import { useOnlineMatch } from "./ui/useOnlineMatch";
+import { useTurnAlert } from "./ui/useTurnAlert";
 import { useAccount } from "./ui/useAccount";
 import { useFriends } from "./ui/useFriends";
 import { addBalance, type Account } from "./online/auth";
@@ -1313,6 +1314,7 @@ function OnlineGame({
     useOnlineMatch(code, isHost);
   const [moneyDelta, setMoneyDelta] = useState<number | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  useTurnAlert(!!game && game.current === me && !game.result && !matchOver, "Tongits: your turn");
 
   // When a round ends, settle this seat's wallet exactly once.
   const result = game?.result;
