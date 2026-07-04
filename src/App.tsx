@@ -2037,6 +2037,18 @@ const BUILD_TIME = new Date(__BUILD_DATE__).toLocaleString(undefined, {
   minute: "2-digit",
 });
 
+/** A stable per-device id, so a player without a synced account still gets a
+ *  consistent multiplayer seat identity. */
+function deviceId(): string {
+  const k = "ldr_device_id";
+  let v = localStorage.getItem(k);
+  if (!v) {
+    v = globalThis.crypto?.randomUUID?.() ?? `dev-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+    localStorage.setItem(k, v);
+  }
+  return v;
+}
+
 export function App() {
   const [game, setGame] = useState<GameChoice>("menu");
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
@@ -2057,6 +2069,18 @@ export function App() {
     return t(account?.name) || fr.friends.some((f) => t(f.profile.name));
   })();
   const farkleName = isTarak ? "Dice Games" : "Press Your Luck";
+
+  // My identity as a lobby seat, and the friends I can invite into a room.
+  const mySeat = useMemo(
+    () => ({ id: account?.id ?? deviceId(), name: account?.name ?? "You", avatar: account?.avatar ?? "🙂" }),
+    [account?.id, account?.name, account?.avatar],
+  );
+  const lobbyFriends = fr.friends.map((f) => ({
+    id: f.profile.id,
+    name: f.profile.name,
+    avatar: f.profile.avatar,
+    online: f.online,
+  }));
 
   // Accept an incoming challenge → open the right game joined to its room.
   async function acceptChallenge() {
@@ -2090,7 +2114,7 @@ export function App() {
     setBusy(true);
     try {
       if (kind === "pressyourluck") {
-        const code = await hostFarkleRoom(account?.name ?? "You", RULESETS.classic);
+        const code = await hostFarkleRoom(mySeat, RULESETS.classic);
         await createChallenge(friendId, code);
         setGame("pressyourluck");
         setFark({ k: "online", code, isHost: true });
@@ -2128,7 +2152,7 @@ export function App() {
     setBusy(true);
     setFarkErr(null);
     try {
-      setFark({ k: "online", code: await hostFarkleRoom(account?.name ?? "You", rules), isHost: true });
+      setFark({ k: "online", code: await hostFarkleRoom(mySeat, rules), isHost: true });
     } catch (e) {
       setFarkErr((e as Error).message ?? "Could not create the room.");
     } finally {
@@ -2171,9 +2195,10 @@ export function App() {
       view = (
         <OnlineFarkle
           code={fark.code}
-          isHost={fark.isHost}
-          myName={account?.name}
+          me={mySeat}
           gameName={farkleName}
+          friends={lobbyFriends}
+          onInvite={(friendId) => void createChallenge(friendId, fark.code)}
           onExit={() => setFark({ k: "menu" })}
         />
       );

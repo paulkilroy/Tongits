@@ -1,25 +1,30 @@
-import { newGame, roll, setAside, bank, nextTurn, takePiggyback } from "./game";
+import { roll, setAside, bank, nextTurn, takePiggyback } from "./game";
 import { FarkleBoard } from "./FarkleBoard";
-import { useOnlineFarkle, GUEST_PLACEHOLDER } from "./online";
+import { useOnlineFarkle, MIN_FARKLE_SEATS, MAX_FARKLE_SEATS } from "./online";
+import { Lobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
 
-/** A live 2-player Press Your Luck game over a Supabase room. Host is seat 0. */
+/** A live 2–6 player Press Your Luck game over a Supabase room. */
 export function OnlineFarkle({
   code,
-  isHost,
-  myName,
+  me,
   gameName,
+  friends,
+  onInvite,
   onExit,
 }: {
   code: string;
-  isHost: boolean;
-  myName?: string;
+  me: LobbySeat;
   gameName: string;
+  friends: LobbyFriend[];
+  onInvite: (friendId: string) => void;
   onExit: () => void;
 }) {
-  const { game: g, connected, write } = useOnlineFarkle(code, isHost, myName);
-  const me = isHost ? 0 : 1;
+  const { room, game: g, connected, seats, started, isHost, meIndex, write, start, restart } = useOnlineFarkle(
+    code,
+    me,
+  );
 
-  if (!g) {
+  if (!room) {
     return (
       <main className="app screen farkle">
         <div className="screen-head">
@@ -40,29 +45,40 @@ export function OnlineFarkle({
     );
   }
 
-  const myTurn = g.current === me && !g.result;
-  const oppJoined = g.players[(me + 1) % g.players.length].name !== GUEST_PLACEHOLDER;
+  if (!started || !g) {
+    return (
+      <Lobby
+        title={`${gameName} · lobby`}
+        code={code}
+        seats={seats}
+        meId={me.id}
+        hostId={room.hostId}
+        isHost={isHost}
+        min={MIN_FARKLE_SEATS}
+        max={MAX_FARKLE_SEATS}
+        friends={friends}
+        onInvite={onInvite}
+        onStart={start}
+        onExit={onExit}
+      />
+    );
+  }
 
-  let waiting: string | null = null;
-  if (!connected) waiting = "Reconnecting…";
-  else if (isHost && !oppJoined) waiting = `Waiting for opponent to join · share code ${code}`;
+  const seat = meIndex >= 0 ? meIndex : 0;
+  const myTurn = g.current === seat && !g.result;
 
   return (
     <FarkleBoard
       g={g}
-      me={me}
+      me={seat}
       title={`${gameName} · online`}
-      waiting={waiting}
+      waiting={!connected ? "Reconnecting…" : null}
       onRoll={() => myTurn && write(roll(g, Math.random))}
       onPress={(keep) => myTurn && write(roll(setAside(g, keep), Math.random))}
       onBank={(keep) => myTurn && write(bank(setAside(g, keep)))}
       onNextTurn={() => myTurn && write(nextTurn(g))}
       onPiggyback={() => myTurn && write(takePiggyback(g, Math.random))}
-      onNewGame={
-        isHost && g.result
-          ? () => write(newGame(g.rules, g.players.map((p) => p.name), [false, false]))
-          : undefined
-      }
+      onNewGame={isHost && g.result ? restart : undefined}
       onExit={onExit}
     />
   );
