@@ -16,7 +16,7 @@ import { FarkleGame } from "./farkle/FarkleGame";
 import { OnlineFarkle } from "./farkle/OnlineFarkle";
 import { hostFarkleRoom } from "./farkle/online";
 import { RULESETS, type FarkleRules } from "./farkle/rules";
-import { GAME_LIST, type GameKind } from "./games";
+import { GAMES, GAME_LIST, type GameKind } from "./games";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -1588,11 +1588,13 @@ type FriendsHook = ReturnType<typeof useFriends>;
 function ChallengePrompt({
   name,
   avatar,
+  game,
   onAccept,
   onDecline,
 }: {
   name: string;
   avatar: string;
+  game: string;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -1601,7 +1603,7 @@ function ChallengePrompt({
       <div className="reveal" style={{ maxWidth: 340 }}>
         <h2 className="reveal-title">Challenge!</h2>
         <p className="reveal-sub">
-          {avatar} {name} wants to play Tongits
+          {avatar} {name} wants to play {game}
         </p>
         <div className="lobby-row">
           <button className="big" onClick={onAccept}>
@@ -2082,6 +2084,29 @@ export function App() {
     online: f.online,
   }));
 
+  // Resolve which game an incoming challenge is for, so the prompt names the
+  // right one (not always "Tongits").
+  const [challengeKind, setChallengeKind] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fr.challenge) {
+      setChallengeKind(null);
+      return;
+    }
+    let active = true;
+    void fetchRoomKind(fr.challenge.room_code).then((k) => {
+      if (active) setChallengeKind(k);
+    });
+    return () => {
+      active = false;
+    };
+  }, [fr.challenge]);
+  const challengeGame =
+    challengeKind === "pressyourluck"
+      ? farkleName
+      : challengeKind && GAMES[challengeKind as GameKind]
+        ? GAMES[challengeKind as GameKind].name
+        : "a game";
+
   // Accept an incoming challenge → open the right game joined to its room.
   async function acceptChallenge() {
     const ch = fr.challenge;
@@ -2167,6 +2192,7 @@ export function App() {
     <ChallengePrompt
       name={challenger?.name ?? "A friend"}
       avatar={challenger?.avatar ?? "👤"}
+      game={challengeGame}
       onAccept={acceptChallenge}
       onDecline={() => {
         void respondChallenge(fr.challenge!.id, "declined");
