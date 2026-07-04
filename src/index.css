@@ -2539,3 +2539,26 @@ h1 {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* rejoin an in-progress online game from the home screen */
+.rejoin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.rejoin-row .hub-name {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.rejoin-x {
+  font-size: 1.1rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 0 0.35rem;
+}
+.rejoin-x:hover {
+  color: #ff7a7a;
+}

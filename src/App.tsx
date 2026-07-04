@@ -17,6 +17,7 @@ import { OnlineFarkle } from "./farkle/OnlineFarkle";
 import { hostFarkleRoom } from "./farkle/online";
 import { RULESETS, type FarkleRules } from "./farkle/rules";
 import { GAMES, GAME_LIST, type GameKind } from "./games";
+import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } from "./online/activeGames";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -1844,6 +1845,9 @@ function GamePicker({
   busy,
   account,
   farkleName,
+  activeGames,
+  onRejoin,
+  onForget,
   onUpdateProfile,
 }: {
   fr: FriendsHook;
@@ -1852,6 +1856,9 @@ function GamePicker({
   busy: boolean;
   account: Account | null;
   farkleName: string;
+  activeGames: ActiveGame[];
+  onRejoin: (g: ActiveGame) => void;
+  onForget: (code: string) => void;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
   const onlineCount = fr.friends.filter((f) => f.online).length;
@@ -1941,6 +1948,28 @@ function GamePicker({
           </button>
         ))}
       </div>
+
+      {activeGames.length > 0 && (
+        <div className="panel rejoin-panel">
+          <div className="of-label">Rejoin a game</div>
+          {activeGames.map((g) => (
+            <div className="hub-friend rejoin-row" key={g.code}>
+              <span className="lobby-avatar">
+                <Icon name={gameIcon[g.kind]} size={20} />
+              </span>
+              <span className="hub-name">
+                {g.kind === "pressyourluck" ? farkleName : GAMES[g.kind].name} · {g.code}
+              </span>
+              <button className="hub-accept" onClick={() => onRejoin(g)}>
+                Rejoin
+              </button>
+              <button className="rejoin-x" aria-label="Remove" onClick={() => onForget(g.code)}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {onlineConfigured && (
         <div className="panel hub-friends">
@@ -2109,6 +2138,39 @@ export function App() {
         ? GAMES[challengeKind as GameKind].name
         : "a game";
 
+  // Remember whatever online game we're currently in, so it can be rejoined from
+  // the home screen after a refresh or a "Leave".
+  const [activeGames, setActiveGames] = useState<ActiveGame[]>(listActiveGames);
+  useEffect(() => {
+    if (game === "pressyourluck" && fark.k === "online") {
+      recordActiveGame({ code: fark.code, kind: "pressyourluck", isHost: fark.isHost });
+      setActiveGames(listActiveGames());
+    } else if (game === "cribbage" && crib.k === "online") {
+      recordActiveGame({ code: crib.code, kind: "cribbage", isHost: crib.isHost });
+      setActiveGames(listActiveGames());
+    } else if (game === "tongits" && mode.kind === "online") {
+      recordActiveGame({ code: mode.code, kind: "tongits", isHost: mode.isHost, me: mode.me });
+      setActiveGames(listActiveGames());
+    }
+  }, [game, fark, crib, mode]);
+
+  const rejoinGame = (g: ActiveGame) => {
+    if (g.kind === "pressyourluck") {
+      setGame("pressyourluck");
+      setFark({ k: "online", code: g.code, isHost: g.isHost });
+    } else if (g.kind === "cribbage") {
+      setGame("cribbage");
+      setCrib({ k: "online", code: g.code, isHost: g.isHost });
+    } else {
+      setGame("tongits");
+      setMode({ kind: "online", code: g.code, isHost: g.isHost, me: g.me ?? (g.isHost ? 0 : 1) });
+    }
+  };
+  const dismissActiveGame = (code: string) => {
+    forgetActiveGame(code);
+    setActiveGames(listActiveGames());
+  };
+
   // Accept an incoming challenge → open the right game joined to its room.
   async function acceptChallenge() {
     const ch = fr.challenge;
@@ -2213,6 +2275,9 @@ export function App() {
         busy={busy}
         account={account}
         farkleName={farkleName}
+        activeGames={activeGames}
+        onRejoin={rejoinGame}
+        onForget={dismissActiveGame}
         onUpdateProfile={update}
       />
     );
