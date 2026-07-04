@@ -88,17 +88,26 @@ export function FarkleBoard({
 
   const myTurn = g.current === me && !g.result;
   const selValues = sel.map((i) => g.dice[i]);
-  const selScore = selValues.length ? scoreDice(selValues, g.rules) : { score: 0, allScoring: false };
-  const valid = myTurn && g.phase === "pick" && selValues.length > 0 && selScore.allScoring;
+  const hasManual = selValues.length > 0;
+  const manualScore = hasManual ? scoreDice(selValues, g.rules) : { score: 0, allScoring: false };
+  const manualValid = hasManual && manualScore.allScoring;
   const best = myTurn && g.phase === "pick" ? bestKeep(g.dice, g.rules) : { keep: [], score: 0 };
 
+  // Effective keep: your hand-picked dice if valid, else fall back to the best
+  // keep — so Press/Bank never dead-end when you haven't tapped anything (an
+  // invalid hand-pick still disables, to nudge you to fix it). This is the fix
+  // for the "rolled, wanted to press, but it locked up" trap.
+  const effKeep = hasManual ? (manualValid ? selValues : []) : best.keep;
+  const effScore = effKeep.length ? scoreDice(effKeep, g.rules).score : 0;
+  const canAct = myTurn && g.phase === "pick" && effKeep.length > 0;
+
   // After keeping this selection: new turn total, dice left, and the odds of pressing.
-  const newTurn = g.turnScore + selScore.score;
-  const remaining = g.dice.length - selValues.length;
+  const newTurn = g.turnScore + effScore;
+  const remaining = g.dice.length - effKeep.length;
   const nextDice = remaining === 0 ? 6 : remaining; // 0 ⇒ hot dice, roll all six
-  const pFarkleNext = valid ? Math.round(rollStats(nextDice, g.rules).pFarkle * 100) : 0;
-  const pressEV = valid ? rollEV(newTurn, nextDice, g.rules) : 0;
-  const bankOk = valid && (g.players[me].onBoard || newTurn >= g.rules.onBoardMin);
+  const pFarkleNext = canAct ? Math.round(rollStats(nextDice, g.rules).pFarkle * 100) : 0;
+  const pressEV = canAct ? rollEV(newTurn, nextDice, g.rules) : 0;
+  const bankOk = canAct && (g.players[me].onBoard || newTurn >= g.rules.onBoardMin);
 
   const toggle = (i: number) => setSel((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
 
@@ -215,26 +224,30 @@ export function FarkleBoard({
         ) : g.phase === "pick" ? (
           <div className="fk-actions">
             <div className="fk-coach">
-              {selValues.length === 0 ? (
-                <>tap the scoring dice to keep · best keep {best.score}</>
-              ) : !selScore.allScoring ? (
+              {hasManual && !manualScore.allScoring ? (
                 <span className="fk-warn">that set includes a non-scoring die</span>
+              ) : !hasManual ? (
+                <>
+                  keeps best <strong>{best.score}</strong> · then {nextDice} dice, {pFarkleNext}% farkle —{" "}
+                  <span className={pressEV > 0 ? "fk-good" : "fk-bad"}>{pressEV > 0 ? "press is +EV" : "bank it"}</span>{" "}
+                  · tap dice to choose
+                </>
               ) : (
                 <>
-                  keep <strong>{selScore.score}</strong> · then {nextDice} dice, {pFarkleNext}% farkle —{" "}
+                  keep <strong>{effScore}</strong> · then {nextDice} dice, {pFarkleNext}% farkle —{" "}
                   <span className={pressEV > 0 ? "fk-good" : "fk-bad"}>{pressEV > 0 ? "press is +EV" : "bank it"}</span>
                 </>
               )}
             </div>
             <div className="cr-row2">
-              <button className="reveal-replay cr-discard-btn" disabled={!valid} onClick={() => onPress(selValues)}>
+              <button className="reveal-replay cr-discard-btn" disabled={!canAct} onClick={() => onPress(effKeep)}>
                 Press my luck
               </button>
-              <button className="cr-coach-btn" disabled={!bankOk} onClick={() => onBank(selValues)}>
-                Bank {valid ? newTurn : g.turnScore}
+              <button className="cr-coach-btn" disabled={!bankOk} onClick={() => onBank(effKeep)}>
+                Bank {canAct ? newTurn : g.turnScore}
               </button>
             </div>
-            {valid && !bankOk && (
+            {canAct && !bankOk && (
               <div className="cr-lbl">need {g.rules.onBoardMin} in a turn to get on the board</div>
             )}
           </div>

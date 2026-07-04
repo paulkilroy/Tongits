@@ -2532,3 +2532,10 @@ h1 {
   background: rgba(255, 255, 255, 0.15);
   color: #cfe;
 }
+
+/* the Farkle action buttons must read as disabled when they can't act, so a
+   greyed Press/Bank never looks tappable-but-dead */
+.cr-row2 button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
