@@ -2482,3 +2482,19 @@ h1 {
 .hub-accept {
   margin-left: auto;
 }
+
+/* hot-dice flash — pulses while a set-aside cleared all six dice */
+.fk-rolling {
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #ff8a3d;
+  padding: 0.4rem 0.6rem;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 12px rgba(255, 138, 61, 0.55);
+  animation: fk-rolling-pulse 0.7s ease-in-out infinite;
+}
+@keyframes fk-rolling-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.06); opacity: 1; }
+}

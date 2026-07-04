@@ -48,6 +48,7 @@ export interface FarkleBoardProps {
   onPress: (keep: number[]) => void; // set aside + roll again
   onBank: (keep: number[]) => void; // set aside + bank the turn
   onNextTurn: () => void; // resolve a farkle reveal
+  onPiggyback?: () => void; // take the previous player's banked score + dice
   onExit: () => void;
   onNewGame?: () => void;
   waiting?: string | null;
@@ -61,6 +62,7 @@ export function FarkleBoard({
   onPress,
   onBank,
   onNextTurn,
+  onPiggyback,
   onExit,
   onNewGame,
   waiting,
@@ -158,6 +160,7 @@ export function FarkleBoard({
 
         {flash && <div className="cr-flash">{flash}</div>}
         {waiting && <div className="cr-waiting">{waiting}</div>}
+        {g.hotDice && <div className="fk-rolling">🔥 …and rooollling!</div>}
 
         <div className="fk-turn">
           this turn <strong>{g.turnScore}</strong>
@@ -234,6 +237,22 @@ export function FarkleBoard({
             {valid && !bankOk && (
               <div className="cr-lbl">need {g.rules.onBoardMin} in a turn to get on the board</div>
             )}
+          </div>
+        ) : g.piggyback ? (
+          <div className="fk-actions">
+            <div className="fk-coach">
+              {g.players[(g.current + g.players.length - 1) % g.players.length].name} left{" "}
+              <strong>{g.piggyback.score}</strong> on {g.piggyback.dice}{" "}
+              {g.piggyback.dice === 1 ? "die" : "dice"}. Piggyback it, or roll fresh?
+            </div>
+            <div className="cr-row2">
+              <button className="reveal-replay cr-discard-btn" onClick={onPiggyback}>
+                Take {g.piggyback.score} · roll {g.piggyback.dice}
+              </button>
+              <button className="cr-coach-btn" onClick={onRoll}>
+                Roll fresh
+              </button>
+            </div>
           </div>
         ) : (
           <div className="fk-actions">

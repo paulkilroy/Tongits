@@ -1,4 +1,4 @@
-import { newGame, roll, setAside, bank, nextTurn } from "./game";
+import { newGame, roll, setAside, bank, nextTurn, takePiggyback } from "./game";
 import { FarkleBoard } from "./FarkleBoard";
 import { useOnlineFarkle, GUEST_PLACEHOLDER } from "./online";
 
@@ -7,11 +7,13 @@ export function OnlineFarkle({
   code,
   isHost,
   myName,
+  gameName,
   onExit,
 }: {
   code: string;
   isHost: boolean;
   myName?: string;
+  gameName: string;
   onExit: () => void;
 }) {
   const { game: g, connected, write } = useOnlineFarkle(code, isHost, myName);
@@ -24,7 +26,7 @@ export function OnlineFarkle({
           <button className="back-btn" onClick={onExit} aria-label="Back">
             ‹
           </button>
-          <h1>Press Your Luck · online</h1>
+          <h1>{gameName} · online</h1>
           <span />
         </div>
         <div className="screen-body">
@@ -49,12 +51,13 @@ export function OnlineFarkle({
     <FarkleBoard
       g={g}
       me={me}
-      title="Press Your Luck · online"
+      title={`${gameName} · online`}
       waiting={waiting}
       onRoll={() => myTurn && write(roll(g, Math.random))}
       onPress={(keep) => myTurn && write(roll(setAside(g, keep), Math.random))}
       onBank={(keep) => myTurn && write(bank(setAside(g, keep)))}
       onNextTurn={() => myTurn && write(nextTurn(g))}
+      onPiggyback={() => myTurn && write(takePiggyback(g, Math.random))}
       onNewGame={
         isHost && g.result
           ? () => write(newGame(g.rules, g.players.map((p) => p.name), [false, false]))

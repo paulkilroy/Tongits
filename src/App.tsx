@@ -1839,6 +1839,7 @@ function GamePicker({
   onInvite,
   busy,
   account,
+  farkleName,
   onUpdateProfile,
 }: {
   fr: FriendsHook;
@@ -1846,6 +1847,7 @@ function GamePicker({
   onInvite: (friendId: string, kind: GameKind) => void;
   busy: boolean;
   account: Account | null;
+  farkleName: string;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
   const onlineCount = fr.friends.filter((f) => f.online).length;
@@ -1930,7 +1932,7 @@ function GamePicker({
             <span className="picker-icon">
               <Icon name={gameIcon[g.kind]} size={38} />
             </span>
-            <span className="picker-name">{g.name}</span>
+            <span className="picker-name">{g.kind === "pressyourluck" ? farkleName : g.name}</span>
             <span className="picker-desc">{g.desc}</span>
           </button>
         ))}
@@ -2048,6 +2050,14 @@ export function App() {
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
   const myProfile = (): Profile => (account ? { name: account.name, avatar: account.avatar } : loadProfile());
 
+  // Easter egg: tarak (or anyone who's friends with tarak) sees the dice game
+  // branded "Dice Games" instead of "Press Your Luck".
+  const isTarak = (() => {
+    const t = (s?: string) => (s ?? "").trim().toLowerCase() === "tarak";
+    return t(account?.name) || fr.friends.some((f) => t(f.profile.name));
+  })();
+  const farkleName = isTarak ? "Dice Games" : "Press Your Luck";
+
   // Accept an incoming challenge → open the right game joined to its room.
   async function acceptChallenge() {
     const ch = fr.challenge;
@@ -2150,23 +2160,27 @@ export function App() {
         onInvite={invite}
         busy={busy}
         account={account}
+        farkleName={farkleName}
         onUpdateProfile={update}
       />
     );
   } else if (game === "pressyourluck") {
-    if (fark.k === "local") view = <FarkleGame rules={fark.rules} onExit={() => setFark({ k: "menu" })} />;
+    if (fark.k === "local")
+      view = <FarkleGame rules={fark.rules} name={farkleName} onExit={() => setFark({ k: "menu" })} />;
     else if (fark.k === "online")
       view = (
         <OnlineFarkle
           code={fark.code}
           isHost={fark.isHost}
           myName={account?.name}
+          gameName={farkleName}
           onExit={() => setFark({ k: "menu" })}
         />
       );
     else
       view = (
         <FarkleMenu
+          name={farkleName}
           onLocal={(rules) => setFark({ k: "local", rules })}
           onHost={hostFarkle}
           onJoin={(c) => c.length >= 4 && setFark({ k: "online", code: c, isHost: false })}

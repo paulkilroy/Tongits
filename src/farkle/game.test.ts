@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeRng } from "../engine/deck";
 import { CLASSIC, ZILCH } from "./rules";
 import { bestKeep } from "./scoring";
-import { newGame, roll, setAside, bank, canBank, nextTurn, type FarkleState } from "./game";
+import { newGame, roll, setAside, bank, canBank, nextTurn, takePiggyback, type FarkleState } from "./game";
 
 /** Greedy auto-player: keep the max scoring dice, bank at ≥ threshold else press. */
 function autoTurn(s: FarkleState, rng: () => number, bankAt = 400): FarkleState {
@@ -83,5 +83,80 @@ describe("farkle game flow", () => {
       }
     }
     throw new Error("no farkle roll found");
+  });
+
+  it("leaves a piggyback offer after a Farkle-ruleset bank (not in Zilch)", () => {
+    // Bank a turn with dice left over: the next player gets an offer to take it.
+    const base: FarkleState = { ...newGame(CLASSIC, ["A", "B"], [false, false]), phase: "roll", turnScore: 600, diceLeft: 3 };
+    const after = bank(base);
+    expect(after.current).toBe(1); // passed to B
+    expect(after.piggyback).toEqual({ score: 600, dice: 3 });
+
+    const z = bank({ ...newGame(ZILCH, ["A", "B"], [false, false]), phase: "roll", turnScore: 600, diceLeft: 3 });
+    expect(z.piggyback).toBeNull(); // Zilch has no piggyback
+  });
+
+  it("takePiggyback inherits the offered score and rolls the leftover dice", () => {
+    const offered: FarkleState = {
+      ...newGame(CLASSIC, ["A", "B"], [false, false]),
+      current: 1,
+      phase: "roll",
+      piggyback: { score: 600, dice: 3 },
+      diceLeft: 6,
+    };
+    const took = takePiggyback(offered, makeRng(7));
+    expect(took.piggyback).toBeNull(); // consumed
+    // Started from 600 and rolled 3 dice → either picking (kept the score) or farkled (lost it).
+    if (took.phase === "farkle") expect(took.turnScore).toBe(600);
+    else expect(took.turnScore).toBeGreaterThanOrEqual(600);
+  });
+
+  it("a fresh roll declines the piggyback offer", () => {
+    const offered: FarkleState = {
+      ...newGame(CLASSIC, ["A", "B"], [false, false]),
+      current: 1,
+      phase: "roll",
+      piggyback: { score: 600, dice: 3 },
+    };
+    expect(roll(offered, makeRng(1)).piggyback).toBeNull();
+  });
+
+  it("hitting the target opens a final round; everyone else gets one last turn", () => {
+    // A banks to the target from seat 0 → last round, B still gets a turn.
+    const near: FarkleState = {
+      ...newGame(CLASSIC, ["A", "B"], [false, false]),
+      phase: "roll",
+      turnScore: 10000,
+      diceLeft: 2,
+    };
+    near.players[0].onBoard = true;
+    const after = bank(near);
+    expect(after.lastRound).toBe(true);
+    expect(after.finalTrigger).toBe(0);
+    expect(after.result).toBeNull(); // not over yet — B plays
+    expect(after.current).toBe(1);
+
+    // B farkles away their last turn → game ends, A (the only scorer) wins.
+    const bTurn = { ...after, phase: "farkle" as const };
+    const done = nextTurn(bTurn);
+    expect(done.result).not.toBeNull();
+    expect(done.result?.winner).toBe(0);
+    expect(done.phase).toBe("gameOver");
+  });
+
+  it("in the final round the highest total wins, even if it's not the trigger", () => {
+    const near: FarkleState = {
+      ...newGame(CLASSIC, ["A", "B"], [false, false]),
+      phase: "roll",
+      turnScore: 10000,
+      diceLeft: 2,
+    };
+    near.players[0].onBoard = true;
+    near.players[1].onBoard = true;
+    near.players[1].score = 9800;
+    const after = bank(near); // A at 10000, last round, B to play
+    // B banks 500 → 10300, beating A's 10000.
+    const bWins = bank({ ...after, phase: "roll", turnScore: 500 });
+    expect(bWins.result?.winner).toBe(1);
   });
 });

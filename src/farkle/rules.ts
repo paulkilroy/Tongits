@@ -20,10 +20,13 @@ export interface FarkleRules {
   farkleStreakPenalty: number;
   /** How many consecutive farkles trigger the penalty. */
   farkleStreakLen: number;
+  /** Piggyback: after a bank, the next player may take the banked turn-score and
+   *  roll the leftover dice instead of rolling a fresh six. */
+  piggyback: boolean;
 }
 
 export const CLASSIC: FarkleRules = {
-  name: "Classic",
+  name: "Farkle",
   target: 10000,
   onBoardMin: 500,
   nOfKind: "double",
@@ -32,6 +35,7 @@ export const CLASSIC: FarkleRules = {
   twoTriplets: 0,
   farkleStreakPenalty: 0,
   farkleStreakLen: 3,
+  piggyback: true,
 };
 
 export const ZILCH: FarkleRules = {
@@ -44,6 +48,7 @@ export const ZILCH: FarkleRules = {
   twoTriplets: 2500,
   farkleStreakPenalty: 500,
   farkleStreakLen: 3,
+  piggyback: false,
 };
 
 export const RULESETS = { classic: CLASSIC, zilch: ZILCH } as const;

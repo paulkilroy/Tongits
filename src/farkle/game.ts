@@ -46,6 +46,11 @@ export interface FarkleState {
   rules: FarkleRules;
   result: { winner: number } | null;
   log: string[];
+  // Piggyback offer left by the player who just banked: the next player may take
+  // this turn-score and roll `dice` leftover dice instead of a fresh six.
+  piggyback: { score: number; dice: number } | null;
+  lastRound: boolean; // someone hit the target — everyone else gets one last turn
+  finalTrigger: number; // seat that reached the target (−1 until then)
 }
 
 export const currentPlayer = (s: FarkleState): FarklePlayer => s.players[s.current];
@@ -78,6 +83,9 @@ export function newGame(rules: FarkleRules, names: string[], ai: boolean[]): Far
     rules,
     result: null,
     log: [`${names[0]}'s turn.`],
+    piggyback: null,
+    lastRound: false,
+    finalTrigger: -1,
   };
 }
 
@@ -94,13 +102,31 @@ function startTurn(s: FarkleState): void {
 
 function advance(s: FarkleState): void {
   s.current = (s.current + 1) % s.players.length;
+  // In the final round, once play returns to whoever hit the target, it's over.
+  if (s.lastRound && s.current === s.finalTrigger) {
+    endGame(s);
+    return;
+  }
   startTurn(s);
+}
+
+/** End the game: highest total wins; the player who hit the target takes ties. */
+function endGame(s: FarkleState): void {
+  const top = Math.max(...s.players.map((p) => p.score));
+  const winner =
+    s.finalTrigger >= 0 && s.players[s.finalTrigger].score === top
+      ? s.finalTrigger
+      : s.players.findIndex((p) => p.score === top);
+  s.result = { winner };
+  s.phase = "gameOver";
+  note(s, `${s.players[winner].name} wins with ${s.players[winner].score}!`);
 }
 
 /** Roll the open dice. Farkle ⇒ lose the turn; otherwise pick scoring dice. */
 export function roll(state: FarkleState, rng: () => number = Math.random): FarkleState {
   if (state.phase !== "roll") return state;
   const s = clone(state);
+  s.piggyback = null; // rolling (fresh) declines any piggyback offer
   const dice = Array.from({ length: s.diceLeft }, () => 1 + Math.floor(rng() * 6));
   s.dice = dice;
   s.hotDice = false;
@@ -162,6 +188,19 @@ export function setAside(state: FarkleState, keep: number[]): FarkleState {
   return s;
 }
 
+/** Take the previous player's piggyback offer: inherit their turn-score and roll
+ *  the leftover dice (instead of a fresh six). Farkle ruleset only. */
+export function takePiggyback(state: FarkleState, rng: () => number = Math.random): FarkleState {
+  if (state.phase !== "roll" || !state.piggyback) return state;
+  const { score, dice } = state.piggyback;
+  const s = clone(state);
+  s.turnScore = score;
+  s.diceLeft = dice;
+  s.piggyback = null;
+  note(s, `${currentPlayer(s).name} piggybacks ${score} onto ${dice} ${dice === 1 ? "die" : "dice"}.`);
+  return roll(s, rng);
+}
+
 /** Whether the current player may bank right now. */
 export function canBank(s: FarkleState): boolean {
   if (s.phase !== "roll" || s.turnScore <= 0) return false;
@@ -179,11 +218,13 @@ export function bank(state: FarkleState): FarkleState {
   p.farkleStreak = 0;
   p.last = { chunks: s.turnEvents, farkled: false, banked: s.turnScore };
   note(s, `${p.name} banks ${s.turnScore} (total ${p.score}).`);
-  if (p.score >= s.rules.target) {
-    s.result = { winner: s.current };
-    s.phase = "gameOver";
-    note(s, `${p.name} wins!`);
-    return s;
+  // Leave a piggyback offer: the next player may take this score + leftover dice.
+  s.piggyback = s.rules.piggyback && s.turnScore > 0 ? { score: s.turnScore, dice: s.diceLeft } : null;
+  // Reaching the target opens the final round — everyone else gets one last turn.
+  if (p.score >= s.rules.target && !s.lastRound) {
+    s.lastRound = true;
+    s.finalTrigger = s.current;
+    note(s, `${p.name} reached ${s.rules.target} — everyone gets one last turn!`);
   }
   advance(s);
   return s;

@@ -6,6 +6,7 @@ import { RULESETS, type RulesetKey, type FarkleRules } from "./rules";
 /** Press Your Luck entry: pick a ruleset, then play the bot / host / join.
  *  Routing (local/online) is owned by the App so cross-game challenges work. */
 export function FarkleMenu({
+  name,
   onLocal,
   onHost,
   onJoin,
@@ -13,6 +14,7 @@ export function FarkleMenu({
   busy,
   error,
 }: {
+  name: string;
   onLocal: (rules: FarkleRules) => void;
   onHost: (rules: FarkleRules) => void;
   onJoin: (code: string) => void;
@@ -28,7 +30,7 @@ export function FarkleMenu({
     <main className="app screen farkle">
       <div className="screen-head">
         <BackButton onClick={onExit} label="Back to games" />
-        <h1>Press Your Luck</h1>
+        <h1>{name}</h1>
         <span />
       </div>
 
