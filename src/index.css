@@ -2445,3 +2445,40 @@ h1 {
   font-size: 0.68rem;
   opacity: 0.4;
 }
+
+/* game-room hub: friend code + add + requests */
+.hub-code {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.hub-code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.hub-code-row strong {
+  font-size: 1.15rem;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+.hub-code-row button,
+.hub-accept {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #062b18;
+  background: #ffd65a;
+  border: none;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+.hub-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.hub-accept {
+  margin-left: auto;
+}

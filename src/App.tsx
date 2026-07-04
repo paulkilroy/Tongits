@@ -1614,128 +1614,6 @@ function ChallengePrompt({
   );
 }
 
-function FriendsScreen({
-  account,
-  fr,
-  busy,
-  onBack,
-  onChallenge,
-}: {
-  account: Account | null;
-  fr: FriendsHook;
-  busy: boolean;
-  onBack: () => void;
-  onChallenge: (friendId: string) => void;
-}) {
-  const [addCode, setAddCode] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  async function add() {
-    setMsg(null);
-    const found = await findByCode(addCode);
-    if (!found) {
-      setMsg("No player with that code.");
-      return;
-    }
-    const res = await addFriend(found.id);
-    setMsg(
-      res === "self"
-        ? "That's your own code 🙂"
-        : res === "accepted"
-          ? `You're now friends with ${found.name}!`
-          : res === "exists"
-            ? `Already linked with ${found.name}.`
-            : `Request sent to ${found.name}.`,
-    );
-    setAddCode("");
-    fr.refresh();
-  }
-
-  const onlineCount = fr.friends.filter((f) => f.online).length;
-
-  return (
-    <main className="app screen">
-      <ScreenHeader title="Friends" onBack={onBack} />
-      <div className="screen-body">
-      {account && (
-        <div className="lobby-section narrow">
-          <div className="lobby-title">Your friend code</div>
-          <div className="invite-code">{account.friendCode}</div>
-          <button
-            onClick={() => {
-              void navigator.clipboard?.writeText(account.friendCode);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
-          >
-            {copied ? "Copied!" : "Copy code"}
-          </button>
-        </div>
-      )}
-
-      <div className="lobby-section narrow">
-        <div className="lobby-title">Add a friend by code</div>
-        <div className="lobby-row">
-          <input
-            placeholder="Friend code"
-            value={addCode}
-            onChange={(e) => setAddCode(e.target.value)}
-            maxLength={6}
-            style={{ textTransform: "uppercase" }}
-          />
-          <button disabled={addCode.trim().length < 4} onClick={add}>
-            Add
-          </button>
-        </div>
-        {msg && <p className="muted">{msg}</p>}
-      </div>
-
-      {fr.incoming.length > 0 && (
-        <div className="lobby-section narrow">
-          <div className="lobby-title">Friend requests</div>
-          {fr.incoming.map(({ friendship, profile }) => (
-            <div className="friend-row" key={friendship.id}>
-              <span>
-                {profile.avatar} {profile.name}
-              </span>
-              <button
-                onClick={async () => {
-                  await acceptFriend(friendship.id);
-                  fr.refresh();
-                }}
-              >
-                Accept
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="lobby-section narrow">
-        <div className="lobby-title">
-          Friends{fr.friends.length > 0 ? ` · ${onlineCount} online` : ""}
-        </div>
-        {fr.friends.length === 0 ? (
-          <p className="muted">No friends yet — share your code above.</p>
-        ) : (
-          fr.friends.map(({ friendship, profile, online }) => (
-            <div className="friend-row" key={friendship.id}>
-              <span>
-                <span className={`dot ${online ? "on" : ""}`} /> {profile.avatar} {profile.name}
-              </span>
-              <button disabled={!online || busy} onClick={() => onChallenge(profile.id)}>
-                {online ? "Challenge" : "Offline"}
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      </div>
-    </main>
-  );
-}
 
 const GRADE_ORDER: Grade[] = ["best", "good", "inaccuracy", "mistake", "blunder"];
 
@@ -1808,7 +1686,7 @@ function Lobby({
   onExitToMenu: () => void;
   fr: FriendsHook;
 }) {
-  const [screen, setScreen] = useState<"main" | "rules" | "friends" | "coach">("main");
+  const [screen, setScreen] = useState<"main" | "rules" | "coach">("main");
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
@@ -1860,13 +1738,8 @@ function Lobby({
     }
   }
 
-  // Incoming challenges are handled globally by App (cross-game); the lobby only
-  // manages friends + sends Tongits invites.
+  // Incoming challenges are handled globally by App; friends live on the home hub.
   if (screen === "rules") return <RulesEditor onBack={() => setScreen("main")} />;
-  if (screen === "friends")
-    return (
-      <FriendsScreen account={account} fr={fr} busy={busy} onBack={() => setScreen("main")} onChallenge={challenge} />
-    );
   if (screen === "coach") return <CoachScreen onBack={() => setScreen("main")} />;
 
   const onlineFriends = fr.friends.filter((f) => f.online).length;
@@ -1946,15 +1819,6 @@ function Lobby({
           </span>
           Coach
         </button>
-        {onlineConfigured && (
-          <button className="tile" onClick={() => setScreen("friends")}>
-            <span className="tile-icon">
-              <Icon name="people" size={26} />
-            </span>
-            Friends
-            {onlineFriends > 0 && <span className="tile-badge">{onlineFriends}</span>}
-          </button>
-        )}
       </nav>
     </main>
   );
@@ -1992,9 +1856,29 @@ function GamePicker({
   };
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [showAvatars, setShowAvatars] = useState(false);
+  const [addCode, setAddCode] = useState("");
+  const [addMsg, setAddMsg] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (account) setProfile({ name: account.name, avatar: account.avatar });
   }, [account]);
+  async function addByCode() {
+    setAddMsg(null);
+    const found = await findByCode(addCode);
+    if (!found) return setAddMsg("No player with that code.");
+    const res = await addFriend(found.id);
+    setAddMsg(
+      res === "self"
+        ? "That's your own code 🙂"
+        : res === "accepted"
+          ? `You're now friends with ${found.name}!`
+          : res === "exists"
+            ? `Already linked with ${found.name}.`
+            : `Request sent to ${found.name}.`,
+    );
+    setAddCode("");
+    fr.refresh();
+  }
   function localUpdate(p: Profile) {
     setProfile(p);
     saveProfile(p);
@@ -2052,29 +1936,90 @@ function GamePicker({
         ))}
       </div>
 
-      {fr.friends.length > 0 && (
+      {onlineConfigured && (
         <div className="panel hub-friends">
-          <div className="of-label">Friends{onlineCount ? ` · ${onlineCount} online` : ""} · invite to a game</div>
-          {fr.friends.map(({ profile, online }) => (
-            <div className="hub-friend" key={profile.id}>
-              <span className={`hub-dot ${online ? "on" : ""}`} />
-              <span className="hub-name">
-                {profile.avatar} {profile.name}
-              </span>
-              <span className="hub-invite">
-                {GAME_LIST.filter((g) => g.online).map((g) => (
-                  <button
-                    key={g.kind}
-                    disabled={!online || busy}
-                    title={`Invite to ${g.name}`}
-                    onClick={() => onInvite(profile.id, g.kind)}
-                  >
-                    <Icon name={gameIcon[g.kind]} size={18} />
-                  </button>
-                ))}
-              </span>
+          {account && (
+            <div className="hub-code">
+              <span className="of-label">Your code</span>
+              <div className="hub-code-row">
+                <strong>{account.friendCode}</strong>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(account.friendCode);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
-          ))}
+          )}
+
+          <div className="join-row">
+            <input
+              placeholder="Add friend by code"
+              value={addCode}
+              onChange={(e) => setAddCode(e.target.value)}
+              maxLength={6}
+              autoCapitalize="characters"
+              style={{ textTransform: "uppercase" }}
+            />
+            <button disabled={addCode.trim().length < 4} onClick={addByCode}>
+              Add
+            </button>
+          </div>
+          {addMsg && <p className="cr-lbl">{addMsg}</p>}
+
+          {fr.incoming.length > 0 && (
+            <div className="hub-requests">
+              <span className="of-label">Requests</span>
+              {fr.incoming.map(({ friendship, profile: pr }) => (
+                <div className="hub-friend" key={friendship.id}>
+                  <span className="hub-name">
+                    {pr.avatar} {pr.name}
+                  </span>
+                  <button
+                    className="hub-accept"
+                    onClick={async () => {
+                      await acceptFriend(friendship.id);
+                      fr.refresh();
+                    }}
+                  >
+                    Accept
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="of-label">
+            Friends{onlineCount ? ` · ${onlineCount} online` : ""} · invite to a game
+          </div>
+          {fr.friends.length === 0 ? (
+            <p className="cr-lbl">No friends yet — share your code above.</p>
+          ) : (
+            fr.friends.map(({ profile: pr, online }) => (
+              <div className="hub-friend" key={pr.id}>
+                <span className={`hub-dot ${online ? "on" : ""}`} />
+                <span className="hub-name">
+                  {pr.avatar} {pr.name}
+                </span>
+                <span className="hub-invite">
+                  {GAME_LIST.filter((g) => g.online).map((g) => (
+                    <button
+                      key={g.kind}
+                      disabled={!online || busy}
+                      title={`Invite to ${g.name}`}
+                      onClick={() => onInvite(pr.id, g.kind)}
+                    >
+                      <Icon name={gameIcon[g.kind]} size={18} />
+                    </button>
+                  ))}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       )}
 
