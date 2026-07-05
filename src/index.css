@@ -2653,3 +2653,84 @@ h1 {
 .bs-ship.active { border-color: #ffd65a; color: #ffd65a; }
 .bs-ship.placed { opacity: 0.5; }
 .bs-ship-size { opacity: 0.6; }
+
+/* ---------------- Backgammon ---------------- */
+.screen.backgammon .screen-body { gap: 0.6rem; }
+.bg-status { display: flex; justify-content: space-between; align-items: center; width: min(96vw, 460px); }
+.bg-status .you { color: #ffd65a; font-weight: 800; }
+.bg-pips { font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); }
+.bg-board {
+  width: min(96vw, 460px);
+  background: rgba(60, 40, 25, 0.5);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bg-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+.bg-point {
+  position: relative;
+  aspect-ratio: 1 / 2.4;
+  border: none;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 0;
+  cursor: pointer;
+  min-width: 0;
+}
+.bg-point.even { background: rgba(210, 180, 140, 0.18); }
+.bg-point.sel-ok { outline: 1.5px solid rgba(255, 214, 90, 0.6); }
+.bg-point.on { outline: 2px solid #ffd65a; }
+.bg-point.dest { background: rgba(90, 200, 120, 0.35); outline: 1.5px solid #6ad68a; }
+.bg-pt-num { font-size: 0.5rem; color: rgba(255, 255, 255, 0.4); line-height: 1; }
+.bg-stack { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.bg-chk {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #111;
+}
+.bg-chk.p0 { background: #f4f1e8; }
+.bg-chk.p1 { background: #3a3a44; color: #eee; border: 1px solid #666; }
+.bg-chk-more { font-size: 0.6rem; color: #fff; font-weight: 800; }
+.bg-mid { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.bg-bar, .bg-off {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #cfe;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.bg-bar.sel-ok { outline: 1.5px solid rgba(255, 214, 90, 0.6); }
+.bg-bar.on { outline: 2px solid #ffd65a; }
+.bg-off.dest { background: rgba(90, 200, 120, 0.35); }
+.bg-bar-counts { display: flex; gap: 3px; }
+.bg-dice { display: flex; gap: 6px; justify-content: center; min-height: 1.6rem; }
+.bg-die {
+  width: 1.6rem;
+  height: 1.6rem;
+  background: #fff;
+  color: #111;
+  border-radius: 5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

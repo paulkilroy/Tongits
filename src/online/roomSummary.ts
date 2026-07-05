@@ -60,6 +60,13 @@ export async function fetchRoomStatus(code: string, kind: GameKind): Promise<Roo
     if (d.game.phase === "place") return { finished: false, label: "placing fleets" };
     return { finished: false, label: "battle underway" };
   }
+  if (kind === "backgammon") {
+    const d = await fetchRoomData<BattleRoomLike>(code).catch(() => null);
+    if (!d) return null;
+    if (!d.started || !d.game) return { finished: false, label: `lobby · ${d.seats?.length ?? 1} in` };
+    if (d.game.result) return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
+    return { finished: false, label: "game underway" };
+  }
   // tongits
   const d = await fetchRoomData<TongitsRoomLike>(code).catch(() => null);
   if (!d?.game) return null;
