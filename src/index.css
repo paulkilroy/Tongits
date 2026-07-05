@@ -2562,3 +2562,23 @@ h1 {
 .rejoin-x:hover {
   color: #ff7a7a;
 }
+
+/* rejoin rows: name + live status stacked, action on the right */
+.rejoin-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+.rejoin-status {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rejoin-status.done {
+  color: #7fd6a2;
+  font-weight: 700;
+}

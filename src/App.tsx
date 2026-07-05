@@ -18,6 +18,7 @@ import { hostFarkleRoom } from "./farkle/online";
 import { RULESETS, type FarkleRules } from "./farkle/rules";
 import { GAMES, GAME_LIST, type GameKind } from "./games";
 import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } from "./online/activeGames";
+import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -1846,6 +1847,7 @@ function GamePicker({
   account,
   farkleName,
   activeGames,
+  gameStatuses,
   onRejoin,
   onForget,
   onUpdateProfile,
@@ -1857,6 +1859,7 @@ function GamePicker({
   account: Account | null;
   farkleName: string;
   activeGames: ActiveGame[];
+  gameStatuses: Record<string, RoomStatus>;
   onRejoin: (g: ActiveGame) => void;
   onForget: (code: string) => void;
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
@@ -1952,22 +1955,32 @@ function GamePicker({
       {activeGames.length > 0 && (
         <div className="panel rejoin-panel">
           <div className="of-label">Rejoin a game</div>
-          {activeGames.map((g) => (
-            <div className="hub-friend rejoin-row" key={g.code}>
-              <span className="lobby-avatar">
-                <Icon name={gameIcon[g.kind]} size={20} />
-              </span>
-              <span className="hub-name">
-                {g.kind === "pressyourluck" ? farkleName : GAMES[g.kind].name} · {g.code}
-              </span>
-              <button className="hub-accept" onClick={() => onRejoin(g)}>
-                Rejoin
-              </button>
-              <button className="rejoin-x" aria-label="Remove" onClick={() => onForget(g.code)}>
-                ×
-              </button>
-            </div>
-          ))}
+          {activeGames.map((g) => {
+            const st = gameStatuses[g.code];
+            return (
+              <div className="hub-friend rejoin-row" key={g.code}>
+                <span className="lobby-avatar">
+                  <Icon name={gameIcon[g.kind]} size={20} />
+                </span>
+                <div className="rejoin-info">
+                  <span className="hub-name">
+                    {g.kind === "pressyourluck" ? farkleName : GAMES[g.kind].name} · {g.code}
+                  </span>
+                  {st && (
+                    <span className={`rejoin-status ${st.finished ? "done" : ""}`}>
+                      {st.finished ? `✓ finished · ${st.label}` : st.label}
+                    </span>
+                  )}
+                </div>
+                <button className="hub-accept" onClick={() => onRejoin(g)}>
+                  {st?.finished ? "View" : "Rejoin"}
+                </button>
+                <button className="rejoin-x" aria-label="Remove" onClick={() => onForget(g.code)}>
+                  ×
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -2171,6 +2184,25 @@ export function App() {
     setActiveGames(listActiveGames());
   };
 
+  // Fetch a live status (finished? score/round?) for each rejoinable game while
+  // we're on the home screen.
+  const [gameStatuses, setGameStatuses] = useState<Record<string, RoomStatus>>({});
+  useEffect(() => {
+    if (game !== "menu" || activeGames.length === 0) return;
+    let active = true;
+    void Promise.all(
+      activeGames.map(async (g) => [g.code, await fetchRoomStatus(g.code, g.kind)] as const),
+    ).then((entries) => {
+      if (!active) return;
+      const map: Record<string, RoomStatus> = {};
+      for (const [code, st] of entries) if (st) map[code] = st;
+      setGameStatuses(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [game, activeGames]);
+
   // Accept an incoming challenge → open the right game joined to its room.
   async function acceptChallenge() {
     const ch = fr.challenge;
@@ -2276,6 +2308,7 @@ export function App() {
         account={account}
         farkleName={farkleName}
         activeGames={activeGames}
+        gameStatuses={gameStatuses}
         onRejoin={rejoinGame}
         onForget={dismissActiveGame}
         onUpdateProfile={update}
