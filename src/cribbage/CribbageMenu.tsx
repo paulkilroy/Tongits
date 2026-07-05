@@ -13,7 +13,7 @@ export function CribbageMenu({
   busy,
   error,
 }: {
-  onLocal: () => void;
+  onLocal: (players: number) => void;
   onHost: () => void;
   onJoin: (code: string) => void;
   onExit: () => void;
@@ -30,15 +30,18 @@ export function CribbageMenu({
       </div>
 
       <div className="screen-body">
-        <button className="big play-primary" onClick={onLocal}>
+        <button className="big play-primary" onClick={() => onLocal(2)}>
           Play vs AI
+        </button>
+        <button className="big" onClick={() => onLocal(3)}>
+          Play vs 2 AI (3-hand)
         </button>
 
         {onlineConfigured ? (
           <>
             <div className="divider">online</div>
             <button className="big" onClick={onHost} disabled={busy}>
-              {busy ? "Creating…" : "Host a game"}
+              {busy ? "Creating…" : "Host a game (2–3 players)"}
             </button>
             <div className="join-row">
               <input

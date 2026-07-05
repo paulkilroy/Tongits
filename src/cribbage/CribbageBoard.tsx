@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
-import { type CribState, legalPlays, canPlay, pone, roundComplete } from "./game";
+import { type CribState, legalPlays, canPlay, roundComplete, discardCount } from "./game";
 import { describeShow } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval } from "./coach";
 import { reviewHand, type HandReview } from "./review";
@@ -84,7 +84,11 @@ export interface BoardProps {
 
 export function CribbageBoard(props: BoardProps) {
   const { g, me, onDiscard, onPlay, onGo, onAdvanceShow, onNextRound, onNewGame, canDiscard, waiting, coach } = props;
-  const opp = (me + 1) % 2;
+  const N = g.players.length;
+  const count = discardCount(N); // cards to lay away (2 heads-up, 1 three-hand)
+  const opp = (me + 1) % N; // first opponent (review / single references)
+  const opponents = g.players.map((_, i) => i).filter((i) => i !== me);
+  const canCoach = !!coach && count === 2; // the discard coach is heads-up only
   const [sel, setSel] = useState<Card[]>([]);
   const [showCoach, setShowCoach] = useState(false);
   const [review, setReview] = useState<HandReview | null>(null);
@@ -119,11 +123,11 @@ export function CribbageBoard(props: BoardProps) {
   const ownsCrib = g.dealer === me;
   const handKey = myHand.map(cardId).join(",");
   const discardEvs = useMemo<DiscardEval[]>(
-    () => (g.phase === "discard" && canDiscard && coach ? analyzeDiscard(myHand, ownsCrib) : []),
+    () => (g.phase === "discard" && canDiscard && canCoach ? analyzeDiscard(myHand, ownsCrib) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [g.phase, handKey, ownsCrib, canDiscard, coach],
+    [g.phase, handKey, ownsCrib, canDiscard, canCoach],
   );
-  const myKeep = sel.length === 2 ? myHand.filter((c) => !sel.some((s) => cardId(s) === cardId(c))) : null;
+  const myKeep = sel.length === count && count === 2 ? myHand.filter((c) => !sel.some((s) => cardId(s) === cardId(c))) : null;
   const myGrade = myKeep && discardEvs.length ? gradeDiscard(discardEvs, myKeep) : null;
 
   function toggle(c: Card) {
@@ -131,21 +135,23 @@ export function CribbageBoard(props: BoardProps) {
     setSel((prev) =>
       prev.some((s) => cardId(s) === id)
         ? prev.filter((s) => cardId(s) !== id)
-        : prev.length < 2
+        : prev.length < count
           ? [...prev, c]
           : prev,
     );
   }
   function confirm() {
-    if (sel.length !== 2) return;
+    if (sel.length !== count) return;
     onDiscard(sel);
     setSel([]);
     setShowCoach(false);
   }
 
+  // Show order: each hand starting left of the dealer, dealer last, then the crib.
   const showLabel = [
-    "Count " + (pone(g) === me ? "your" : g.players[pone(g)].name + "’s") + " hand",
-    "Count " + (g.dealer === me ? "your" : g.players[g.dealer].name + "’s") + " hand",
+    ...Array.from({ length: N }, (_, k) => (g.dealer + 1 + k) % N).map(
+      (who) => "Count " + (who === me ? "your" : g.players[who].name + "’s") + " hand",
+    ),
     "Count the crib",
   ];
 
@@ -178,7 +184,7 @@ export function CribbageBoard(props: BoardProps) {
           (canDiscard ? (
             <div className="cr-phase">
               <p className="cr-instr">
-                Lay 2 cards into {ownsCrib ? "your" : g.players[g.dealer].name + "’s"} crib.
+                Lay {count === 1 ? "1 card" : "2 cards"} into {ownsCrib ? "your" : g.players[g.dealer].name + "’s"} crib.
               </p>
               <div className="cr-hand">
                 {myHand.map((c) => (
@@ -197,13 +203,13 @@ export function CribbageBoard(props: BoardProps) {
                 </div>
               )}
               <div className="cr-row2">
-                {coach && (
+                {canCoach && (
                   <button className="cr-coach-btn" onClick={() => setShowCoach((v) => !v)}>
                     {showCoach ? "Hide coach" : "💡 Coach"}
                   </button>
                 )}
-                <button className="reveal-replay cr-discard-btn" disabled={sel.length !== 2} onClick={confirm}>
-                  Discard {sel.length}/2
+                <button className="reveal-replay cr-discard-btn" disabled={sel.length !== count} onClick={confirm}>
+                  Discard {sel.length}/{count}
                 </button>
               </div>
               {showCoach && (
@@ -269,10 +275,18 @@ export function CribbageBoard(props: BoardProps) {
               </div>
             </div>
             <div className={`cr-turn ${myTurn ? "you" : ""}`}>
-              {myTurn ? (canPlay(g, me) ? "Your turn" : "Your turn — say “Go”") : `Waiting for ${g.players[opp].name}…`}
+              {myTurn
+                ? canPlay(g, me)
+                  ? "Your turn"
+                  : "Your turn — say “Go”"
+                : `Waiting for ${g.players[g.current].name}…`}
             </div>
             <div className="cr-oppline">
-              {g.players[opp].name}: {g.players[opp].hand.length} card{g.players[opp].hand.length === 1 ? "" : "s"} left
+              {opponents.map((i) => (
+                <span key={i} className="cr-opp">
+                  {g.players[i].name}: {g.players[i].hand.length} card{g.players[i].hand.length === 1 ? "" : "s"}
+                </span>
+              ))}
             </div>
             <div className="cr-hand">
               {myHand.map((c) => (
@@ -343,9 +357,7 @@ export function CribbageBoard(props: BoardProps) {
         {g.phase === "gameOver" && g.result && (
           <div className="cr-phase cr-over">
             <h2>{g.result.winner === me ? "You win!" : g.players[g.result.winner].name + " wins!"}</h2>
-            <div className="cr-lbl">
-              {g.players[me].score} – {g.players[opp].score}
-            </div>
+            <div className="cr-lbl">{g.players.map((p, i) => `${i === me ? "You" : p.name} ${p.score}`).join(" · ")}</div>
             <div className="cr-row2">
               {history.length > 0 && (
                 <button className="cr-coach-btn" onClick={() => setGameReview(true)}>

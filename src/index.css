@@ -2587,3 +2587,11 @@ h1 {
   align-self: flex-start;
   margin-top: 0.3rem;
 }
+
+/* cribbage: several opponents' card counts on the play line */
+.cr-oppline {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}

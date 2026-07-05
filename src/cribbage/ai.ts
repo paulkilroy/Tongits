@@ -4,6 +4,7 @@ import { scorePlay, scoreShow } from "./scoring";
 import {
   type CribState,
   discardToCrib,
+  discardCount,
   playCard,
   go,
   legalPlays,
@@ -32,22 +33,32 @@ function cribPotential(a: Card, b: Card): number {
   return v;
 }
 
-const pairIndices = (n: number): [number, number][] => {
-  const out: [number, number][] = [];
+const pairIndices = (n: number): number[][] => {
+  const out: number[][] = [];
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) out.push([i, j]);
   return out;
 };
 
-/** Choose the two cards to lay away, given whether this seat owns the crib. */
-export function chooseDiscard(hand: Card[], ownsCrib: boolean): Card[] {
+/** Rough worth of a lone card sitting in the crib (a 5 is gold; tens help). */
+function singleCribPotential(a: Card): number {
+  if (a.rank === "5") return 2;
+  if (cardPoints(a) === 10) return 0.7;
+  return 0.2;
+}
+
+/** Choose the card(s) to lay away, given whether this seat owns the crib.
+ *  `count` is 2 heads-up, 1 in the three-hand game. */
+export function chooseDiscard(hand: Card[], ownsCrib: boolean, count = 2): Card[] {
   const seen = new Set(hand.map(cardId));
   const starters = freshDeck().filter((c) => !seen.has(cardId(c)));
   const sign = ownsCrib ? 1 : -1;
+  const combos = count === 1 ? hand.map((_, i) => [i]) : pairIndices(hand.length);
   let best: { pts: number; discard: Card[] } | null = null;
-  for (const [i, j] of pairIndices(hand.length)) {
-    const discard = [hand[i], hand[j]];
-    const keep = hand.filter((_, k) => k !== i && k !== j);
-    const pts = expectedHandValue(keep, starters) + sign * 0.5 * cribPotential(discard[0], discard[1]);
+  for (const idx of combos) {
+    const discard = idx.map((i) => hand[i]);
+    const keep = hand.filter((_, k) => !idx.includes(k));
+    const cp = discard.length === 2 ? cribPotential(discard[0], discard[1]) : singleCribPotential(discard[0]);
+    const pts = expectedHandValue(keep, starters) + sign * 0.5 * cp;
     if (!best || pts > best.pts) best = { pts, discard };
   }
   return best!.discard;
@@ -78,7 +89,8 @@ export function takeAITurn(state: CribState): CribState {
   if (state.phase === "discard") {
     for (let p = 0; p < state.players.length; p++) {
       if (state.players[p].isAI && !state.players[p].discarded) {
-        return discardToCrib(state, p, chooseDiscard(state.players[p].hand, p === state.dealer));
+        const count = discardCount(state.players.length);
+        return discardToCrib(state, p, chooseDiscard(state.players[p].hand, p === state.dealer, count));
       }
     }
     return state;

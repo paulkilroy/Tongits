@@ -1836,7 +1836,7 @@ function Lobby({
 /* --------------------------------- app ----------------------------------- */
 
 type GameChoice = "menu" | GameKind;
-type CribMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string; isHost: boolean };
+type CribMode = { k: "menu" } | { k: "local"; players: number } | { k: "online"; code: string };
 type FarkMode =
   | { k: "menu" }
   | { k: "local"; rules: FarkleRules }
@@ -2161,7 +2161,7 @@ export function App() {
       recordActiveGame({ code: fark.code, kind: "pressyourluck", isHost: fark.isHost });
       setActiveGames(listActiveGames());
     } else if (game === "cribbage" && crib.k === "online") {
-      recordActiveGame({ code: crib.code, kind: "cribbage", isHost: crib.isHost });
+      recordActiveGame({ code: crib.code, kind: "cribbage", isHost: false });
       setActiveGames(listActiveGames());
     } else if (game === "tongits" && mode.kind === "online") {
       recordActiveGame({ code: mode.code, kind: "tongits", isHost: false });
@@ -2175,7 +2175,7 @@ export function App() {
       setFark({ k: "online", code: g.code, isHost: g.isHost });
     } else if (g.kind === "cribbage") {
       setGame("cribbage");
-      setCrib({ k: "online", code: g.code, isHost: g.isHost });
+      setCrib({ k: "online", code: g.code });
     } else {
       setGame("tongits");
       setMode({ kind: "online", code: g.code });
@@ -2214,7 +2214,7 @@ export function App() {
     if (kind === "cribbage") {
       await respondChallenge(ch.id, "accepted");
       setGame("cribbage");
-      setCrib({ k: "online", code: ch.room_code, isHost: false });
+      setCrib({ k: "online", code: ch.room_code });
       return;
     }
     if (kind === "pressyourluck") {
@@ -2242,10 +2242,10 @@ export function App() {
         setGame("pressyourluck");
         setFark({ k: "online", code, isHost: true });
       } else if (kind === "cribbage") {
-        const code = await hostCribbageRoom(account?.name ?? "You");
+        const code = await hostCribbageRoom(mySeat);
         await createChallenge(friendId, code);
         setGame("cribbage");
-        setCrib({ k: "online", code, isHost: true });
+        setCrib({ k: "online", code });
       } else {
         const code = await hostRoom(mySeat);
         await createChallenge(friendId, code);
@@ -2263,7 +2263,7 @@ export function App() {
     setBusy(true);
     setCribErr(null);
     try {
-      setCrib({ k: "online", code: await hostCribbageRoom(account?.name ?? "You"), isHost: true });
+      setCrib({ k: "online", code: await hostCribbageRoom(mySeat) });
     } catch (e) {
       setCribErr((e as Error).message ?? "Could not create the room.");
     } finally {
@@ -2343,15 +2343,24 @@ export function App() {
         />
       );
   } else if (game === "cribbage") {
-    if (crib.k === "local") view = <CribbageGame onExit={() => setCrib({ k: "menu" })} />;
+    if (crib.k === "local")
+      view = <CribbageGame players={crib.players} onExit={() => setCrib({ k: "menu" })} />;
     else if (crib.k === "online")
-      view = <OnlineCribbage code={crib.code} isHost={crib.isHost} onExit={() => setCrib({ k: "menu" })} />;
+      view = (
+        <OnlineCribbage
+          code={crib.code}
+          mySeat={mySeat}
+          friends={lobbyFriends}
+          onInvite={(friendId) => void createChallenge(friendId, crib.code)}
+          onExit={() => setCrib({ k: "menu" })}
+        />
+      );
     else
       view = (
         <CribbageMenu
-          onLocal={() => setCrib({ k: "local" })}
+          onLocal={(players) => setCrib({ k: "local", players })}
           onHost={hostCribbage}
-          onJoin={(c) => c.length >= 4 && setCrib({ k: "online", code: c, isHost: false })}
+          onJoin={(c) => c.length >= 4 && setCrib({ k: "online", code: c })}
           onExit={() => setGame("menu")}
           busy={busy}
           error={cribErr}

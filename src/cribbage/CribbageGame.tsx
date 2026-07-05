@@ -15,11 +15,11 @@ import { CribbageBoard } from "./CribbageBoard";
 const randSeed = () => Math.floor(Math.random() * 2 ** 31);
 const HUMAN = 0;
 
-/** Local game vs the AI. Owns the state; drives the bot; the human is seat 0. */
-export function CribbageGame({ onExit }: { onExit: () => void }) {
-  const [g, setG] = useState<CribState>(() =>
-    newRound(STANDARD_CRIB_RULES, randSeed(), ["You", "Bot"], [false, true], 0),
-  );
+/** Local game vs 1–2 AI bots. Owns the state; drives the bots; the human is seat 0. */
+export function CribbageGame({ players = 2, onExit }: { players?: number; onExit: () => void }) {
+  const names = players === 3 ? ["You", "Bot 1", "Bot 2"] : ["You", "Bot"];
+  const ai = players === 3 ? [false, true, true] : [false, true];
+  const [g, setG] = useState<CribState>(() => newRound(STANDARD_CRIB_RULES, randSeed(), names, ai, 0));
 
   // Drive the AI: discard, or peg on its turn.
   useEffect(() => {
@@ -34,21 +34,14 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
 
   const nextRound = () =>
     setG((s) =>
-      newRound(
-        STANDARD_CRIB_RULES,
-        randSeed(),
-        ["You", "Bot"],
-        [false, true],
-        (s.dealer + 1) % 2,
-        s.players.map((p) => p.score),
-      ),
+      newRound(STANDARD_CRIB_RULES, randSeed(), names, ai, (s.dealer + 1) % s.players.length, s.players.map((p) => p.score)),
     );
 
   return (
     <CribbageBoard
       g={g}
       me={HUMAN}
-      title="Cribbage"
+      title={players === 3 ? "Cribbage · 3-hand" : "Cribbage"}
       onExit={onExit}
       coach
       canDiscard={g.phase === "discard" && !g.players[HUMAN].discarded}
@@ -57,7 +50,7 @@ export function CribbageGame({ onExit }: { onExit: () => void }) {
       onGo={() => setG((s) => go(s))}
       onAdvanceShow={() => setG((s) => nextShow(s))}
       onNextRound={nextRound}
-      onNewGame={() => setG(newRound(STANDARD_CRIB_RULES, randSeed(), ["You", "Bot"], [false, true], 0))}
+      onNewGame={() => setG(newRound(STANDARD_CRIB_RULES, randSeed(), names, ai, 0))}
     />
   );
 }
