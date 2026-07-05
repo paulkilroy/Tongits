@@ -27,6 +27,11 @@ interface TongitsRoomLike {
   wins?: number[];
   gameId?: number;
 }
+interface BattleRoomLike {
+  started?: boolean;
+  seats?: { name: string }[];
+  game?: { players: PlayerLike[]; phase: string; result: { winner: number } | null } | null;
+}
 
 const scoreLine = (ps: PlayerLike[]) => ps.map((p) => `${p.name} ${p.score ?? 0}`).join(" · ");
 const winnerName = (ps: PlayerLike[], i: number) => ps[i]?.name ?? "someone";
@@ -46,6 +51,14 @@ export async function fetchRoomStatus(code: string, kind: GameKind): Promise<Roo
       return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
     }
     return { finished: false, label: `${scoreLine(d.game.players)} · to 121` };
+  }
+  if (kind === "battleship") {
+    const d = await fetchRoomData<BattleRoomLike>(code).catch(() => null);
+    if (!d) return null;
+    if (!d.started || !d.game) return { finished: false, label: `lobby · ${d.seats?.length ?? 1} in` };
+    if (d.game.result) return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
+    if (d.game.phase === "place") return { finished: false, label: "placing fleets" };
+    return { finished: false, label: "battle underway" };
   }
   // tongits
   const d = await fetchRoomData<TongitsRoomLike>(code).catch(() => null);

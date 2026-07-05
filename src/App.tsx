@@ -15,6 +15,10 @@ import { FarkleMenu } from "./farkle/FarkleMenu";
 import { FarkleGame } from "./farkle/FarkleGame";
 import { OnlineFarkle } from "./farkle/OnlineFarkle";
 import { hostFarkleRoom } from "./farkle/online";
+import { BattleshipMenu } from "./battleship/BattleshipMenu";
+import { BattleshipGame } from "./battleship/BattleshipGame";
+import { OnlineBattleship } from "./battleship/OnlineBattleship";
+import { hostBattleshipRoom } from "./battleship/online";
 import { RULESETS, type FarkleRules } from "./farkle/rules";
 import { GAMES, GAME_LIST, type GameKind } from "./games";
 import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } from "./online/activeGames";
@@ -1842,6 +1846,8 @@ type FarkMode =
   | { k: "local"; rules: FarkleRules }
   | { k: "online"; code: string; isHost: boolean };
 
+type BattleMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string };
+
 function GamePicker({
   fr,
   onPick,
@@ -1868,10 +1874,11 @@ function GamePicker({
   onUpdateProfile: (patch: Partial<Pick<Account, "name" | "avatar">>) => void;
 }) {
   const onlineCount = fr.friends.filter((f) => f.online).length;
-  const gameIcon: Record<GameKind, "card" | "cribbage" | "dice"> = {
+  const gameIcon: Record<GameKind, "card" | "cribbage" | "dice" | "ship"> = {
     tongits: "card",
     cribbage: "cribbage",
     pressyourluck: "dice",
+    battleship: "ship",
   };
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [showAvatars, setShowAvatars] = useState(false);
@@ -2103,9 +2110,11 @@ export function App() {
   const [mode, setMode] = useState<Mode>({ kind: "lobby" });
   const [crib, setCrib] = useState<CribMode>({ k: "menu" });
   const [fark, setFark] = useState<FarkMode>({ k: "menu" });
+  const [bat, setBat] = useState<BattleMode>({ k: "menu" });
   const [busy, setBusy] = useState(false);
   const [cribErr, setCribErr] = useState<string | null>(null);
   const [farkErr, setFarkErr] = useState<string | null>(null);
+  const [batErr, setBatErr] = useState<string | null>(null);
   const { account, update, setBalance } = useAccount();
   const fr = useFriends(account);
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
@@ -2166,8 +2175,11 @@ export function App() {
     } else if (game === "tongits" && mode.kind === "online") {
       recordActiveGame({ code: mode.code, kind: "tongits", isHost: false });
       setActiveGames(listActiveGames());
+    } else if (game === "battleship" && bat.k === "online") {
+      recordActiveGame({ code: bat.code, kind: "battleship", isHost: false });
+      setActiveGames(listActiveGames());
     }
-  }, [game, fark, crib, mode]);
+  }, [game, fark, crib, mode, bat]);
 
   const rejoinGame = (g: ActiveGame) => {
     if (g.kind === "pressyourluck") {
@@ -2176,6 +2188,9 @@ export function App() {
     } else if (g.kind === "cribbage") {
       setGame("cribbage");
       setCrib({ k: "online", code: g.code });
+    } else if (g.kind === "battleship") {
+      setGame("battleship");
+      setBat({ k: "online", code: g.code });
     } else {
       setGame("tongits");
       setMode({ kind: "online", code: g.code });
@@ -2223,6 +2238,12 @@ export function App() {
       setFark({ k: "online", code: ch.room_code, isHost: false });
       return;
     }
+    if (kind === "battleship") {
+      await respondChallenge(ch.id, "accepted");
+      setGame("battleship");
+      setBat({ k: "online", code: ch.room_code });
+      return;
+    }
     if (await fetchRoom(ch.room_code)) {
       await respondChallenge(ch.id, "accepted");
       setGame("tongits");
@@ -2246,6 +2267,11 @@ export function App() {
         await createChallenge(friendId, code);
         setGame("cribbage");
         setCrib({ k: "online", code });
+      } else if (kind === "battleship") {
+        const code = await hostBattleshipRoom(mySeat);
+        await createChallenge(friendId, code);
+        setGame("battleship");
+        setBat({ k: "online", code });
       } else {
         const code = await hostRoom(mySeat);
         await createChallenge(friendId, code);
@@ -2266,6 +2292,18 @@ export function App() {
       setCrib({ k: "online", code: await hostCribbageRoom(mySeat) });
     } catch (e) {
       setCribErr((e as Error).message ?? "Could not create the room.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hostBattleship() {
+    setBusy(true);
+    setBatErr(null);
+    try {
+      setBat({ k: "online", code: await hostBattleshipRoom(mySeat) });
+    } catch (e) {
+      setBatErr((e as Error).message ?? "Could not create the room.");
     } finally {
       setBusy(false);
     }
@@ -2364,6 +2402,29 @@ export function App() {
           onExit={() => setGame("menu")}
           busy={busy}
           error={cribErr}
+        />
+      );
+  } else if (game === "battleship") {
+    if (bat.k === "local") view = <BattleshipGame onExit={() => setBat({ k: "menu" })} />;
+    else if (bat.k === "online")
+      view = (
+        <OnlineBattleship
+          code={bat.code}
+          mySeat={mySeat}
+          friends={lobbyFriends}
+          onInvite={(friendId) => void createChallenge(friendId, bat.code)}
+          onExit={() => setBat({ k: "menu" })}
+        />
+      );
+    else
+      view = (
+        <BattleshipMenu
+          onLocal={() => setBat({ k: "local" })}
+          onHost={hostBattleship}
+          onJoin={(c) => c.length >= 4 && setBat({ k: "online", code: c })}
+          onExit={() => setGame("menu")}
+          busy={busy}
+          error={batErr}
         />
       );
   } else if (mode.kind === "lobby") {

@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 
 // Shared line-art icon set (used across the game shell and both games).
-export type IconName = "card" | "cribbage" | "hearts" | "dice" | "gear" | "chart" | "people" | "back";
+export type IconName = "card" | "cribbage" | "hearts" | "dice" | "gear" | "chart" | "people" | "back" | "ship";
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const svg = (children: ReactNode) => (
@@ -68,6 +68,15 @@ export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
           ].map(([cx, cy]) => (
             <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.5" fill="currentColor" stroke="none" />
           ))}
+        </>,
+      );
+    case "ship":
+      // A little boat on a wave.
+      return svg(
+        <>
+          <path d="M3 15h18l-2.2 4.2a2 2 0 0 1-1.8 1.1H7a2 2 0 0 1-1.8-1.1L3 15z" />
+          <path d="M6 15V8l6-2 6 2v7" />
+          <path d="M12 6V3" />
         </>,
       );
     case "gear":

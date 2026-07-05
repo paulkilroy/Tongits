@@ -2,7 +2,7 @@
 // means adding a kind here + its module; the shared shell (game picker, friends
 // hub, cross-game challenges) is driven off this metadata.
 
-export type GameKind = "tongits" | "cribbage" | "pressyourluck";
+export type GameKind = "tongits" | "cribbage" | "pressyourluck" | "battleship";
 
 export interface GameMeta {
   kind: GameKind;
@@ -33,6 +33,13 @@ export const GAMES: Record<GameKind, GameMeta> = {
     name: "Press Your Luck",
     emoji: "🎲",
     desc: "Push-your-luck dice · Farkle / Zilch · online + AI + coach",
+    online: true,
+  },
+  battleship: {
+    kind: "battleship",
+    name: "Battleship",
+    emoji: "🚢",
+    desc: "Sink the fleet · online + AI",
     online: true,
   },
 };

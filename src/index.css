@@ -2595,3 +2595,61 @@ h1 {
   flex-wrap: wrap;
   justify-content: center;
 }
+
+/* ---------------- Battleship ---------------- */
+.screen.battleship .screen-body { gap: 0.7rem; }
+.bs-grid-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+.bs-grid-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.bs-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  width: min(92vw, 360px);
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px;
+  border-radius: 8px;
+}
+.bs-cell {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 3px;
+  background: rgba(10, 40, 70, 0.55);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: default;
+  line-height: 1;
+}
+.bs-cell.enemy { background: rgba(12, 55, 92, 0.7); cursor: pointer; }
+.bs-cell.enemy:hover { background: rgba(30, 90, 140, 0.9); }
+.bs-cell.ship { background: #5b6b7d; }
+.bs-cell.miss { background: rgba(10, 40, 70, 0.55); color: rgba(255, 255, 255, 0.5); }
+.bs-cell.hit { background: #d1553f; }
+.bs-cell.sunk { background: #7a1f14; }
+.bs-cell:disabled { cursor: default; }
+
+.bs-palette { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; }
+.bs-ship {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #cfe;
+  cursor: pointer;
+}
+.bs-ship.active { border-color: #ffd65a; color: #ffd65a; }
+.bs-ship.placed { opacity: 0.5; }
+.bs-ship-size { opacity: 0.6; }
