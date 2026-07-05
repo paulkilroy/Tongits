@@ -19,13 +19,13 @@ import { RULESETS, type FarkleRules } from "./farkle/rules";
 import { GAMES, GAME_LIST, type GameKind } from "./games";
 import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } from "./online/activeGames";
 import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
+import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/Lobby";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
 import { bestMelds, deadwood } from "./engine/meldFinder";
 import { type RuleSet, type StockExhaustionRule } from "./engine/rules";
 import {
-  newRound,
   topDiscard,
   draw,
   layMeld,
@@ -37,7 +37,7 @@ import {
   type GameState,
 } from "./engine/game";
 import { useGame } from "./ui/useGame";
-import { useOnlineMatch } from "./ui/useOnlineMatch";
+import { useOnlineMatch, MIN_TONGITS_SEATS, MAX_TONGITS_SEATS } from "./ui/useOnlineMatch";
 import { useTurnAlert } from "./ui/useTurnAlert";
 import { useAccount } from "./ui/useAccount";
 import { useFriends } from "./ui/useFriends";
@@ -56,7 +56,14 @@ import {
 } from "./ui/coachStore";
 import { loadProfile, saveProfile, AVATARS, type Profile } from "./ui/profile";
 import { loadRules, saveRules } from "./ui/rulesStore";
-import { onlineConfigured, makeCode, createRoom, fetchRoom, pushRoom, fetchRoomKind } from "./online/supabase";
+import {
+  onlineConfigured,
+  makeCode,
+  createRoom,
+  fetchRoom,
+  fetchRoomKind,
+  type RoomData,
+} from "./online/supabase";
 
 /* ----------------------------- card helpers ------------------------------ */
 
@@ -1299,24 +1306,27 @@ function markSettled(key: string): void {
 
 function OnlineGame({
   code,
-  isHost,
-  me,
+  mySeat,
   account,
+  friends,
+  onInvite,
   onBalance,
   onExit,
 }: {
   code: string;
-  isHost: boolean;
-  me: number;
+  mySeat: LobbySeat;
   account: Account | null;
+  friends: LobbyFriend[];
+  onInvite: (friendId: string) => void;
   onBalance: (b: number) => void;
   onExit: () => void;
 }) {
-  const { game, wins, gameId, target, matchOver, connected, dispatch, nextGame, newMatch } =
-    useOnlineMatch(code, isHost);
+  const { room, game, wins, gameId, target, matchOver, connected, seats, started, isHost, meIndex, dispatch, start, addBot, nextGame, newMatch } =
+    useOnlineMatch(code, mySeat);
+  const me = meIndex >= 0 ? meIndex : 0;
   const [moneyDelta, setMoneyDelta] = useState<number | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  useTurnAlert(!!game && game.current === me && !game.result && !matchOver, "Tongits: your turn");
+  useTurnAlert(started && !!game && game.current === me && !game.result && !matchOver, "Tongits: your turn");
 
   // When a round ends, settle this seat's wallet exactly once.
   const result = game?.result;
@@ -1361,6 +1371,30 @@ function OnlineGame({
     </div>
   ) : null;
 
+  // Before the deal: the seat lobby.
+  if (room && !started) {
+    return (
+      <>
+        {leaveModal}
+        <SeatLobby
+          title="Tongits · lobby"
+          code={code}
+          seats={seats}
+          meId={mySeat.id}
+          hostId={room.hostId ?? ""}
+          isHost={isHost}
+          min={MIN_TONGITS_SEATS}
+          max={MAX_TONGITS_SEATS}
+          friends={friends}
+          onInvite={onInvite}
+          onStart={() => void start()}
+          onAddBot={() => void addBot()}
+          onExit={leave}
+        />
+      </>
+    );
+  }
+
   if (!game) {
     return (
       <main className="app center-screen">
@@ -1377,46 +1411,33 @@ function OnlineGame({
 
   const otherName = game.players.find((_, i) => i !== me)?.name ?? "opponent";
   const waiting = `Waiting for ${otherName}…`;
-  // The guest's seat keeps its placeholder name until they actually join.
-  const waitingForGuest =
-    isHost && !!game.players[1] && !game.players[1].isAI && game.players[1].name === "Player 2";
 
   return (
     <>
       {leaveModal}
       <Table
         state={game}
-      me={me}
-      wins={wins}
-      target={target}
-      matchOver={matchOver}
-      onAction={(next) => dispatch(next)}
-      onNext={nextGame}
-      onNewMatch={newMatch}
-      onExit={onExit}
-      onBack={leave}
-      canControlMatch={isHost}
-      statusNote={waiting}
-      balance={account?.balance}
-      moneyDelta={moneyDelta}
-      banner={
-        waitingForGuest ? (
-          <section className="invite">
-            <div className="invite-title">Invite your friend</div>
-            <div className="invite-code">{code}</div>
-            <ShareControls code={code} big />
-            <div className="invite-hint">They tap your link, or enter this code → Join.</div>
-          </section>
-        ) : undefined
-      }
-      headerExtra={
-        <>
-          <span className="code-chip">
-            Code <strong>{code}</strong>
-          </span>
-          <ShareControls code={code} />
-        </>
-      }
+        me={me}
+        wins={wins}
+        target={target}
+        matchOver={matchOver}
+        onAction={(next) => dispatch(next)}
+        onNext={nextGame}
+        onNewMatch={newMatch}
+        onExit={onExit}
+        onBack={leave}
+        canControlMatch={isHost}
+        statusNote={waiting}
+        balance={account?.balance}
+        moneyDelta={moneyDelta}
+        headerExtra={
+          <>
+            <span className="code-chip">
+              Code <strong>{code}</strong>
+            </span>
+            <ShareControls code={code} />
+          </>
+        }
       />
     </>
   );
@@ -1427,7 +1448,7 @@ function OnlineGame({
 type Mode =
   | { kind: "lobby" }
   | { kind: "local" }
-  | { kind: "online"; code: string; isHost: boolean; me: number };
+  | { kind: "online"; code: string };
 
 /* ------------------------------ sub-screens ------------------------------ */
 
@@ -1559,32 +1580,22 @@ function RulesEditor({ onBack }: { onBack: () => void }) {
   );
 }
 
-// Room helpers shared by host/join, challenge, and challenge-accept.
-async function hostRoom(profile: Profile, withBot: boolean): Promise<string> {
+// Create a Tongits seat lobby (host takes seat 0); the deal happens on Start.
+async function hostRoom(host: LobbySeat): Promise<string> {
   const roomCode = makeCode(Math.floor(Math.random() * 1_000_000_000));
-  const myName = profile.name || "Player 1";
-  const names = withBot ? [myName, "Player 2", "Bot"] : [myName, "Player 2"];
-  const avatars = withBot ? [profile.avatar, "🙂", "🤖"] : [profile.avatar, "🙂"];
-  const ai = withBot ? [false, false, true] : [false, false];
-  const game = newRound(
-    { ...loadRules(), playerCount: names.length as 2 | 3 },
-    Math.floor(Math.random() * 1_000_000_000),
-    names,
-    ai,
-    0,
-    avatars,
-  );
-  await createRoom(roomCode, { kind: "tongits", game, wins: names.map(() => 0), gameId: 1, version: 1 });
+  const room: RoomData = {
+    kind: "tongits",
+    game: null,
+    wins: [],
+    gameId: 1,
+    version: 1,
+    seats: [host],
+    hostId: host.id,
+    started: false,
+    rules: loadRules(),
+  };
+  await createRoom(roomCode, room);
   return roomCode;
-}
-
-async function joinRoomAs(code: string, profile: Profile): Promise<boolean> {
-  const data = await fetchRoom(code);
-  if (!data) return false;
-  data.game.players[1].name = profile.name || "Player 2";
-  data.game.players[1].avatar = profile.avatar;
-  await pushRoom(code, { ...data, version: data.version + 1 });
-  return true;
 }
 
 type FriendsHook = ReturnType<typeof useFriends>;
@@ -1683,32 +1694,27 @@ function Lobby({
   onStart,
   initialCode,
   account,
+  mySeat,
   onExitToMenu,
   fr,
 }: {
   onStart: (m: Mode) => void;
   initialCode?: string;
   account: Account | null;
+  mySeat: LobbySeat;
   onExitToMenu: () => void;
   fr: FriendsHook;
 }) {
   const [screen, setScreen] = useState<"main" | "rules" | "coach">("main");
-  const [profile, setProfile] = useState<Profile>(loadProfile);
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Identity (name/avatar) is edited on the home screen; here we just mirror it
-  // from the account so hosting/joining carries the current name + avatar.
-  useEffect(() => {
-    if (account) setProfile({ name: account.name, avatar: account.avatar });
-  }, [account]);
-
-  async function host(withBot: boolean) {
+  async function host() {
     setBusy(true);
     setError(null);
     try {
-      onStart({ kind: "online", code: await hostRoom(profile, withBot), isHost: true, me: 0 });
+      onStart({ kind: "online", code: await hostRoom(mySeat) });
     } catch (e) {
       setError(String((e as Error).message ?? e));
       setBusy(false);
@@ -1720,8 +1726,8 @@ function Lobby({
     setError(null);
     try {
       const clean = code.trim().toUpperCase();
-      if (await joinRoomAs(clean, profile)) {
-        onStart({ kind: "online", code: clean, isHost: false, me: 1 });
+      if (await fetchRoom(clean)) {
+        onStart({ kind: "online", code: clean });
       } else {
         setError("No game found with that code.");
         setBusy(false);
@@ -1735,9 +1741,9 @@ function Lobby({
   async function challenge(friendId: string) {
     setBusy(true);
     try {
-      const roomCode = await hostRoom(profile, false);
+      const roomCode = await hostRoom(mySeat);
       await createChallenge(friendId, roomCode);
-      onStart({ kind: "online", code: roomCode, isHost: true, me: 0 });
+      onStart({ kind: "online", code: roomCode });
     } catch (e) {
       setError(String((e as Error).message ?? e));
       setBusy(false);
@@ -1786,11 +1792,8 @@ function Lobby({
               </div>
             )}
             <div className="play-online">
-              <button disabled={busy} onClick={() => host(false)}>
-                Host vs friend
-              </button>
-              <button disabled={busy} onClick={() => host(true)}>
-                Host + AI
+              <button disabled={busy} onClick={host}>
+                Host a game (2–3 players)
               </button>
             </div>
             <div className="join-row">
@@ -2106,7 +2109,6 @@ export function App() {
   const { account, update, setBalance } = useAccount();
   const fr = useFriends(account);
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
-  const myProfile = (): Profile => (account ? { name: account.name, avatar: account.avatar } : loadProfile());
 
   // Easter egg: tarak (or anyone who's friends with tarak) sees the dice game
   // branded "Dice Games" instead of "Press Your Luck".
@@ -2162,7 +2164,7 @@ export function App() {
       recordActiveGame({ code: crib.code, kind: "cribbage", isHost: crib.isHost });
       setActiveGames(listActiveGames());
     } else if (game === "tongits" && mode.kind === "online") {
-      recordActiveGame({ code: mode.code, kind: "tongits", isHost: mode.isHost, me: mode.me });
+      recordActiveGame({ code: mode.code, kind: "tongits", isHost: false });
       setActiveGames(listActiveGames());
     }
   }, [game, fark, crib, mode]);
@@ -2176,7 +2178,7 @@ export function App() {
       setCrib({ k: "online", code: g.code, isHost: g.isHost });
     } else {
       setGame("tongits");
-      setMode({ kind: "online", code: g.code, isHost: g.isHost, me: g.me ?? (g.isHost ? 0 : 1) });
+      setMode({ kind: "online", code: g.code });
     }
   };
   const dismissActiveGame = (code: string) => {
@@ -2221,10 +2223,10 @@ export function App() {
       setFark({ k: "online", code: ch.room_code, isHost: false });
       return;
     }
-    if (await joinRoomAs(ch.room_code, myProfile())) {
+    if (await fetchRoom(ch.room_code)) {
       await respondChallenge(ch.id, "accepted");
       setGame("tongits");
-      setMode({ kind: "online", code: ch.room_code, isHost: false, me: 1 });
+      setMode({ kind: "online", code: ch.room_code });
     } else {
       await respondChallenge(ch.id, "declined");
     }
@@ -2245,10 +2247,10 @@ export function App() {
         setGame("cribbage");
         setCrib({ k: "online", code, isHost: true });
       } else {
-        const code = await hostRoom(myProfile(), false);
+        const code = await hostRoom(mySeat);
         await createChallenge(friendId, code);
         setGame("tongits");
-        setMode({ kind: "online", code, isHost: true, me: 0 });
+        setMode({ kind: "online", code });
       }
     } catch (e) {
       console.error("invite failed", e);
@@ -2361,6 +2363,7 @@ export function App() {
         onStart={setMode}
         initialCode={joinCode}
         account={account}
+        mySeat={mySeat}
         onExitToMenu={() => setGame("menu")}
         fr={fr}
       />
@@ -2371,9 +2374,10 @@ export function App() {
     view = (
       <OnlineGame
         code={mode.code}
-        isHost={mode.isHost}
-        me={mode.me}
+        mySeat={mySeat}
         account={account}
+        friends={lobbyFriends}
+        onInvite={(friendId) => void createChallenge(friendId, mode.code)}
         onBalance={setBalance}
         onExit={() => setMode({ kind: "lobby" })}
       />

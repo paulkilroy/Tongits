@@ -10,6 +10,7 @@ export interface LobbySeat {
   id: string;
   name: string;
   avatar?: string;
+  isAI?: boolean;
 }
 
 export interface LobbyFriend {
@@ -31,6 +32,7 @@ export function Lobby({
   friends,
   onInvite,
   onStart,
+  onAddBot,
   onExit,
 }: {
   title: string;
@@ -44,6 +46,7 @@ export function Lobby({
   friends: LobbyFriend[];
   onInvite: (friendId: string) => void;
   onStart: () => void;
+  onAddBot?: () => void;
   onExit: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -91,11 +94,17 @@ export function Lobby({
               <span className="lobby-avatar">{s.avatar ?? "🙂"}</span>
               <span className="hub-name">{s.name}</span>
               <span className="lobby-tags">
+                {s.isAI && <span className="lobby-tag you">bot</span>}
                 {s.id === hostId && <span className="lobby-tag host">host</span>}
                 {s.id === meId && <span className="lobby-tag you">you</span>}
               </span>
             </div>
           ))}
+          {isHost && onAddBot && seats.length < max && (
+            <button className="hub-accept lobby-addbot" onClick={onAddBot}>
+              + Add bot
+            </button>
+          )}
           {seats.length < min && <p className="cr-lbl">Need at least {min} players to start.</p>}
         </div>
 

@@ -1,4 +1,6 @@
 import { type GameState } from "../engine/game";
+import { type RuleSet } from "../engine/rules";
+import type { LobbySeat } from "./Lobby";
 import { getClient } from "./client";
 
 export { onlineConfigured } from "./client";
@@ -14,12 +16,18 @@ export { onlineConfigured } from "./client";
 export interface RoomData {
   /** Which game this room is — lets challenges route to the right board. */
   kind?: "tongits";
-  game: GameState;
+  /** The dealt match, or null while the room is still a seat lobby. */
+  game: GameState | null;
   wins: number[];
   /** Identifies the current round, so wallets settle exactly once per game. */
   gameId: number;
   /** Bumped on every write so clients can ignore their own stale echoes. */
   version: number;
+  // --- seat lobby (before the first deal) ---
+  seats?: LobbySeat[]; // claimed seats; index = seat number
+  hostId?: string;
+  started?: boolean;
+  rules?: RuleSet; // chosen ruleset; playerCount is set to seats.length on start
 }
 
 /** Read just the game kind of a room (defaults to tongits for legacy rooms). */
