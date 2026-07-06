@@ -43,7 +43,7 @@ export function pointOf(c: RCard, wildRank: Rank | null): number {
 }
 
 export function rlabel(c: RCard): string {
-  return isJoker(c) ? "★" : `${c.rank}${SUIT_SYMBOL[c.suit as Suit]}`;
+  return isJoker(c) ? "🃏" : `${c.rank}${SUIT_SYMBOL[c.suit as Suit]}`;
 }
 
 /** How many decks to shuffle together for a given player count. */
