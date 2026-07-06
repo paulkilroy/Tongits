@@ -79,6 +79,13 @@ export async function fetchRoomStatus(code: string, kind: GameKind): Promise<Roo
     if (d.game.result) return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
     return { finished: false, label: `hand ${d.game.handSize ?? "?"}/13 · ${scoreLine(d.game.players.map((p) => ({ name: p.name, score: (p as { total?: number }).total })))}` };
   }
+  if (kind === "gin") {
+    const d = await fetchRoomData<BattleRoomLike>(code).catch(() => null);
+    if (!d) return null;
+    if (!d.started || !d.game) return { finished: false, label: `lobby · ${d.seats?.length ?? 1} in` };
+    if (d.game.result) return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
+    return { finished: false, label: `${scoreLine(d.game.players)} · to 100` };
+  }
   // tongits
   const d = await fetchRoomData<TongitsRoomLike>(code).catch(() => null);
   if (!d?.game) return null;
