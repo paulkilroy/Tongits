@@ -2734,3 +2734,58 @@ h1 {
   align-items: center;
   justify-content: center;
 }
+
+/* ---------------- 65 (progressive rummy) ---------------- */
+.screen.sixtyfive .screen-body { gap: 0.6rem; }
+.sf-round { text-align: center; }
+.sf-piles { display: flex; gap: 1rem; justify-content: center; }
+.sf-pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+.sf-pile:disabled { opacity: 0.5; cursor: default; }
+.sf-pile-back { font-size: 2rem; }
+.sf-analyzer {
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 10px;
+  padding: 0.6rem;
+}
+.sf-a-head { font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 0.4rem; }
+.sf-a-head strong { color: #ffd65a; }
+.sf-groups, .sf-melds { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.sf-meld {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(90, 200, 120, 0.18);
+  border-radius: 8px;
+}
+.sf-dead { display: inline-flex; gap: 2px; padding: 3px; border: 1px dashed rgba(255, 120, 120, 0.5); border-radius: 8px; }
+.sf-chip {
+  min-width: 2rem;
+  padding: 0.35rem 0.2rem;
+  border-radius: 6px;
+  border: none;
+  background: #f4f1e8;
+  color: #111;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.sf-chip:disabled { cursor: default; }
+.sf-chip.s-heart, .sf-chip.s-diamond { color: #c0392b; }
+.sf-chip.s-club, .sf-chip.s-spade { color: #111; }
+.sf-chip.s-joker { background: #ffd65a; }
+.sf-chip.wild { outline: 2px solid #ffd65a; }
+.sf-chip.dim { opacity: 0.6; }
+.sf-actions { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.sf-reveal { padding: 0.4rem 0; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.sf-reveal-name { font-size: 0.85rem; margin-bottom: 0.3rem; }
+.sf-h2 { text-align: center; }

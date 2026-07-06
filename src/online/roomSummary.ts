@@ -32,6 +32,11 @@ interface BattleRoomLike {
   seats?: { name: string }[];
   game?: { players: PlayerLike[]; phase: string; result: { winner: number } | null } | null;
 }
+interface SFRoomLike {
+  started?: boolean;
+  seats?: { name: string }[];
+  game?: { players: { name: string; total?: number }[]; handSize?: number; result: { winner: number } | null } | null;
+}
 
 const scoreLine = (ps: PlayerLike[]) => ps.map((p) => `${p.name} ${p.score ?? 0}`).join(" · ");
 const winnerName = (ps: PlayerLike[], i: number) => ps[i]?.name ?? "someone";
@@ -66,6 +71,13 @@ export async function fetchRoomStatus(code: string, kind: GameKind): Promise<Roo
     if (!d.started || !d.game) return { finished: false, label: `lobby · ${d.seats?.length ?? 1} in` };
     if (d.game.result) return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
     return { finished: false, label: "game underway" };
+  }
+  if (kind === "sixtyfive") {
+    const d = await fetchRoomData<SFRoomLike>(code).catch(() => null);
+    if (!d) return null;
+    if (!d.started || !d.game) return { finished: false, label: `lobby · ${d.seats?.length ?? 1} in` };
+    if (d.game.result) return { finished: true, label: `${winnerName(d.game.players, d.game.result.winner)} won` };
+    return { finished: false, label: `hand ${d.game.handSize ?? "?"}/13 · ${scoreLine(d.game.players.map((p) => ({ name: p.name, score: (p as { total?: number }).total })))}` };
   }
   // tongits
   const d = await fetchRoomData<TongitsRoomLike>(code).catch(() => null);

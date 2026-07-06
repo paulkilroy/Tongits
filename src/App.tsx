@@ -23,6 +23,10 @@ import { BackgammonMenu } from "./backgammon/BackgammonMenu";
 import { BackgammonGame } from "./backgammon/BackgammonGame";
 import { OnlineBackgammon } from "./backgammon/OnlineBackgammon";
 import { hostBackgammonRoom } from "./backgammon/online";
+import { SixtyFiveMenu } from "./sixtyfive/SixtyFiveMenu";
+import { SixtyFiveGame } from "./sixtyfive/SixtyFiveGame";
+import { OnlineSixtyFive } from "./sixtyfive/OnlineSixtyFive";
+import { hostSixtyFiveRoom } from "./sixtyfive/online";
 import { RULESETS, type FarkleRules } from "./farkle/rules";
 import { GAMES, GAME_LIST, type GameKind } from "./games";
 import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } from "./online/activeGames";
@@ -1852,6 +1856,7 @@ type FarkMode =
 
 type BattleMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string };
 type BgMode = { k: "menu" } | { k: "local" } | { k: "online"; code: string };
+type SfMode = { k: "menu" } | { k: "local"; players: number } | { k: "online"; code: string };
 
 function GamePicker({
   fr,
@@ -1885,6 +1890,7 @@ function GamePicker({
     pressyourluck: "dice",
     battleship: "ship",
     backgammon: "backgammon",
+    sixtyfive: "card",
   };
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [showAvatars, setShowAvatars] = useState(false);
@@ -2118,11 +2124,13 @@ export function App() {
   const [fark, setFark] = useState<FarkMode>({ k: "menu" });
   const [bat, setBat] = useState<BattleMode>({ k: "menu" });
   const [bg, setBg] = useState<BgMode>({ k: "menu" });
+  const [sf, setSf] = useState<SfMode>({ k: "menu" });
   const [busy, setBusy] = useState(false);
   const [cribErr, setCribErr] = useState<string | null>(null);
   const [farkErr, setFarkErr] = useState<string | null>(null);
   const [batErr, setBatErr] = useState<string | null>(null);
   const [bgErr, setBgErr] = useState<string | null>(null);
+  const [sfErr, setSfErr] = useState<string | null>(null);
   const { account, update, setBalance } = useAccount();
   const fr = useFriends(account);
   const joinCode = new URLSearchParams(window.location.search).get("join") ?? undefined;
@@ -2189,8 +2197,11 @@ export function App() {
     } else if (game === "backgammon" && bg.k === "online") {
       recordActiveGame({ code: bg.code, kind: "backgammon", isHost: false });
       setActiveGames(listActiveGames());
+    } else if (game === "sixtyfive" && sf.k === "online") {
+      recordActiveGame({ code: sf.code, kind: "sixtyfive", isHost: false });
+      setActiveGames(listActiveGames());
     }
-  }, [game, fark, crib, mode, bat, bg]);
+  }, [game, fark, crib, mode, bat, bg, sf]);
 
   const rejoinGame = (g: ActiveGame) => {
     if (g.kind === "pressyourluck") {
@@ -2205,6 +2216,9 @@ export function App() {
     } else if (g.kind === "backgammon") {
       setGame("backgammon");
       setBg({ k: "online", code: g.code });
+    } else if (g.kind === "sixtyfive") {
+      setGame("sixtyfive");
+      setSf({ k: "online", code: g.code });
     } else {
       setGame("tongits");
       setMode({ kind: "online", code: g.code });
@@ -2264,6 +2278,12 @@ export function App() {
       setBg({ k: "online", code: ch.room_code });
       return;
     }
+    if (kind === "sixtyfive") {
+      await respondChallenge(ch.id, "accepted");
+      setGame("sixtyfive");
+      setSf({ k: "online", code: ch.room_code });
+      return;
+    }
     if (await fetchRoom(ch.room_code)) {
       await respondChallenge(ch.id, "accepted");
       setGame("tongits");
@@ -2297,6 +2317,11 @@ export function App() {
         await createChallenge(friendId, code);
         setGame("backgammon");
         setBg({ k: "online", code });
+      } else if (kind === "sixtyfive") {
+        const code = await hostSixtyFiveRoom(mySeat);
+        await createChallenge(friendId, code);
+        setGame("sixtyfive");
+        setSf({ k: "online", code });
       } else {
         const code = await hostRoom(mySeat);
         await createChallenge(friendId, code);
@@ -2341,6 +2366,18 @@ export function App() {
       setBg({ k: "online", code: await hostBackgammonRoom(mySeat) });
     } catch (e) {
       setBgErr((e as Error).message ?? "Could not create the room.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hostSixtyFive() {
+    setBusy(true);
+    setSfErr(null);
+    try {
+      setSf({ k: "online", code: await hostSixtyFiveRoom(mySeat) });
+    } catch (e) {
+      setSfErr((e as Error).message ?? "Could not create the room.");
     } finally {
       setBusy(false);
     }
@@ -2485,6 +2522,29 @@ export function App() {
           onExit={() => setGame("menu")}
           busy={busy}
           error={bgErr}
+        />
+      );
+  } else if (game === "sixtyfive") {
+    if (sf.k === "local") view = <SixtyFiveGame players={sf.players} onExit={() => setSf({ k: "menu" })} />;
+    else if (sf.k === "online")
+      view = (
+        <OnlineSixtyFive
+          code={sf.code}
+          mySeat={mySeat}
+          friends={lobbyFriends}
+          onInvite={(friendId) => void createChallenge(friendId, sf.code)}
+          onExit={() => setSf({ k: "menu" })}
+        />
+      );
+    else
+      view = (
+        <SixtyFiveMenu
+          onLocal={(players) => setSf({ k: "local", players })}
+          onHost={hostSixtyFive}
+          onJoin={(c) => c.length >= 4 && setSf({ k: "online", code: c })}
+          onExit={() => setGame("menu")}
+          busy={busy}
+          error={sfErr}
         />
       );
   } else if (mode.kind === "lobby") {
