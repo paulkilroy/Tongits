@@ -7,8 +7,12 @@ import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game"
 const SUIT_CLASS: Record<Suit, string> = { clubs: "s-club", diamonds: "s-diamond", hearts: "s-heart", spades: "s-spade" };
 
 function Chip({ c, onClick, dim }: { c: Card; onClick?: () => void; dim?: boolean }) {
+  const cls = `sf-chip ${SUIT_CLASS[c.suit]} ${dim ? "dim" : ""}`;
+  // Non-interactive chips are spans, so a chip inside the discard-pile button
+  // doesn't swallow the pile's click.
+  if (!onClick) return <span className={cls}>{cardLabel(c)}</span>;
   return (
-    <button className={`sf-chip ${SUIT_CLASS[c.suit]} ${dim ? "dim" : ""}`} onClick={onClick} disabled={!onClick}>
+    <button className={cls} onClick={onClick}>
       {cardLabel(c)}
     </button>
   );

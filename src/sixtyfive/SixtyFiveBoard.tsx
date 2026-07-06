@@ -8,12 +8,12 @@ import { type SFState } from "./game";
 const SUIT_CLASS: Record<Suit, string> = { clubs: "s-club", diamonds: "s-diamond", hearts: "s-heart", spades: "s-spade" };
 
 function Chip({ c, wild, onClick, dim }: { c: RCard; wild: boolean; onClick?: () => void; dim?: boolean }) {
+  const cls = `sf-chip ${isJoker(c) ? "s-joker" : SUIT_CLASS[c.suit as Suit]} ${wild ? "wild" : ""} ${dim ? "dim" : ""}`;
+  // Non-interactive chips render as spans, not disabled buttons — otherwise a chip
+  // sitting inside another button (the discard pile) swallows the pile's clicks.
+  if (!onClick) return <span className={cls}>{rlabel(c)}</span>;
   return (
-    <button
-      className={`sf-chip ${isJoker(c) ? "s-joker" : SUIT_CLASS[c.suit as Suit]} ${wild ? "wild" : ""} ${dim ? "dim" : ""}`}
-      onClick={onClick}
-      disabled={!onClick}
-    >
+    <button className={cls} onClick={onClick}>
       {rlabel(c)}
     </button>
   );

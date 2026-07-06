@@ -36,6 +36,7 @@ import { GAMES, GAME_LIST, type GameKind } from "./games";
 import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } from "./online/activeGames";
 import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/Lobby";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -2637,7 +2638,9 @@ export function App() {
   return (
     <>
       {modal}
-      {view}
+      <ErrorBoundary key={game} onReset={() => setGame("menu")}>
+        {view}
+      </ErrorBoundary>
     </>
   );
 }
