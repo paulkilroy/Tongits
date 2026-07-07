@@ -7,6 +7,7 @@ import { reviewHand, type HandReview } from "./review";
 import { CribReview } from "./CribReview";
 import { CribGameReview } from "./CribGameReview";
 import { BackButton } from "../ui/Icon";
+import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 
 const SUIT_CLASS: Record<Suit, string> = {
   clubs: "s-club",
@@ -117,7 +118,8 @@ export function CribbageBoard(props: BoardProps) {
     }
   }, [g.log]);
 
-  const myHand = g.players[me].hand;
+  const [sortMode, setSortMode] = useState<SortMode>("suit");
+  const myHand = useMemo(() => sortHand(g.players[me].hand, sortMode), [g.players, me, sortMode]);
   const myLegal = new Set(legalPlays(g, me).map(cardId));
   const myTurn = g.phase === "play" && g.current === me;
   const ownsCrib = g.dealer === me;
@@ -186,6 +188,7 @@ export function CribbageBoard(props: BoardProps) {
               <p className="cr-instr">
                 Lay {count === 1 ? "1 card" : "2 cards"} into {ownsCrib ? "your" : g.players[g.dealer].name + "’s"} crib.
               </p>
+              <SortToggle mode={sortMode} onChange={setSortMode} />
               <div className="cr-hand">
                 {myHand.map((c) => (
                   <CribCard
@@ -288,6 +291,7 @@ export function CribbageBoard(props: BoardProps) {
                 </span>
               ))}
             </div>
+            <SortToggle mode={sortMode} onChange={setSortMode} />
             <div className="cr-hand">
               {myHand.map((c) => (
                 <CribCard

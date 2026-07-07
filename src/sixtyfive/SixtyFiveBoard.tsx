@@ -1,20 +1,49 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BackButton } from "../ui/Icon";
-import { type Suit } from "../engine/cards";
-import { type RCard, isWild, rlabel, isJoker } from "./rules";
+import { type Suit, SUITS } from "../engine/cards";
+import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
 import { analyze } from "./meld";
 import { type SFState } from "./game";
+import { SortToggle, type SortMode } from "../ui/handSort";
 
 const SUIT_CLASS: Record<Suit, string> = { clubs: "s-club", diamonds: "s-diamond", hearts: "s-heart", spades: "s-spade" };
 
-function Chip({ c, wild, onClick, dim }: { c: RCard; wild: boolean; onClick?: () => void; dim?: boolean }) {
-  const cls = `sf-chip ${isJoker(c) ? "s-joker" : SUIT_CLASS[c.suit as Suit]} ${wild ? "wild" : ""} ${dim ? "dim" : ""}`;
-  // Non-interactive chips render as spans, not disabled buttons — otherwise a chip
-  // sitting inside another button (the discard pile) swallows the pile's clicks.
+/** Sort a "65" hand (jokers/wilds trail the end). */
+function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {
+  const si = (s: Suit | null) => (s ? SUITS.indexOf(s) : 99);
+  const wo = (c: RCard) => (isWild(c, wild) ? 99 : 0);
+  return [...hand].sort((a, b) => {
+    if (wo(a) !== wo(b)) return wo(a) - wo(b);
+    if (mode === "suit") return si(a.suit) !== si(b.suit) ? si(a.suit) - si(b.suit) : ord(b.rank as Rank) - ord(a.rank as Rank);
+    const ra = a.rank === "JOKER" ? 0 : ord(a.rank as Rank);
+    const rb = b.rank === "JOKER" ? 0 : ord(b.rank as Rank);
+    return ra !== rb ? rb - ra : si(a.suit) - si(b.suit);
+  });
+}
+
+function Chip({
+  c,
+  wild,
+  onClick,
+  dim,
+  selected,
+  isNew,
+  inMeld,
+}: {
+  c: RCard;
+  wild: boolean;
+  onClick?: () => void;
+  dim?: boolean;
+  selected?: boolean;
+  isNew?: boolean;
+  inMeld?: boolean;
+}) {
+  const cls = `sf-chip ${isJoker(c) ? "s-joker" : SUIT_CLASS[c.suit as Suit]} ${wild ? "wild" : ""} ${dim ? "dim" : ""} ${selected ? "sel" : ""} ${isNew ? "new" : ""} ${inMeld ? "in-meld" : ""}`;
   if (!onClick) return <span className={cls}>{rlabel(c)}</span>;
   return (
     <button className={cls} onClick={onClick}>
       {rlabel(c)}
+      {isNew && <span className="chip-new">new</span>}
     </button>
   );
 }
@@ -37,13 +66,22 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
   const hand = g.players[me].hand;
   const myTurn = g.current === me && !g.result && (g.phase === "draw" || g.phase === "discard");
 
+  const [sel, setSel] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("suit");
+  // Clear the selection when the turn/phase changes.
+  useEffect(() => setSel(null), [g.current, g.phase, g.handSize]);
+
   const analysis = useMemo(() => analyze(hand, wild), [hand, wild]);
-  // A card we could discard to go out (all remaining melded).
+  const meldedIds = useMemo(() => new Set(analysis.melds.flat().map((c) => c.id)), [analysis]);
+  const sorted = useMemo(() => sortRHand(hand, sortMode, wild), [hand, sortMode, wild]);
+  const canDiscard = myTurn && g.phase === "discard";
+  // A card we could discard to go out (all remaining melded) — prefer the selected one.
   const payMeCard = useMemo(() => {
-    if (!myTurn || g.phase !== "discard") return null;
-    for (const c of hand) if (analyze(hand.filter((x) => x.id !== c.id), wild).points === 0 && hand.length - 1 === g.handSize) return c;
+    if (!canDiscard || hand.length - 1 !== g.handSize) return null;
+    if (sel && analyze(hand.filter((x) => x.id !== sel), wild).points === 0) return sel;
+    for (const c of hand) if (analyze(hand.filter((x) => x.id !== c.id), wild).points === 0) return c.id;
     return null;
-  }, [hand, wild, myTurn, g.phase, g.handSize]);
+  }, [hand, wild, canDiscard, g.handSize, sel]);
 
   const discardTop = g.discard[g.discard.length - 1];
 
@@ -134,37 +172,25 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
               </button>
             </div>
 
-            {/* the live hand analyzer */}
+            {/* the live hand analyzer — green cards are melded */}
             <div className="sf-analyzer">
               <div className="sf-a-head">
-                Your hand · deadwood <strong>{analysis.points}</strong>
+                Your hand · deadwood <strong>{analysis.points}</strong> · <span className="legend">green = meld</span>
                 {analysis.points === 0 && hand.length >= g.handSize && <span className="fk-good"> · ready to Pay Me!</span>}
               </div>
-              <div className="sf-groups">
-                {analysis.melds.map((m, k) => (
-                  <span className="sf-meld" key={`m${k}`}>
-                    {m.map((c) => (
-                      <Chip
-                        key={c.id}
-                        c={c}
-                        wild={isWild(c, wild)}
-                        onClick={myTurn && g.phase === "discard" ? () => onDiscard(c.id) : undefined}
-                      />
-                    ))}
-                  </span>
+              <SortToggle mode={sortMode} onChange={setSortMode} />
+              <div className="sf-hand">
+                {sorted.map((c) => (
+                  <Chip
+                    key={c.id}
+                    c={c}
+                    wild={isWild(c, wild)}
+                    inMeld={meldedIds.has(c.id)}
+                    selected={sel === c.id}
+                    isNew={g.drawnId === c.id}
+                    onClick={canDiscard ? () => setSel((s) => (s === c.id ? null : c.id)) : undefined}
+                  />
                 ))}
-                {analysis.deadwood.length > 0 && (
-                  <span className="sf-dead">
-                    {analysis.deadwood.map((c) => (
-                      <Chip
-                        key={c.id}
-                        c={c}
-                        wild={false}
-                        onClick={myTurn && g.phase === "discard" ? () => onDiscard(c.id) : undefined}
-                      />
-                    ))}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -175,12 +201,17 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                 <div className="cr-lbl">draw from the stock or take the discard</div>
               ) : (
                 <>
-                  <div className="cr-lbl">tap a card to discard{payMeCard ? " — or go out:" : ""}</div>
-                  {payMeCard && (
-                    <button className="big play-primary" onClick={() => onPayMe(payMeCard.id)}>
-                      💰 Pay Me!
+                  <div className="cr-lbl">{sel ? "discard the selected card, or:" : "tap a card to select"}</div>
+                  <div className="cr-row2">
+                    <button className="reveal-replay cr-discard-btn" disabled={!sel} onClick={() => sel && onDiscard(sel)}>
+                      Discard
                     </button>
-                  )}
+                    {payMeCard && (
+                      <button className="cr-coach-btn" onClick={() => onPayMe(payMeCard)}>
+                        💰 Pay Me!
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>

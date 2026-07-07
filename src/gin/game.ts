@@ -42,6 +42,7 @@ export interface GinState {
   current: number;
   phase: GinPhase;
   drewFrom: "deck" | "discard" | null;
+  drawnId: string | null; // the card just drawn (highlighted until you discard)
   round: RoundResult | null;
   result: { winner: number } | null;
   log: string[];
@@ -67,6 +68,7 @@ function deal(s: GinState): void {
   s.current = p0;
   s.phase = "draw";
   s.drewFrom = null;
+  s.drawnId = null;
   s.round = null;
   note(s, `${s.players[s.dealer].name} deals. ${s.players[p0].name} to draw.`);
 }
@@ -80,6 +82,7 @@ export function newGame(names: string[], ai: boolean[]): GinState {
     current: 0,
     phase: "draw",
     drewFrom: null,
+    drawnId: null,
     round: null,
     result: null,
     log: [],
@@ -93,9 +96,10 @@ export function draw(state: GinState, source: "deck" | "discard"): GinState {
   if (state.phase !== "draw") return state;
   const s = clone(state);
   const p = s.players[s.current];
+  let drawn;
   if (source === "discard") {
     if (!s.discard.length) return state;
-    p.hand.push(s.discard.pop()!);
+    drawn = s.discard.pop()!;
     s.drewFrom = "discard";
   } else {
     if (s.deck.length <= 2) {
@@ -104,9 +108,11 @@ export function draw(state: GinState, source: "deck" | "discard"): GinState {
       deal(s);
       return s;
     }
-    p.hand.push(s.deck.shift()!);
+    drawn = s.deck.shift()!;
     s.drewFrom = "deck";
   }
+  p.hand.push(drawn);
+  s.drawnId = cardId(drawn);
   s.phase = "discard";
   return s;
 }
@@ -123,6 +129,7 @@ export function discard(state: GinState, cardId_: string): GinState {
   s.current = (s.current + 1) % 2;
   s.phase = "draw";
   s.drewFrom = null;
+  s.drawnId = null;
   return s;
 }
 

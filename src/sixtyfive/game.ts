@@ -41,6 +41,7 @@ export interface SFState {
   current: number;
   phase: SFPhase;
   drewFrom: "deck" | "discard" | null; // this turn's draw source (null = not yet)
+  drawnId: string | null; // the card just drawn (highlighted until you discard)
   paidBy: number | null;
   finalTurnsLeft: number;
   reveals: Reveal[] | null;
@@ -71,6 +72,7 @@ function dealRound(s: SFState): void {
   s.current = (s.dealer + 1) % N;
   s.phase = "draw";
   s.drewFrom = null;
+  s.drawnId = null;
   s.paidBy = null;
   s.finalTurnsLeft = 0;
   s.reveals = null;
@@ -91,6 +93,7 @@ export function newGame(names: string[], ai: boolean[]): SFState {
     current: 0,
     phase: "draw",
     drewFrom: null,
+    drawnId: null,
     paidBy: null,
     finalTurnsLeft: 0,
     reveals: null,
@@ -108,15 +111,18 @@ export function draw(state: SFState, source: "deck" | "discard"): SFState {
   if (state.phase !== "draw") return state;
   const s = clone(state);
   const p = s.players[s.current];
+  let drawn;
   if (source === "discard") {
     if (!s.discard.length) return state;
-    p.hand.push(s.discard.pop()!);
+    drawn = s.discard.pop()!;
     s.drewFrom = "discard";
   } else {
     if (!s.deck.length) return state; // stock empty — the hand will end (see beginTurn)
-    p.hand.push(s.deck.shift()!);
+    drawn = s.deck.shift()!;
     s.drewFrom = "deck";
   }
+  p.hand.push(drawn);
+  s.drawnId = drawn.id;
   s.phase = "discard";
   return s;
 }
@@ -132,6 +138,7 @@ function beginTurn(s: SFState): void {
   }
   s.phase = "draw";
   s.drewFrom = null;
+  s.drawnId = null;
 }
 
 function advance(s: SFState): void {

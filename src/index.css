@@ -2805,3 +2805,27 @@ h1 {
 .sf-reveal { padding: 0.4rem 0; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .sf-reveal-name { font-size: 0.85rem; margin-bottom: 0.3rem; }
 .sf-h2 { text-align: center; }
+
+/* flat sortable hand for 65 / Gin (green = meld, ring = selected, badge = drawn) */
+.sf-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.sf-chip { position: relative; transition: transform 0.08s ease; }
+.sf-chip.in-meld { box-shadow: inset 0 -4px 0 rgba(90, 200, 120, 0.8); }
+.sf-chip.sel { transform: translateY(-6px); outline: 2px solid #ffd65a; }
+.sf-chip.new { outline: 2px solid #6ad6ff; }
+.chip-new {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  background: #6ad6ff;
+  color: #06263a;
+  font-size: 0.5rem;
+  font-weight: 800;
+  padding: 0 3px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}

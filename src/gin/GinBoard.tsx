@@ -1,19 +1,33 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BackButton } from "../ui/Icon";
 import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
-import { bestMelds, deadwood } from "../engine/meldFinder";
+import { bestMelds } from "../engine/meldFinder";
 import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
+import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 
 const SUIT_CLASS: Record<Suit, string> = { clubs: "s-club", diamonds: "s-diamond", hearts: "s-heart", spades: "s-spade" };
 
-function Chip({ c, onClick, dim }: { c: Card; onClick?: () => void; dim?: boolean }) {
-  const cls = `sf-chip ${SUIT_CLASS[c.suit]} ${dim ? "dim" : ""}`;
-  // Non-interactive chips are spans, so a chip inside the discard-pile button
-  // doesn't swallow the pile's click.
+function Chip({
+  c,
+  onClick,
+  dim,
+  selected,
+  isNew,
+  inMeld,
+}: {
+  c: Card;
+  onClick?: () => void;
+  dim?: boolean;
+  selected?: boolean;
+  isNew?: boolean;
+  inMeld?: boolean;
+}) {
+  const cls = `sf-chip ${SUIT_CLASS[c.suit]} ${dim ? "dim" : ""} ${selected ? "sel" : ""} ${isNew ? "new" : ""} ${inMeld ? "in-meld" : ""}`;
   if (!onClick) return <span className={cls}>{cardLabel(c)}</span>;
   return (
     <button className={cls} onClick={onClick}>
       {cardLabel(c)}
+      {isNew && <span className="chip-new">new</span>}
     </button>
   );
 }
@@ -35,14 +49,22 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const hand = g.players[me].hand;
   const myTurn = g.current === me && !g.result && (g.phase === "draw" || g.phase === "discard");
 
-  const groups = useMemo(() => ({ melds: bestMelds(hand).map((m) => m.cards), dead: deadwood(hand) }), [hand]);
+  const [sel, setSel] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("suit");
+  useEffect(() => setSel(null), [g.current, g.phase]);
+
+  const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
+  const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
   const deadPts = deadwoodPts(hand);
-  const knockCard = useMemo(() => {
-    if (!myTurn || g.phase !== "discard") return null;
-    for (const c of hand) if (canKnock(g, cardId(c))) return c;
+  const canDiscard = myTurn && g.phase === "discard";
+  // A card we can knock/gin with — prefer the selected one.
+  const knockCardId = useMemo(() => {
+    if (!canDiscard) return null;
+    if (sel && canKnock(g, sel)) return sel;
+    for (const c of hand) if (canKnock(g, cardId(c))) return cardId(c);
     return null;
-  }, [g, hand, myTurn]);
-  const knockGin = knockCard ? deadwoodPts(hand.filter((c) => cardId(c) !== cardId(knockCard))) === 0 : false;
+  }, [g, hand, canDiscard, sel]);
+  const knockGin = knockCardId ? deadwoodPts(hand.filter((c) => cardId(c) !== knockCardId)) === 0 : false;
 
   const discardTop = g.discard[g.discard.length - 1];
 
@@ -128,24 +150,21 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
 
             <div className="sf-analyzer">
               <div className="sf-a-head">
-                Your hand · deadwood <strong>{deadPts}</strong>
+                Your hand · deadwood <strong>{deadPts}</strong> · <span className="legend">green = meld</span>
                 {deadPts === 0 && hand.length >= 7 && <span className="fk-good"> · Gin!</span>}
               </div>
-              <div className="sf-groups">
-                {groups.melds.map((m, k) => (
-                  <span className="sf-meld" key={`m${k}`}>
-                    {m.map((c) => (
-                      <Chip key={cardId(c)} c={c} onClick={myTurn && g.phase === "discard" ? () => onDiscard(cardId(c)) : undefined} />
-                    ))}
-                  </span>
+              <SortToggle mode={sortMode} onChange={setSortMode} />
+              <div className="sf-hand">
+                {sorted.map((c) => (
+                  <Chip
+                    key={cardId(c)}
+                    c={c}
+                    inMeld={meldedIds.has(cardId(c))}
+                    selected={sel === cardId(c)}
+                    isNew={g.drawnId === cardId(c)}
+                    onClick={canDiscard ? () => setSel((s) => (s === cardId(c) ? null : cardId(c))) : undefined}
+                  />
                 ))}
-                {groups.dead.length > 0 && (
-                  <span className="sf-dead">
-                    {groups.dead.map((c) => (
-                      <Chip key={cardId(c)} c={c} onClick={myTurn && g.phase === "discard" ? () => onDiscard(cardId(c)) : undefined} />
-                    ))}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -156,12 +175,17 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 <div className="cr-lbl">draw from the stock or take the discard</div>
               ) : (
                 <>
-                  <div className="cr-lbl">tap a card to discard{knockCard ? " — or:" : ""}</div>
-                  {knockCard && (
-                    <button className="big play-primary" onClick={() => onKnock(cardId(knockCard))}>
-                      {knockGin ? "✊ Gin!" : "✊ Knock"}
+                  <div className="cr-lbl">{sel ? "discard the selected card, or:" : "tap a card to select"}</div>
+                  <div className="cr-row2">
+                    <button className="reveal-replay cr-discard-btn" disabled={!sel} onClick={() => sel && onDiscard(sel)}>
+                      Discard
                     </button>
-                  )}
+                    {knockCardId && (
+                      <button className="cr-coach-btn" onClick={() => onKnock(knockCardId)}>
+                        {knockGin ? "✊ Gin!" : "✊ Knock"}
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>
