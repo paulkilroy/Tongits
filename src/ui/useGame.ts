@@ -34,10 +34,14 @@ export function useGame(initialBots: 1 | 2 = 1) {
   const target = state.rules.gamesToWin;
   const matchOver = wins.some((w) => w >= target);
 
-  // Drive AI turns (paused once the round ends or the match is over).
+  // Drive AI turns — and AI fold/fight replies to a pending Laban (which may be
+  // owed even when it's not an AI's "turn", e.g. the human called it).
   useEffect(() => {
     if (state.result || matchOver) return;
-    if (!currentPlayer(state).isAI) return;
+    const drive = state.pendingLaban
+      ? state.pendingLaban.responses.some((r, i) => r === null && state.players[i].isAI)
+      : currentPlayer(state).isAI;
+    if (!drive) return;
     const id = setTimeout(() => setState((s) => takeAITurn(s)), 800);
     return () => clearTimeout(id);
   }, [state, matchOver]);

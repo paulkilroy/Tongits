@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { newRound, type GameState } from "../engine/game";
 import { takeAITurn } from "../engine/ai";
 import { STANDARD_RULES } from "../engine/rules";
+import { openMatch, settleHand, freshBet, type HandOutcome } from "../engine/betting";
 import {
   type RoomData,
   fetchRoom,
@@ -152,12 +153,16 @@ export function useOnlineMatch(code: string, mySeat: LobbySeat) {
     if (!base || base.started || base.hostId !== mySeat.id) return;
     if ((base.seats?.length ?? 0) < MIN_TONGITS_SEATS) return;
     countedRef.current = false;
+    const opening = openMatch((base.seats ?? []).length); // everyone antes ₱20 into the pot
     const next: RoomData = {
       ...base,
       started: true,
       game: dealFromSeats(base, 0),
       wins: (base.seats ?? []).map(() => 0),
       gameId: 1,
+      bet: opening.bet,
+      settleSeq: 1,
+      settleDeltas: opening.deltas,
       version: base.version + 1,
     };
     if (await pushRoomDataVersioned(code, next, base.version)) apply(next);
@@ -170,21 +175,38 @@ export function useOnlineMatch(code: string, mySeat: LobbySeat) {
   // The acting player writes their move.
   const dispatch = useCallback((next: GameState) => writeRoom({ game: next }), [writeRoom]);
 
-  // Host: play out AI seats.
+  // Host: play out AI seats (but not while a Laban is awaiting fold/fight replies).
   useEffect(() => {
-    if (!isHost || !started || !game || game.result || matchOver) return;
+    if (!isHost || !started || !game || game.result || matchOver || game.pendingLaban) return;
     if (!game.players[game.current].isAI) return;
     const id = setTimeout(() => writeRoom({ game: takeAITurn(game) }), 800);
     return () => clearTimeout(id);
   }, [isHost, started, game, matchOver, writeRoom]);
 
-  // Host: tally a game win exactly once when a round ends.
+  // Host: answer a pending Laban on behalf of any AI that still owes a reply.
+  useEffect(() => {
+    if (!isHost || !game || game.result || !game.pendingLaban) return;
+    const owes = game.pendingLaban.responses.some((r, i) => r === null && game.players[i].isAI);
+    if (!owes) return;
+    const id = setTimeout(() => writeRoom({ game: takeAITurn(game) }), 700);
+    return () => clearTimeout(id);
+  }, [isHost, game, writeRoom]);
+
+  // Host: on a finished round, tally the win AND settle the pot/heater/ante — once.
   useEffect(() => {
     if (!isHost || !game || !game.result || countedRef.current) return;
     countedRef.current = true;
-    if (game.result.winner >= 0) {
-      writeRoom({ wins: wins.map((n, i) => (i === game.result!.winner ? n + 1 : n)) });
-    }
+    const winner = game.result.winner;
+    const newWins = winner >= 0 ? wins.map((n, i) => (i === winner ? n + 1 : n)) : wins;
+    const outcome: HandOutcome = { playerCount: game.players.length, winner, laban: game.result.laban };
+    const base = roomRef.current;
+    const settled = settleHand(base?.bet ?? freshBet(), outcome);
+    writeRoom({
+      wins: newWins,
+      bet: settled.bet,
+      settleSeq: (base?.settleSeq ?? 0) + 1,
+      settleDeltas: settled.deltas,
+    });
   }, [isHost, game, wins, writeRoom]);
 
   const deal = useCallback(
@@ -202,8 +224,19 @@ export function useOnlineMatch(code: string, mySeat: LobbySeat) {
   }, [game, wins, gameId, deal]);
 
   const newMatch = useCallback(() => {
-    if (game) deal(0, game.players.map(() => 0), gameId + 1);
-  }, [game, gameId, deal]);
+    const base = roomRef.current;
+    if (!isHost || !base?.game) return;
+    countedRef.current = false;
+    const opening = openMatch(base.game.players.length); // fresh ₱20 ante, new pot
+    writeRoom({
+      game: dealFromSeats(base, 0),
+      wins: base.game.players.map(() => 0),
+      gameId: gameId + 1,
+      bet: opening.bet,
+      settleSeq: (base.settleSeq ?? 0) + 1,
+      settleDeltas: opening.deltas,
+    });
+  }, [isHost, gameId, writeRoom]);
 
   return {
     room,

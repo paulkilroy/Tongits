@@ -1,5 +1,6 @@
 import { type GameState } from "../engine/game";
 import { type RuleSet } from "../engine/rules";
+import { type BetState } from "../engine/betting";
 import type { LobbySeat } from "./Lobby";
 import { getClient } from "./client";
 
@@ -28,6 +29,10 @@ export interface RoomData {
   hostId?: string;
   started?: boolean;
   rules?: RuleSet; // chosen ruleset; playerCount is set to seats.length on start
+  // --- betting (pot / heater / ante; see engine/betting) ---
+  bet?: BetState;
+  settleSeq?: number; // monotonic id of the latest wallet settlement
+  settleDeltas?: number[]; // per-seat wallet change from that settlement
 }
 
 /** Read just the game kind of a room (defaults to tongits for legacy rooms). */

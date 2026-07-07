@@ -50,6 +50,7 @@ import {
   discard,
   callFight,
   canCallFight,
+  respondLaban,
   canTakeDiscard,
   type GameState,
 } from "./engine/game";
@@ -60,7 +61,6 @@ import { useAccount } from "./ui/useAccount";
 import { useFriends } from "./ui/useFriends";
 import { addBalance, type Account } from "./online/auth";
 import { findByCode, addFriend, acceptFriend, createChallenge, respondChallenge } from "./online/friends";
-import { settlementDelta } from "./engine/wallet";
 import { reviewRound, roundSegments } from "./engine/review";
 import { type TurnGrade, type Grade, type DeepOutcome } from "./engine/analysis";
 import {
@@ -1227,25 +1227,42 @@ function Table({
 
 function LocalGame({ onExit }: { onExit: () => void }) {
   const { state, setState, wins, target, matchOver, nextGame, newMatch } = useGame(1);
+  const iOweLaban = !!state.pendingLaban && state.pendingLaban.responses[0] === null;
   return (
-    <Table
-      state={state}
-      me={0}
-      wins={wins}
-      target={target}
-      matchOver={matchOver}
-      onAction={setState}
-      onNext={nextGame}
-      onNewMatch={() => newMatch((state.players.length - 1) as 1 | 2)}
-      onExit={onExit}
-      canControlMatch
-      headerExtra={
-        <>
-          <button onClick={() => newMatch(1)}>1 bot</button>
-          <button onClick={() => newMatch(2)}>2 bots</button>
-        </>
-      }
-    />
+    <>
+      {iOweLaban && (
+        <div className="reveal-backdrop">
+          <div className="reveal" style={{ maxWidth: 340 }}>
+            <h2 className="reveal-title">{state.players[state.pendingLaban!.caller].name} called Laban!</h2>
+            <p className="reveal-sub">Fold, or fight (lower unmatched hand wins)?</p>
+            <div className="modal-actions">
+              <button onClick={() => setState((s) => respondLaban(s, 0, "fold"))}>Fold</button>
+              <button className="big" onClick={() => setState((s) => respondLaban(s, 0, "fight"))}>
+                Fight
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <Table
+        state={state}
+        me={0}
+        wins={wins}
+        target={target}
+        matchOver={matchOver}
+        onAction={setState}
+        onNext={nextGame}
+        onNewMatch={() => newMatch((state.players.length - 1) as 1 | 2)}
+        onExit={onExit}
+        canControlMatch
+        headerExtra={
+          <>
+            <button onClick={() => newMatch(1)}>1 bot</button>
+            <button onClick={() => newMatch(2)}>2 bots</button>
+          </>
+        }
+      />
+    </>
   );
 }
 
@@ -1294,26 +1311,6 @@ function ShareControls({ code, big }: { code: string; big?: boolean }) {
 /* ------------------------------ online game ------------------------------ */
 
 // Settle a wallet at most once per game, surviving reloads.
-function settleKey(code: string, gameId: number): string {
-  return `${code}:${gameId}`;
-}
-function alreadySettled(key: string): boolean {
-  try {
-    return (JSON.parse(localStorage.getItem("tongits.settled") ?? "[]") as string[]).includes(key);
-  } catch {
-    return false;
-  }
-}
-function markSettled(key: string): void {
-  try {
-    const a = JSON.parse(localStorage.getItem("tongits.settled") ?? "[]") as string[];
-    a.push(key);
-    localStorage.setItem("tongits.settled", JSON.stringify(a.slice(-300)));
-  } catch {
-    /* ignore */
-  }
-}
-
 function OnlineGame({
   code,
   mySeat,
@@ -1331,28 +1328,31 @@ function OnlineGame({
   onBalance: (b: number) => void;
   onExit: () => void;
 }) {
-  const { room, game, wins, gameId, target, matchOver, connected, seats, started, isHost, meIndex, dispatch, start, addBot, nextGame, newMatch } =
+  const { room, game, wins, target, matchOver, connected, seats, started, isHost, meIndex, dispatch, start, addBot, nextGame, newMatch } =
     useOnlineMatch(code, mySeat);
   const me = meIndex >= 0 ? meIndex : 0;
   const [moneyDelta, setMoneyDelta] = useState<number | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   useTurnAlert(started && !!game && game.current === me && !game.result && !matchOver, "Tongits: your turn");
 
-  // When a round ends, settle this seat's wallet exactly once.
-  const result = game?.result;
+  // Apply each betting settlement (ante / win / pot / laban) to this seat's wallet
+  // exactly once. Deltas are computed once by the host and mirrored in the room;
+  // each client applies its own share, keyed by the monotonic settleSeq. Games
+  // with a bot seat are practice — no money.
+  const settleSeq = room?.settleSeq ?? 0;
+  const hasBot = seats.some((s) => s.isAI);
   useEffect(() => {
-    if (!result || !game) {
-      setMoneyDelta(null);
-      return;
-    }
-    const key = settleKey(code, gameId);
-    if (alreadySettled(key)) return;
-    markSettled(key);
-    const delta = settlementDelta(game, me);
+    const deltas = room?.settleDeltas;
+    if (!settleSeq || !deltas || hasBot) return;
+    const key = `${code}:seq`;
+    const last = Number(localStorage.getItem(key) ?? 0);
+    if (settleSeq <= last) return;
+    localStorage.setItem(key, String(settleSeq));
+    const delta = deltas[me] ?? 0;
     setMoneyDelta(delta || null);
     if (delta !== 0) void addBalance(delta).then((b) => b != null && onBalance(b));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, gameId]);
+  }, [settleSeq]);
 
   // Warn before a refresh / tab-close / back-navigation drops you out of the game.
   useEffect(() => {
@@ -1420,11 +1420,29 @@ function OnlineGame({
   }
 
   const otherName = game.players.find((_, i) => i !== me)?.name ?? "opponent";
-  const waiting = `Waiting for ${otherName}…`;
+  const bet = room?.bet;
+  const iOweLaban = !!game.pendingLaban && game.pendingLaban.responses[me] === null;
+  const waiting = game.pendingLaban ? "Laban called — fold or fight…" : `Waiting for ${otherName}…`;
+
+  const labanModal = iOweLaban ? (
+    <div className="reveal-backdrop">
+      <div className="reveal" style={{ maxWidth: 340 }}>
+        <h2 className="reveal-title">{game.players[game.pendingLaban!.caller].name} called Laban!</h2>
+        <p className="reveal-sub">Fold (pay ₱10) or fight (₱20 vs the caller — lower hand wins)?</p>
+        <div className="modal-actions">
+          <button onClick={() => dispatch(respondLaban(game, me, "fold"))}>Fold · ₱10</button>
+          <button className="big" onClick={() => dispatch(respondLaban(game, me, "fight"))}>
+            Fight · ₱20
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
       {leaveModal}
+      {labanModal}
       <Table
         state={game}
         me={me}
@@ -1442,6 +1460,12 @@ function OnlineGame({
         moneyDelta={moneyDelta}
         headerExtra={
           <>
+            {bet && !hasBot && (
+              <span className="code-chip">
+                Pot <strong>₱{bet.pot}</strong>
+                {bet.heater != null && ` · 🔥 ${me === bet.heater ? "you" : game.players[bet.heater]?.name ?? ""}`}
+              </span>
+            )}
             <span className="code-chip">
               Code <strong>{code}</strong>
             </span>
