@@ -153,16 +153,18 @@ export function useOnlineMatch(code: string, mySeat: LobbySeat) {
     if (!base || base.started || base.hostId !== mySeat.id) return;
     if ((base.seats?.length ?? 0) < MIN_TONGITS_SEATS) return;
     countedRef.current = false;
-    const opening = openMatch((base.seats ?? []).length); // everyone antes ₱20 into the pot
+    // The pot/heater/ante betting is a 3-player house rule; heads-up uses the
+    // simple per-hand stake (no ante, no pot).
+    const opening = (base.seats ?? []).length === 3 ? openMatch(3) : null;
     const next: RoomData = {
       ...base,
       started: true,
       game: dealFromSeats(base, 0),
       wins: (base.seats ?? []).map(() => 0),
       gameId: 1,
-      bet: opening.bet,
-      settleSeq: 1,
-      settleDeltas: opening.deltas,
+      bet: opening?.bet,
+      settleSeq: opening ? 1 : 0,
+      settleDeltas: opening?.deltas,
       version: base.version + 1,
     };
     if (await pushRoomDataVersioned(code, next, base.version)) apply(next);
@@ -192,21 +194,28 @@ export function useOnlineMatch(code: string, mySeat: LobbySeat) {
     return () => clearTimeout(id);
   }, [isHost, game, writeRoom]);
 
-  // Host: on a finished round, tally the win AND settle the pot/heater/ante — once.
+  // Host: on a finished round, tally the win AND settle wallets — once. 3-player
+  // uses the pot/heater/ante betting; heads-up uses the simple per-hand stake.
   useEffect(() => {
     if (!isHost || !game || !game.result || countedRef.current) return;
     countedRef.current = true;
+    const N = game.players.length;
     const winner = game.result.winner;
     const newWins = winner >= 0 ? wins.map((n, i) => (i === winner ? n + 1 : n)) : wins;
-    const outcome: HandOutcome = { playerCount: game.players.length, winner, laban: game.result.laban };
     const base = roomRef.current;
-    const settled = settleHand(base?.bet ?? freshBet(), outcome);
-    writeRoom({
-      wins: newWins,
-      bet: settled.bet,
-      settleSeq: (base?.settleSeq ?? 0) + 1,
-      settleDeltas: settled.deltas,
-    });
+    let deltas: number[];
+    let bet = base?.bet;
+    if (N === 3) {
+      const outcome: HandOutcome = { playerCount: N, winner, laban: game.result.laban };
+      const settled = settleHand(base?.bet ?? freshBet(), outcome);
+      deltas = settled.deltas;
+      bet = settled.bet;
+    } else {
+      // heads-up: loser pays the winner the stake (a TONGITS! win pays double)
+      const stake = (game.rules.stake ?? 10) * (game.result.reason === "tongits" ? 2 : 1);
+      deltas = game.players.map((_, i) => (winner < 0 ? 0 : i === winner ? stake : -stake));
+    }
+    writeRoom({ wins: newWins, bet, settleSeq: (base?.settleSeq ?? 0) + 1, settleDeltas: deltas });
   }, [isHost, game, wins, writeRoom]);
 
   const deal = useCallback(
@@ -227,14 +236,14 @@ export function useOnlineMatch(code: string, mySeat: LobbySeat) {
     const base = roomRef.current;
     if (!isHost || !base?.game) return;
     countedRef.current = false;
-    const opening = openMatch(base.game.players.length); // fresh ₱20 ante, new pot
+    const opening = base.game.players.length === 3 ? openMatch(3) : null; // fresh pot (3-player only)
     writeRoom({
       game: dealFromSeats(base, 0),
       wins: base.game.players.map(() => 0),
       gameId: gameId + 1,
-      bet: opening.bet,
+      bet: opening?.bet,
       settleSeq: (base.settleSeq ?? 0) + 1,
-      settleDeltas: opening.deltas,
+      settleDeltas: opening ? opening.deltas : base.game.players.map(() => 0),
     });
   }, [isHost, gameId, writeRoom]);
 

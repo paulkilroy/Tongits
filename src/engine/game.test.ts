@@ -153,7 +153,6 @@ describe("fight / laban", () => {
     ];
     s.players[1].hand = [card("K", "clubs"), card("Q", "hearts")]; // 20 points
     s = callFight(s);
-    s = respondLaban(s, 1, "fight");
     expect(s.result?.reason).toBe("showdown");
     expect(s.result?.winner).toBe(0);
     expect(s.result?.handPoints).toEqual([3, 20]);
@@ -168,7 +167,6 @@ describe("fight / laban", () => {
     s.players[0].hand = [card("2", "clubs")]; // caller, 2 points
     s.players[1].hand = [card("2", "hearts")]; // also 2 — a tie
     s = callFight(s); // player 0 calls
-    s = respondLaban(s, 1, "fight");
     expect(s.result?.winner).toBe(1); // caller loses the tie
     expect(s.result?.tupong).toBe(true);
   });
@@ -199,7 +197,6 @@ describe("fight / laban", () => {
     s.players[0].hand = [card("5", "clubs"), card("5", "diamonds"), card("5", "hearts"), card("2", "spades")];
     s.players[1].hand = [card("K", "clubs"), card("Q", "hearts")]; // 20
     s = callFight(s);
-    s = respondLaban(s, 1, "fight");
     expect(s.result?.handPoints).toEqual([2, 20]);
     expect(s.result?.winner).toBe(0);
   });

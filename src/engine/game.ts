@@ -254,6 +254,12 @@ export function callFight(state: GameState): GameState {
   if (!canCallFight(state)) return state;
   const s = clone(state);
   const caller = s.current;
+  // Heads-up (2 players): no fold/fight — a straight showdown, lowest wins (caller
+  // loses ties). Fold/fight is a 3-player house rule.
+  if (s.players.length === 2) {
+    note(s, `${currentPlayer(s).name} calls Laban!`);
+    return finish(s, "showdown", caller, caller);
+  }
   note(s, `${currentPlayer(s).name} calls Laban! Fold or fight.`);
   s.pendingLaban = {
     caller,
