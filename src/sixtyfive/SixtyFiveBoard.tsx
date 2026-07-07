@@ -5,6 +5,7 @@ import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
 import { analyze } from "./meld";
 import { type SFState } from "./game";
 import { SortToggle, type SortMode } from "../ui/handSort";
+import { PlayingCard } from "../ui/PlayingCard";
 
 /** Sort a "65" hand (jokers/wilds trail the end). */
 function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {
@@ -27,6 +28,7 @@ function Chip({
   selected,
   isNew,
   inMeld,
+  mini,
 }: {
   c: RCard;
   wild: boolean;
@@ -35,14 +37,21 @@ function Chip({
   selected?: boolean;
   isNew?: boolean;
   inMeld?: boolean;
+  mini?: boolean;
 }) {
-  const cls = `sf-chip ${isJoker(c) ? "s-joker" : SUIT_CLASS[c.suit as Suit]} ${wild ? "wild" : ""} ${dim ? "dim" : ""} ${selected ? "sel" : ""} ${isNew ? "new" : ""} ${inMeld ? "in-meld" : ""}`;
-  if (!onClick) return <span className={cls}>{rlabel(c)}</span>;
   return (
-    <button className={cls} onClick={onClick}>
-      {rlabel(c)}
-      {isNew && <span className="chip-new">new</span>}
-    </button>
+    <PlayingCard
+      label={rlabel(c)}
+      suitClass={isJoker(c) ? "" : SUIT_CLASS[c.suit as Suit]}
+      joker={isJoker(c)}
+      wild={wild}
+      dim={dim}
+      mini={mini}
+      selected={selected}
+      isNew={isNew}
+      inMeld={inMeld}
+      onClick={onClick}
+    />
   );
 }
 
@@ -121,13 +130,17 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                   {r.melds.map((m, k) => (
                     <span className="sf-meld" key={k}>
                       {m.map((c) => (
-                        <Chip key={c.id} c={c} wild={isWild(c, wild)} />
+                        <Chip key={c.id} c={c} wild={isWild(c, wild)} mini />
                       ))}
                     </span>
                   ))}
-                  {r.deadwood.map((c) => (
-                    <Chip key={c.id} c={c} wild={false} dim />
-                  ))}
+                  {r.deadwood.length > 0 && (
+                    <span className="sf-dead">
+                      {r.deadwood.map((c) => (
+                        <Chip key={c.id} c={c} wild={false} dim mini />
+                      ))}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

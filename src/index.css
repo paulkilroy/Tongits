@@ -865,6 +865,21 @@ h1 {
   border-color: #ff5a5a;
   box-shadow: 0 0 10px #ff5a5a99;
 }
+/* extra card states for the wild games (65) */
+.card.joker,
+.mc.joker {
+  background: #ffd65a;
+  color: #1a1a1a;
+}
+.card.wild,
+.mc.wild {
+  outline: 2px solid #ffd65a;
+  outline-offset: 1px;
+}
+.card.dim,
+.mc.dim {
+  opacity: 0.5;
+}
 .tag {
   position: absolute;
   top: -8px;
@@ -2769,25 +2784,8 @@ h1 {
   background: rgba(90, 200, 120, 0.18);
   border-radius: 8px;
 }
-.sf-dead { display: inline-flex; gap: 2px; padding: 3px; border: 1px dashed rgba(255, 120, 120, 0.5); border-radius: 8px; }
-/* Match the Tongits/Cribbage `.card` size so every game's cards are the same. */
-.sf-chip {
-  min-width: 2.9rem;
-  padding: 0.55rem 0.4rem;
-  border-radius: 10px;
-  border: none;
-  background: #fff;
-  /* colour comes from the shared .s-* suit classes (four-colour deck) */
-  font-weight: 700;
-  font-size: 1.05rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-}
-.sf-chip:disabled { cursor: default; }
-/* suit colours come from the shared four-colour rules (.s-heart/.s-diamond/…) */
-.sf-chip.s-joker { background: #ffd65a; color: #1a1a1a; }
-.sf-chip.wild { outline: 2px solid #ffd65a; }
-.sf-chip.dim { opacity: 0.6; }
+.sf-dead { display: inline-flex; gap: 2px; padding: 3px; border: 1px dashed rgba(255, 120, 120, 0.5); border-radius: 8px; align-items: center; }
+/* 65 / Gin render the shared <PlayingCard> (.card/.mc) — no bespoke chip styles. */
 .sf-actions {
   display: flex;
   flex-direction: column;
@@ -2813,20 +2811,4 @@ h1 {
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.4rem;
-}
-.sf-chip { position: relative; transition: transform 0.08s ease; }
-.sf-chip.in-meld { box-shadow: inset 0 -4px 0 rgba(90, 200, 120, 0.8); }
-.sf-chip.sel { transform: translateY(-6px); outline: 2px solid #ffd65a; }
-.sf-chip.new { outline: 2px solid #6ad6ff; }
-.chip-new {
-  position: absolute;
-  top: -7px;
-  right: -5px;
-  background: #6ad6ff;
-  color: #06263a;
-  font-size: 0.5rem;
-  font-weight: 800;
-  padding: 0 3px;
-  border-radius: 4px;
-  letter-spacing: 0.02em;
 }

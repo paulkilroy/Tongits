@@ -29,9 +29,10 @@ export interface RoundResult {
   undercut: boolean;
   scorer: number;
   points: number;
-  melds: Card[][]; // knocker's melds (with any lay-offs appended)
+  knockerMelds: Card[][]; // knocker's melds, with the defender's lay-offs appended
   knockerDeadwood: Card[];
-  defenderDeadwood: Card[];
+  defenderMelds: Card[][];
+  defenderDeadwood: Card[]; // what's left after laying off onto the knocker
 }
 
 export interface GinState {
@@ -197,8 +198,9 @@ export function knock(state: GinState, cardId_: string): GinState {
     undercut,
     scorer,
     points,
-    melds: layoffMelds.concat(dMelds),
+    knockerMelds: layoffMelds,
     knockerDeadwood: kDead,
+    defenderMelds: dMelds,
     defenderDeadwood: dDead,
   };
   note(s, `${p.name} ${gin ? "goes GIN" : "knocks"}. ${s.players[scorer].name} +${points}.`);

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { BackButton } from "../ui/Icon";
-import { type Card, cardId, cardLabel, SUIT_CLASS } from "../engine/cards";
+import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
 import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
+import { PlayingCard } from "../ui/PlayingCard";
 
 function Chip({
   c,
@@ -12,6 +13,7 @@ function Chip({
   selected,
   isNew,
   inMeld,
+  mini,
 }: {
   c: Card;
   onClick?: () => void;
@@ -19,14 +21,19 @@ function Chip({
   selected?: boolean;
   isNew?: boolean;
   inMeld?: boolean;
+  mini?: boolean;
 }) {
-  const cls = `sf-chip ${SUIT_CLASS[c.suit]} ${dim ? "dim" : ""} ${selected ? "sel" : ""} ${isNew ? "new" : ""} ${inMeld ? "in-meld" : ""}`;
-  if (!onClick) return <span className={cls}>{cardLabel(c)}</span>;
   return (
-    <button className={cls} onClick={onClick}>
-      {cardLabel(c)}
-      {isNew && <span className="chip-new">new</span>}
-    </button>
+    <PlayingCard
+      label={cardLabel(c)}
+      suitClass={SUIT_CLASS[c.suit]}
+      dim={dim}
+      mini={mini}
+      selected={selected}
+      isNew={isNew}
+      inMeld={inMeld}
+      onClick={onClick}
+    />
   );
 }
 
@@ -99,18 +106,38 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
               {g.players[g.round.scorer].name} +{g.round.points}
               {g.round.undercut ? " (undercut!)" : ""}
             </h2>
-            <div className="sf-melds">
-              {g.round.melds.map((m, k) => (
-                <span className="sf-meld" key={k}>
-                  {m.map((c) => (
-                    <Chip key={cardId(c)} c={c} />
+            {[
+              { seat: g.round.knocker, melds: g.round.knockerMelds, dead: g.round.knockerDeadwood, tag: "knocks" },
+              {
+                seat: (g.round.knocker + 1) % 2,
+                melds: g.round.defenderMelds,
+                dead: g.round.defenderDeadwood,
+                tag: "defends",
+              },
+            ].map(({ seat, melds, dead, tag }) => (
+              <div className="sf-reveal" key={seat}>
+                <div className="sf-reveal-name">
+                  {seat === me ? "You" : g.players[seat].name} · {tag} ·{" "}
+                  <strong>{dead.reduce((a, c) => a + cardPoints(c), 0)} deadwood</strong>
+                </div>
+                <div className="sf-melds">
+                  {melds.map((m, k) => (
+                    <span className="sf-meld" key={k}>
+                      {m.map((c) => (
+                        <Chip key={cardId(c)} c={c} mini />
+                      ))}
+                    </span>
                   ))}
-                </span>
-              ))}
-            </div>
-            <div className="cr-lbl">
-              knocker deadwood {g.round.knockerDeadwood.length} · defender left {g.round.defenderDeadwood.length}
-            </div>
+                  {dead.length > 0 && (
+                    <span className="sf-dead">
+                      {dead.map((c) => (
+                        <Chip key={cardId(c)} c={c} dim mini />
+                      ))}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
             {onNextRound ? (
               <button className="big play-primary" onClick={onNextRound}>
                 Next hand

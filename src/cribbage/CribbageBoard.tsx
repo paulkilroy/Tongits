@@ -8,7 +8,7 @@ import { CribReview } from "./CribReview";
 import { CribGameReview } from "./CribGameReview";
 import { BackButton } from "../ui/Icon";
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
-
+import { PlayingCard } from "../ui/PlayingCard";
 
 export function CribCard({
   card,
@@ -24,14 +24,14 @@ export function CribCard({
   mini?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      className={`${mini ? "mc" : "card"} ${SUIT_CLASS[card.suit]} ${selected ? "selected" : ""}`}
+    <PlayingCard
+      label={cardLabel(card)}
+      suitClass={SUIT_CLASS[card.suit]}
+      mini={mini}
+      selected={selected}
+      disabled={disabled}
       onClick={onClick}
-      disabled={disabled || !onClick}
-    >
-      {cardLabel(card)}
-    </button>
+    />
   );
 }
 
