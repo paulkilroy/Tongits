@@ -50,7 +50,7 @@ export const STANDARD_RULES: RuleSet = {
   enableLaban: true,
   mustHaveMeldToCall: true,
   allowSapawOnOpponents: true,
-  sapawLockAllRound: true,
+  sapawLockAllRound: false, // Paul's table: sapaw blocks Laban only the next turn
   tongitsBonus: 0,
   challengeAfterTongits: false,
   stockExhaustion: "lowestHandWins",

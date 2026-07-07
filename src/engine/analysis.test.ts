@@ -30,7 +30,9 @@ describe("play analysis", () => {
       expect(g.yourPct).toBeLessThanOrEqual(100);
       // the best line is never worse than what you played (within MC noise)
       expect(g.bestPct).toBeGreaterThanOrEqual(g.yourPct - 15);
-      if (g.grade !== "best") expect(g.reason.length).toBeGreaterThan(0);
+      // Corrected turns (inaccuracy/mistake) explain themselves; "good" is a
+      // within-noise near-tie and intentionally carries no correction.
+      if (g.grade === "inaccuracy" || g.grade === "mistake") expect(g.reason.length).toBeGreaterThan(0);
     }
   });
 

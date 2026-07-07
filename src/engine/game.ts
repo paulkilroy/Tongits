@@ -325,23 +325,16 @@ function endByStockEmpty(s: GameState): GameState {
     s.result = { reason: "stockEmpty", winner, handPoints: points };
     return s;
   }
-  return finish(s, "stockEmpty", lowestHand(points));
+  return finish(s, "stockEmpty", -1); // finish recomputes the winner (with the tiebreak)
 }
 
-function lowestHand(points: number[]): number {
-  let winner = -1;
-  let best = Infinity;
-  let tie = false;
-  points.forEach((pt, i) => {
-    if (pt < best) {
-      best = pt;
-      winner = i;
-      tie = false;
-    } else if (pt === best) {
-      tie = true;
-    }
-  });
-  return tie ? -1 : winner;
+/** Lowest hand wins; a tie goes to the most recent player to have played — the
+ *  closest predecessor of `current` in turn order (house rule for stock-out). */
+function lowestHandRecent(points: number[], current: number, count: number): number {
+  const min = Math.min(...points);
+  const tied = points.map((p, i) => (p === min ? i : -1)).filter((i) => i >= 0);
+  const recency = (i: number) => (current - 1 - i + count) % count; // 0 = played most recently
+  return tied.reduce((best, i) => (recency(i) < recency(best) ? i : best), tied[0]);
 }
 
 /** Lowest hand wins. On a tie for lowest the CALLER LOSES — they needed strictly
@@ -375,7 +368,7 @@ function finish(
     resolvedWinner = r.winner;
     tupong = r.tupong;
   } else if (reason === "stockEmpty") {
-    resolvedWinner = lowestHand(points);
+    resolvedWinner = lowestHandRecent(points, s.current, s.players.length);
   }
   s.result = { reason, winner: resolvedWinner, handPoints: points, caller, tupong };
   const w = s.players[resolvedWinner];

@@ -18,6 +18,26 @@ function twoPlayer(seed = 1): GameState {
   return newRound({ ...STANDARD_RULES, playerCount: 2 }, seed, ["You", "Bot"], [false, true]);
 }
 
+function threePlayer(seed = 1): GameState {
+  return newRound({ ...STANDARD_RULES, playerCount: 3 }, seed, ["A", "B", "C"], [false, false, false]);
+}
+
+describe("stock-out tiebreak", () => {
+  it("a tie for lowest goes to the most recent player to have played", () => {
+    let s = threePlayer();
+    s.stock = []; // stock is empty
+    s.phase = "draw";
+    s.current = 1; // player 1 is about to draw and can't → predecessor (player 0) is most recent
+    // Players 0 and 2 tie for the lowest hand (one unmatched 5 = 5 pts each); player 1 is higher.
+    s.players[0] = { ...s.players[0], hand: [card("5", "hearts")], melds: [] };
+    s.players[1] = { ...s.players[1], hand: [card("K", "spades")], melds: [] };
+    s.players[2] = { ...s.players[2], hand: [card("5", "clubs")], melds: [] };
+    s = draw(s, "stock"); // triggers the stock-empty resolution
+    expect(s.result?.reason).toBe("stockEmpty");
+    expect(s.result?.winner).toBe(0); // most recent player breaks the 0-vs-2 tie
+  });
+});
+
 describe("dealing", () => {
   it("gives the dealer 13 and the opponent 12, rest to stock", () => {
     const s = twoPlayer();
@@ -213,8 +233,9 @@ describe("sapaw lock (burned Laban)", () => {
     expect(canCallFight(s)).toBe(true);
   });
 
-  it("rest-of-round mode (default): stays burned for the whole round", () => {
-    let s = twoPlayer(); // STANDARD_RULES → sapawLockAllRound true
+  it("rest-of-round mode: stays burned for the whole round", () => {
+    let s = twoPlayer();
+    s.rules = { ...s.rules, sapawLockAllRound: true };
     s.players[0].melds = [
       { kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] },
     ];
