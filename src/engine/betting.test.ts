@@ -1,14 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  openMatch,
-  settleHand,
-  labanWinner,
-  freshBet,
-  ANTE,
-  RE_ANTE,
-  type BetState,
-  type HandOutcome,
-} from "./betting";
+import { openMatch, settleHand, labanWinner, ANTE, RE_ANTE, type BetState, type HandOutcome } from "./betting";
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
