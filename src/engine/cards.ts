@@ -10,6 +10,15 @@ export const SUIT_SYMBOL: Record<Suit, string> = {
   spades: "♠",
 };
 
+/** CSS class per suit, driving the shared four-colour deck (see index.css). Every
+ *  card game uses this so suit colouring is identical everywhere. */
+export const SUIT_CLASS: Record<Suit, string> = {
+  clubs: "s-club",
+  diamonds: "s-diamond",
+  hearts: "s-heart",
+  spades: "s-spade",
+};
+
 // Ranks ace–king. The numeric value is the *sequence order* used for runs (ace low).
 // Scoring points are separate — see `cardPoints`.
 export const RANKS = [

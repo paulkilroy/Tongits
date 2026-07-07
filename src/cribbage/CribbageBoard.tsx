@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
+import { type Card, cardId, cardLabel, SUIT_CLASS } from "../engine/cards";
 import { type CribState, legalPlays, canPlay, roundComplete, discardCount } from "./game";
 import { describeShow } from "./scoring";
 import { analyzeDiscard, gradeDiscard, type DiscardEval } from "./coach";
@@ -9,12 +9,6 @@ import { CribGameReview } from "./CribGameReview";
 import { BackButton } from "../ui/Icon";
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 
-const SUIT_CLASS: Record<Suit, string> = {
-  clubs: "s-club",
-  diamonds: "s-diamond",
-  hearts: "s-heart",
-  spades: "s-spade",
-};
 
 export function CribCard({
   card,

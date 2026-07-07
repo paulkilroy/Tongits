@@ -6,7 +6,7 @@ import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { type Card, type Suit, SUITS, cardId, cardLabel, rankOrder } from "./engine/cards";
+import { type Card, type Suit, SUITS, SUIT_CLASS, cardId, cardLabel, rankOrder } from "./engine/cards";
 import { CribbageMenu } from "./cribbage/CribbageMenu";
 import { CribbageGame } from "./cribbage/CribbageGame";
 import { OnlineCribbage } from "./cribbage/OnlineCribbage";
@@ -92,13 +92,6 @@ function meldCardIds(hand: readonly Card[]): Set<string> {
 
 const suitIndex = (s: Suit) => SUITS.indexOf(s);
 
-// Four-colour deck for readability: ♥ red, ♦ blue, ♣ green, ♠ black.
-const SUIT_CLASS: Record<Suit, string> = {
-  clubs: "s-club",
-  diamonds: "s-diamond",
-  hearts: "s-heart",
-  spades: "s-spade",
-};
 
 function sortHand(hand: readonly Card[], mode: SortMode): Card[] {
   const cmp =

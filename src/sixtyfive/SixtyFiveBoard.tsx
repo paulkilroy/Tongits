@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { BackButton } from "../ui/Icon";
-import { type Suit, SUITS } from "../engine/cards";
+import { type Suit, SUITS, SUIT_CLASS } from "../engine/cards";
 import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
 import { analyze } from "./meld";
 import { type SFState } from "./game";
 import { SortToggle, type SortMode } from "../ui/handSort";
-
-const SUIT_CLASS: Record<Suit, string> = { clubs: "s-club", diamonds: "s-diamond", hearts: "s-heart", spades: "s-spade" };
 
 /** Sort a "65" hand (jokers/wilds trail the end). */
 function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {

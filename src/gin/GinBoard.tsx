@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { BackButton } from "../ui/Icon";
-import { type Card, type Suit, cardId, cardLabel } from "../engine/cards";
+import { type Card, cardId, cardLabel, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
 import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
-
-const SUIT_CLASS: Record<Suit, string> = { clubs: "s-club", diamonds: "s-diamond", hearts: "s-heart", spades: "s-spade" };
 
 function Chip({
   c,

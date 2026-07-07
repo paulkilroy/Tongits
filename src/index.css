@@ -2775,16 +2775,15 @@ h1 {
   padding: 0.35rem 0.2rem;
   border-radius: 6px;
   border: none;
-  background: #f4f1e8;
-  color: #111;
+  background: #fff;
+  /* colour comes from the shared .s-* suit classes (four-colour deck) */
   font-weight: 800;
   font-size: 0.9rem;
   cursor: pointer;
 }
 .sf-chip:disabled { cursor: default; }
-.sf-chip.s-heart, .sf-chip.s-diamond { color: #c0392b; }
-.sf-chip.s-club, .sf-chip.s-spade { color: #111; }
-.sf-chip.s-joker { background: #ffd65a; }
+/* suit colours come from the shared four-colour rules (.s-heart/.s-diamond/…) */
+.sf-chip.s-joker { background: #ffd65a; color: #1a1a1a; }
 .sf-chip.wild { outline: 2px solid #ffd65a; }
 .sf-chip.dim { opacity: 0.6; }
 .sf-actions {
