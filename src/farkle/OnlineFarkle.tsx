@@ -20,7 +20,7 @@ export function OnlineFarkle({
   onInvite: (friendId: string) => void;
   onExit: () => void;
 }) {
-  const { room, game: g, connected, seats, started, isHost, meIndex, write, start, restart } = useOnlineFarkle(
+  const { room, game: g, connected, seats, started, isHost, meIndex, write, start, addBot, restart } = useOnlineFarkle(
     code,
     me,
   );
@@ -64,6 +64,7 @@ export function OnlineFarkle({
         friends={friends}
         onInvite={onInvite}
         onStart={start}
+        onAddBot={addBot}
         onExit={onExit}
       />
     );
