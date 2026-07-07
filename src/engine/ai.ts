@@ -14,6 +14,8 @@ import {
   canCallFight,
   canTakeDiscard,
   discardFormsMeld,
+  respondLaban,
+  pendingResponders,
 } from "./game";
 
 // A simple greedy AI. It draws, lays down every meld it can, sapaws its spare
@@ -70,8 +72,24 @@ function sapawAll(state: GameState): GameState {
 }
 
 /** Play one complete AI turn, returning the state after it ends (or wins). */
+const FIGHT_THRESHOLD = 12; // an AI fights a Laban with this few points or fewer, else folds
+
+/** If a Laban is pending, make the next AI responder fold or fight. */
+export function respondLabanAI(state: GameState): GameState {
+  if (!state.pendingLaban) return state;
+  for (const seat of pendingResponders(state)) {
+    if (state.players[seat].isAI) {
+      const pts = handPoints(deadwood(state.players[seat].hand));
+      return respondLaban(state, seat, pts <= FIGHT_THRESHOLD ? "fight" : "fold");
+    }
+  }
+  return state;
+}
+
 export function takeAITurn(state: GameState): GameState {
-  if (state.result || !currentPlayer(state).isAI) return state;
+  if (state.result) return state;
+  if (state.pendingLaban) return respondLabanAI(state); // answer a pending Laban first
+  if (!currentPlayer(state).isAI) return state;
   let s = state;
 
   if (s.phase === "draw") {

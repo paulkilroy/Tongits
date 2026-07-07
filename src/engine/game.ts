@@ -4,6 +4,7 @@ import { type Meld, classifyMeld, canLayOff, canLayOffMany } from "./melds";
 import { handPoints } from "./scoring";
 import { deadwood } from "./meldFinder";
 import { type RuleSet } from "./rules";
+import { labanWinner, type LabanResponse } from "./betting";
 
 // At a showdown you're judged only on your UNMATCHED cards — cards that don't
 // form a meld. Melds you hold in hand ("secret" melds) don't count against you.
@@ -42,6 +43,14 @@ export interface RoundResult {
   handPoints: number[]; // each player's remaining hand points
   caller?: number; // who called the fight, for showdowns
   tupong?: boolean; // true if a showdown tie was broken in the caller's favour
+  /** For a Laban hand: everyone's fold/fight, for the pairwise money settlement. */
+  laban?: { caller: number; responses: LabanResponse[]; handPoints: number[] };
+}
+
+/** After someone calls Laban, each other player must fold or fight before it resolves. */
+export interface PendingLaban {
+  caller: number;
+  responses: (LabanResponse | null)[]; // "caller" for the caller, null until a reply
 }
 
 export interface GameState {
@@ -63,6 +72,8 @@ export interface GameState {
   /** A card taken from the discard pile that MUST be played (melded/sapawed)
    *  before the player can discard. Null once it's been played. */
   mustPlay: Card | null;
+  /** Set while a Laban call is awaiting fold/fight replies from the others. */
+  pendingLaban: PendingLaban | null;
 }
 
 const clone = (s: GameState): GameState => structuredClone(s);
@@ -120,6 +131,7 @@ export function newRound(
     labanBlocked: false,
     lastDrawn: null,
     mustPlay: null,
+    pendingLaban: null,
   };
   return state;
 }
@@ -236,13 +248,57 @@ export function discard(state: GameState, card: Card): GameState {
   return s;
 }
 
-/** Laban (call a fight): only at the START of your turn, before drawing.
- *  Everyone compares hands; the lowest points wins the round. */
+/** Laban (call a fight): only at the START of your turn, before drawing. Each other
+ *  player must then fold or fight (see respondLaban) before the hand resolves. */
 export function callFight(state: GameState): GameState {
   if (!canCallFight(state)) return state;
   const s = clone(state);
-  note(s, `${currentPlayer(s).name} calls Laban!`);
-  return finish(s, "showdown", s.current, s.current);
+  const caller = s.current;
+  note(s, `${currentPlayer(s).name} calls Laban! Fold or fight.`);
+  s.pendingLaban = {
+    caller,
+    responses: s.players.map((_, i) => (i === caller ? "caller" : null)),
+  };
+  return s;
+}
+
+/** Seats still owing a fold/fight reply to the pending Laban. */
+export function pendingResponders(state: GameState): number[] {
+  const pl = state.pendingLaban;
+  if (!pl) return [];
+  return pl.responses.map((r, i) => (r === null ? i : -1)).filter((i) => i >= 0);
+}
+
+/** A player answers a Laban call. When everyone has, the hand resolves (lowest of
+ *  the caller + fighters wins; folders are out; the caller loses ties). */
+export function respondLaban(state: GameState, player: number, response: "fold" | "fight"): GameState {
+  const pl = state.pendingLaban;
+  if (!pl || pl.responses[player] !== null) return state;
+  const s = clone(state);
+  s.pendingLaban!.responses[player] = response;
+  note(s, `${s.players[player].name} ${response === "fold" ? "folds" : "fights"}.`);
+  if (s.pendingLaban!.responses.every((r) => r !== null)) resolveLaban(s);
+  return s;
+}
+
+function resolveLaban(s: GameState): void {
+  const pl = s.pendingLaban!;
+  const responses = pl.responses as LabanResponse[];
+  const points = s.players.map((p) => scoreHand(p.hand));
+  const winner = labanWinner(pl.caller, responses, points);
+  const contenders = responses.map((r, i) => (i === pl.caller || r === "fight" ? i : -1)).filter((i) => i >= 0);
+  const min = Math.min(...contenders.map((i) => points[i]));
+  const tupong = contenders.filter((i) => points[i] === min).length > 1; // a tie was broken
+  s.pendingLaban = null;
+  s.result = {
+    reason: "showdown",
+    winner,
+    handPoints: points,
+    caller: pl.caller,
+    tupong,
+    laban: { caller: pl.caller, responses, handPoints: points },
+  };
+  note(s, `${s.players[winner].name} wins the Laban.`);
 }
 
 /** Whether the current player may call Laban right now (start of turn only). */
