@@ -16,6 +16,7 @@ import {
   discardFormsMeld,
   respondLaban,
   pendingResponders,
+  canFightLaban,
 } from "./game";
 
 // A simple greedy AI. It draws, lays down every meld it can, sapaws its spare
@@ -80,7 +81,8 @@ export function respondLabanAI(state: GameState): GameState {
   for (const seat of pendingResponders(state)) {
     if (state.players[seat].isAI) {
       const pts = handPoints(deadwood(state.players[seat].hand));
-      return respondLaban(state, seat, pts <= FIGHT_THRESHOLD ? "fight" : "fold");
+      const fight = canFightLaban(state, seat) && pts <= FIGHT_THRESHOLD;
+      return respondLaban(state, seat, fight ? "fight" : "fold");
     }
   }
   return state;

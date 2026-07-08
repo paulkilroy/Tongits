@@ -35,7 +35,11 @@ describe("Laban fold/fight", () => {
       hand: [card("5", "hearts")], // 5 pts
       burned: false,
     };
-    s.players[1] = { ...s.players[1], hand: [card("3", "clubs")], melds: [] }; // 3 pts (lowest)
+    s.players[1] = {
+      ...s.players[1],
+      hand: [card("3", "clubs")], // 3 pts (lowest)
+      melds: [{ kind: "set", cards: [card("7", "clubs"), card("7", "hearts"), card("7", "spades")] }], // meld → may fight
+    };
     s.players[2] = { ...s.players[2], hand: [card("K", "spades"), card("Q", "hearts")], melds: [] };
     s.labanBlocked = false;
 
@@ -50,6 +54,24 @@ describe("Laban fold/fight", () => {
     expect(s.result?.reason).toBe("showdown");
     expect(s.result?.winner).toBe(1); // fighter 1 (3 pts) beats caller 0 (5); folder 2 is out
     expect(s.result?.laban?.responses).toEqual(["caller", "fight", "fold"]);
+  });
+
+  it("you can't fight a Laban without a meld down (must fold)", () => {
+    let s = threePlayer();
+    s.phase = "draw";
+    s.current = 0;
+    s.players[0] = {
+      ...s.players[0],
+      melds: [{ kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] }],
+      hand: [card("4", "hearts")],
+    };
+    s.players[1] = { ...s.players[1], melds: [], hand: [card("2", "clubs")] }; // no meld
+    s.players[2] = { ...s.players[2], melds: [], hand: [card("K", "spades")] };
+    s = callFight(s);
+    expect(respondLaban(s, 1, "fight")).toBe(s); // no meld → fight rejected (no change)
+    s = respondLaban(s, 1, "fold"); // must fold instead
+    s = respondLaban(s, 2, "fold");
+    expect(s.result?.winner).toBe(0); // caller wins uncontested
   });
 });
 

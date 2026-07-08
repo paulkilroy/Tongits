@@ -51,6 +51,7 @@ import {
   callFight,
   canCallFight,
   respondLaban,
+  canFightLaban,
   canTakeDiscard,
   type GameState,
 } from "./engine/game";
@@ -1234,12 +1235,16 @@ function LocalGame({ onExit }: { onExit: () => void }) {
         <div className="reveal-backdrop">
           <div className="reveal" style={{ maxWidth: 340 }}>
             <h2 className="reveal-title">{state.players[state.pendingLaban!.caller].name} called Laban!</h2>
-            <p className="reveal-sub">Fold, or fight (lower unmatched hand wins)?</p>
+            <p className="reveal-sub">
+              {canFightLaban(state, 0) ? "Fold, or fight (lower unmatched hand wins)?" : "No meld down — you can only fold."}
+            </p>
             <div className="modal-actions">
               <button onClick={() => setState((s) => respondLaban(s, 0, "fold"))}>Fold</button>
-              <button className="big" onClick={() => setState((s) => respondLaban(s, 0, "fight"))}>
-                Fight
-              </button>
+              {canFightLaban(state, 0) && (
+                <button className="big" onClick={() => setState((s) => respondLaban(s, 0, "fight"))}>
+                  Fight
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1428,12 +1433,18 @@ function OnlineGame({
     <div className="reveal-backdrop">
       <div className="reveal" style={{ maxWidth: 340 }}>
         <h2 className="reveal-title">{game.players[game.pendingLaban!.caller].name} called Laban!</h2>
-        <p className="reveal-sub">Fold (pay ₱10) or fight (₱20 vs the caller — lower hand wins)?</p>
+        <p className="reveal-sub">
+          {canFightLaban(game, me)
+            ? "Fold (pay ₱10) or fight (₱20 vs the caller — lower hand wins)?"
+            : "You have no meld down, so you can only fold (pay ₱10)."}
+        </p>
         <div className="modal-actions">
           <button onClick={() => dispatch(respondLaban(game, me, "fold"))}>Fold · ₱10</button>
-          <button className="big" onClick={() => dispatch(respondLaban(game, me, "fight"))}>
-            Fight · ₱20
-          </button>
+          {canFightLaban(game, me) && (
+            <button className="big" onClick={() => dispatch(respondLaban(game, me, "fight"))}>
+              Fight · ₱20
+            </button>
+          )}
         </div>
       </div>
     </div>

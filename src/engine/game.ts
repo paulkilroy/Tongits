@@ -275,11 +275,18 @@ export function pendingResponders(state: GameState): number[] {
   return pl.responses.map((r, i) => (r === null ? i : -1)).filter((i) => i >= 0);
 }
 
+/** To FIGHT a Laban you must have a meld down (same as calling one), when the rule
+ *  requires it. With no meld you can only fold. */
+export function canFightLaban(state: GameState, player: number): boolean {
+  return !state.rules.mustHaveMeldToCall || state.players[player].melds.length > 0;
+}
+
 /** A player answers a Laban call. When everyone has, the hand resolves (lowest of
  *  the caller + fighters wins; folders are out; the caller loses ties). */
 export function respondLaban(state: GameState, player: number, response: "fold" | "fight"): GameState {
   const pl = state.pendingLaban;
   if (!pl || pl.responses[player] !== null) return state;
+  if (response === "fight" && !canFightLaban(state, player)) return state; // no meld → can't fight
   const s = clone(state);
   s.pendingLaban!.responses[player] = response;
   note(s, `${s.players[player].name} ${response === "fold" ? "folds" : "fights"}.`);
