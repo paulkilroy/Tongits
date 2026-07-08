@@ -261,10 +261,13 @@ export function callFight(state: GameState): GameState {
     return finish(s, "showdown", caller, caller);
   }
   note(s, `${currentPlayer(s).name} calls Laban! Fold or fight.`);
+  // Opponents with no meld down can't fight, so they auto-fold (no prompt). If that
+  // leaves nobody able to fight, the caller wins the Laban automatically.
   s.pendingLaban = {
     caller,
-    responses: s.players.map((_, i) => (i === caller ? "caller" : null)),
+    responses: s.players.map((_, i) => (i === caller ? "caller" : canFightLaban(s, i) ? null : "fold")),
   };
+  if (s.pendingLaban.responses.every((r) => r !== null)) resolveLaban(s);
   return s;
 }
 

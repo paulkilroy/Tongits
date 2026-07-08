@@ -990,6 +990,10 @@ function Table({
   }
 
   const sapawLocked = state.rules.sapawLockAllRound ? meP.burned : state.labanBlocked;
+  // A player whose meld was sapaw'd is burned — they can't call/fight Laban until
+  // it clears. Shown with a 🔥 so everyone can see it.
+  const isBurned = (i: number) =>
+    state.players[i].burned || state.players[i].meldSapawed || (i === state.current && state.labanBlocked);
   const instruction = !isMyTurn
     ? statusNote ?? `Waiting for ${state.players[state.current].name}…`
     : inDraw
@@ -1074,6 +1078,7 @@ function Table({
             <div className="opp-head">
               <strong>
                 {p.avatar} {p.name}
+                {isBurned(i) && <span className="fire" title="sapaw'd — can't Laban">🔥</span>}
               </strong>
               <span className="count">{p.hand.length} cards</span>
             </div>
@@ -1138,6 +1143,7 @@ function Table({
       <section className="hand-area">
         <div className="section-label">
           Your hand · <strong>{unmatched}</strong> unmatched pts
+          {isBurned(me) && <span className="fire" title="your meld was sapaw'd — Laban locked">🔥</span>}
           <span className="legend"> · green = meld · drag to reorder</span>
         </div>
         <div className="hand-controls">
@@ -1191,7 +1197,7 @@ function Table({
           Labyog
         </button>
         <button className="laban" disabled={!canCall} onClick={() => act(callFight(state))}>
-          Laban!
+          {isMyTurn && sapawLocked ? "🔥 Laban locked" : "Laban!"}
         </button>
       </section>
 

@@ -44,16 +44,31 @@ describe("Laban fold/fight", () => {
     s.labanBlocked = false;
 
     s = callFight(s);
-    expect(s.pendingLaban).not.toBeNull();
+    expect(s.pendingLaban).not.toBeNull(); // seat 2 (no meld) auto-folds; seat 1 must answer
     expect(s.result).toBeNull();
 
-    s = respondLaban(s, 1, "fight");
-    expect(s.result).toBeNull(); // still waiting on seat 2
-    s = respondLaban(s, 2, "fold");
+    s = respondLaban(s, 1, "fight"); // seat 1 fights → resolves (seat 2 already auto-folded)
 
     expect(s.result?.reason).toBe("showdown");
     expect(s.result?.winner).toBe(1); // fighter 1 (3 pts) beats caller 0 (5); folder 2 is out
     expect(s.result?.laban?.responses).toEqual(["caller", "fight", "fold"]);
+  });
+
+  it("a Laban auto-wins (no prompts) when you're the only one with a meld down", () => {
+    let s = threePlayer();
+    s.phase = "draw";
+    s.current = 0;
+    s.players[0] = {
+      ...s.players[0],
+      melds: [{ kind: "set", cards: [card("9", "clubs"), card("9", "hearts"), card("9", "spades")] }],
+      hand: [card("8", "hearts")], // 8 pts — even though the others hold less, they can't fight
+    };
+    s.players[1] = { ...s.players[1], melds: [], hand: [card("2", "clubs")] };
+    s.players[2] = { ...s.players[2], melds: [], hand: [card("3", "diamonds")] };
+    s = callFight(s);
+    expect(s.pendingLaban).toBeNull(); // resolved immediately — nobody could fight
+    expect(s.result?.winner).toBe(0);
+    expect(s.result?.laban?.responses).toEqual(["caller", "fold", "fold"]);
   });
 
   it("you can't fight a Laban without a meld down (must fold)", () => {
