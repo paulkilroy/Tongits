@@ -5,6 +5,7 @@ import { bestMelds } from "../engine/meldFinder";
 import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
+import { DiscardHistory } from "../ui/DiscardHistory";
 
 function Chip({
   c,
@@ -56,6 +57,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
 
   const [sel, setSel] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
+  const [showDiscards, setShowDiscards] = useState(false);
   useEffect(() => setSel(null), [g.current, g.phase]);
 
   const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
@@ -165,13 +167,25 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
               </button>
               <button
                 className="sf-pile"
-                disabled={!(myTurn && g.phase === "draw") || !discardTop}
-                onClick={() => onDraw("discard")}
+                disabled={g.discard.length === 0}
+                onClick={() => setShowDiscards(true)}
               >
                 {discardTop ? <Chip c={discardTop} /> : <span className="cr-lbl">—</span>}
-                <span className="cr-lbl">discard</span>
+                <span className="cr-lbl">discard · {g.discard.length}</span>
               </button>
             </div>
+
+            {showDiscards && (
+              <DiscardHistory
+                count={g.discard.length}
+                onClose={() => setShowDiscards(false)}
+                onTake={myTurn && g.phase === "draw" ? () => { setShowDiscards(false); onDraw("discard"); } : undefined}
+              >
+                {[...g.discard].reverse().map((c, i) => (
+                  <Chip key={`${cardId(c)}-${i}`} c={c} mini />
+                ))}
+              </DiscardHistory>
+            )}
 
             <div className="sf-analyzer">
               <div className="sf-a-head">

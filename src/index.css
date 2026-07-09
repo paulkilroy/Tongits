@@ -2824,3 +2824,14 @@ h1 {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.75; transform: scale(1.12); }
 }
+
+/* discard-pile history overlay */
+.dh-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 0.5rem 0.2rem;
+}

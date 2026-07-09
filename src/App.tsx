@@ -37,6 +37,8 @@ import { listActiveGames, recordActiveGame, forgetActiveGame, type ActiveGame } 
 import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/Lobby";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
+import { PlayingCard } from "./ui/PlayingCard";
+import { DiscardHistory } from "./ui/DiscardHistory";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -897,6 +899,7 @@ function Table({
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
+  const [showDiscards, setShowDiscards] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [event, setEvent] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
@@ -1110,8 +1113,8 @@ function Table({
         <button
           type="button"
           className={`pile discard ${canTake ? "takeable" : inDraw ? "notyet" : ""}`}
-          disabled={!(inDraw && !!topDiscard(state))}
-          onClick={takeDiscard}
+          disabled={state.discard.length === 0}
+          onClick={() => setShowDiscards(true)}
         >
           <span className="pile-label">Kawat</span>
           {topDiscard(state) ? (
@@ -1121,8 +1124,22 @@ function Table({
           ) : (
             <span className="pile-top empty">—</span>
           )}
+          {state.discard.length > 1 && <span className="pile-count">{state.discard.length}</span>}
         </button>
       </section>
+
+      {showDiscards && (
+        <DiscardHistory
+          count={state.discard.length}
+          onClose={() => setShowDiscards(false)}
+          onTake={canTake ? () => { setShowDiscards(false); takeDiscard(); } : undefined}
+          takeLabel="Kawat this card"
+        >
+          {[...state.discard].reverse().map((c, i) => (
+            <PlayingCard key={`${cardId(c)}-${i}`} label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
+          ))}
+        </DiscardHistory>
+      )}
 
       {meP.melds.length > 0 && (
         <section className="your-melds">
