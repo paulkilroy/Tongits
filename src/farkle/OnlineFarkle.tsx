@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { roll, setAside, bank, nextTurn, takePiggyback } from "./game";
+import { aiStep } from "./ai";
 import { FarkleBoard } from "./FarkleBoard";
 import { useOnlineFarkle, MIN_FARKLE_SEATS, MAX_FARKLE_SEATS } from "./online";
 import { Lobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
@@ -28,6 +30,13 @@ export function OnlineFarkle({
   const seat = meIndex >= 0 ? meIndex : 0;
   const myTurn = started && !!g && g.current === seat && !g.result;
   useTurnAlert(myTurn, `${gameName}: your roll`);
+
+  // Host drives bot seats, one action at a time so rolls/set-asides are watchable.
+  useEffect(() => {
+    if (!isHost || !g || g.result || !g.players[g.current]?.isAI) return;
+    const t = setTimeout(() => write(aiStep(g)), 1000);
+    return () => clearTimeout(t);
+  }, [isHost, g, write]);
 
   if (!room) {
     return (
