@@ -1113,8 +1113,8 @@ function Table({
         <button
           type="button"
           className={`pile discard ${canTake ? "takeable" : inDraw ? "notyet" : ""}`}
-          disabled={state.discard.length === 0}
-          onClick={() => setShowDiscards(true)}
+          disabled={!(inDraw && !!topDiscard(state))}
+          onClick={takeDiscard}
         >
           <span className="pile-label">Kawat</span>
           {topDiscard(state) ? (
@@ -1124,17 +1124,24 @@ function Table({
           ) : (
             <span className="pile-top empty">—</span>
           )}
-          {state.discard.length > 1 && <span className="pile-count">{state.discard.length}</span>}
         </button>
+
+        {state.discard.length > 0 && (
+          <button type="button" className="pile histfan" onClick={() => setShowDiscards(true)} title="see all discards">
+            <span className="pile-label">all {state.discard.length}</span>
+            <span className="histfan-cards">
+              {state.discard.slice(-3).map((c, i) => (
+                <span className="histfan-card" key={i}>
+                  <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
+                </span>
+              ))}
+            </span>
+          </button>
+        )}
       </section>
 
       {showDiscards && (
-        <DiscardHistory
-          count={state.discard.length}
-          onClose={() => setShowDiscards(false)}
-          onTake={canTake ? () => { setShowDiscards(false); takeDiscard(); } : undefined}
-          takeLabel="Kawat this card"
-        >
+        <DiscardHistory count={state.discard.length} onClose={() => setShowDiscards(false)}>
           {[...state.discard].reverse().map((c, i) => (
             <PlayingCard key={`${cardId(c)}-${i}`} label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
           ))}

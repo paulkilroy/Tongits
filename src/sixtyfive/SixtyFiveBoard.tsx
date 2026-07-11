@@ -177,20 +177,28 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
               </button>
               <button
                 className="sf-pile"
-                disabled={g.discard.length === 0}
-                onClick={() => setShowDiscards(true)}
+                disabled={!(myTurn && g.phase === "draw") || !discardTop}
+                onClick={() => onDraw("discard")}
               >
                 {discardTop ? <Chip c={discardTop} wild={isWild(discardTop, wild)} /> : <span className="cr-lbl">—</span>}
-                <span className="cr-lbl">discard · {g.discard.length}</span>
+                <span className="cr-lbl">take discard</span>
               </button>
+              {g.discard.length > 0 && (
+                <button className="sf-histfan" onClick={() => setShowDiscards(true)} title="see all discards">
+                  <span className="histfan-cards">
+                    {g.discard.slice(-3).map((c, i) => (
+                      <span className="histfan-card" key={i}>
+                        <Chip c={c} wild={isWild(c, wild)} mini />
+                      </span>
+                    ))}
+                  </span>
+                  <span className="cr-lbl">all {g.discard.length}</span>
+                </button>
+              )}
             </div>
 
             {showDiscards && (
-              <DiscardHistory
-                count={g.discard.length}
-                onClose={() => setShowDiscards(false)}
-                onTake={myTurn && g.phase === "draw" ? () => { setShowDiscards(false); onDraw("discard"); } : undefined}
-              >
+              <DiscardHistory count={g.discard.length} onClose={() => setShowDiscards(false)}>
                 {[...g.discard].reverse().map((c, i) => (
                   <Chip key={`${c.id}-${i}`} c={c} wild={isWild(c, wild)} mini />
                 ))}
