@@ -99,7 +99,7 @@ export function newGame(names: string[], ai: boolean[]): SFState {
     reveals: null,
     result: null,
     log: [],
-    seedCtr: 1234567,
+    seedCtr: Math.floor(Math.random() * 2 ** 31), // random so every game deals differently
     turns: 0,
   };
   dealRound(s);

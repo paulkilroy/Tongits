@@ -87,7 +87,7 @@ export function newGame(names: string[], ai: boolean[]): GinState {
     round: null,
     result: null,
     log: [],
-    seedCtr: 987654,
+    seedCtr: Math.floor(Math.random() * 2 ** 31), // random so every game deals differently
   };
   deal(s);
   return s;
