@@ -48,6 +48,7 @@ export interface GinState {
   result: { winner: number } | null;
   log: string[];
   seedCtr: number;
+  handNo: number; // increments each deal — lets the UI scope its per-hand review
 }
 
 const clone = (s: GinState): GinState => structuredClone(s);
@@ -71,6 +72,7 @@ function deal(s: GinState): void {
   s.drewFrom = null;
   s.drawnId = null;
   s.round = null;
+  s.handNo = (s.handNo ?? 0) + 1;
   note(s, `${s.players[s.dealer].name} deals. ${s.players[p0].name} to draw.`);
 }
 
@@ -88,6 +90,7 @@ export function newGame(names: string[], ai: boolean[]): GinState {
     result: null,
     log: [],
     seedCtr: Math.floor(Math.random() * 2 ** 31), // random so every game deals differently
+    handNo: 0,
   };
   deal(s);
   return s;

@@ -2860,3 +2860,35 @@ h1 {
 }
 .histfan-card:nth-child(2) { transform: rotate(2deg); }
 .histfan-card:nth-child(3) { transform: rotate(7deg); }
+
+/* Gin post-hand coach */
+.gin-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 44vh;
+  overflow-y: auto;
+  text-align: left;
+  margin: 0.4rem 0;
+}
+.gin-rev-turn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid transparent;
+  font-size: 0.78rem;
+}
+.gin-rev-turn.grade-best { border-left-color: #36c46a; }
+.gin-rev-turn.grade-good { border-left-color: #8fd14f; }
+.gin-rev-turn.grade-inaccuracy { border-left-color: #ffb24a; }
+.gin-rev-turn.grade-mistake { border-left-color: #ff5a5a; }
+.gin-rev-n { font-weight: 800; opacity: 0.6; min-width: 1.5rem; }
+.gin-rev-threw { display: inline-flex; align-items: center; gap: 0.3rem; }
+.gin-rev-note { opacity: 0.85; }
+.gin-review strong.grade-best { color: #4ade80; text-transform: capitalize; }
+.gin-review strong.grade-good { color: #a3e635; text-transform: capitalize; }
+.gin-review strong.grade-inaccuracy { color: #ffb24a; text-transform: capitalize; }
+.gin-review strong.grade-mistake { color: #ff6b6b; text-transform: capitalize; }

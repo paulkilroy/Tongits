@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackButton } from "../ui/Icon";
 import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
@@ -6,6 +6,7 @@ import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game"
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { DiscardHistory } from "../ui/DiscardHistory";
+import { reviewGinHand, type GinTurn } from "./review";
 
 function Chip({
   c,
@@ -58,7 +59,30 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const [sel, setSel] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [showDiscards, setShowDiscards] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   useEffect(() => setSel(null), [g.current, g.phase]);
+
+  // Record my turns this hand (the 8-card hand I held + what I threw) for the
+  // post-hand coach. Resets when a new hand is dealt.
+  const turnsRef = useRef<GinTurn[]>([]);
+  const pendingRef = useRef<{ hand8: Card[]; drewDiscard: boolean } | null>(null);
+  const handNoRef = useRef(g.handNo);
+  useEffect(() => {
+    if (g.handNo !== handNoRef.current) {
+      handNoRef.current = g.handNo;
+      turnsRef.current = [];
+      pendingRef.current = null;
+    }
+    const myHand = g.players[me].hand;
+    if (g.current === me && g.phase === "discard" && myHand.length === 8 && !pendingRef.current) {
+      pendingRef.current = { hand8: myHand.map((c) => ({ rank: c.rank, suit: c.suit })), drewDiscard: g.drewFrom === "discard" };
+    } else if (pendingRef.current && myHand.length === 7) {
+      const disc = pendingRef.current.hand8.find((c) => !myHand.some((x) => cardId(x) === cardId(c)));
+      if (disc) turnsRef.current.push({ hand8: pendingRef.current.hand8, discarded: disc, drewDiscard: pendingRef.current.drewDiscard });
+      pendingRef.current = null;
+    }
+  }, [g, me]);
+  const review = showReview ? reviewGinHand(turnsRef.current) : null;
 
   const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
   const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
@@ -140,13 +164,20 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 </div>
               </div>
             ))}
-            {onNextRound ? (
-              <button className="big play-primary" onClick={onNextRound}>
-                Next hand
-              </button>
-            ) : (
-              <div className="cr-lbl">waiting for the next hand…</div>
-            )}
+            <div className="cr-row2">
+              {turnsRef.current.length > 0 && (
+                <button className="cr-coach-btn" onClick={() => setShowReview(true)}>
+                  🔍 Review my hand
+                </button>
+              )}
+              {onNextRound ? (
+                <button className="big play-primary" onClick={onNextRound}>
+                  Next hand
+                </button>
+              ) : (
+                <div className="cr-lbl">waiting for the next hand…</div>
+              )}
+            </div>
           </div>
         ) : g.result ? (
           <div className="cr-phase cr-over">
@@ -237,6 +268,36 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
               )}
             </div>
           </>
+        )}
+
+        {review && (
+          <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
+            <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+              <h2 className="reveal-title">Hand review</h2>
+              <p className="cr-lbl">
+                {review.couldKnockTurn && review.couldKnockTurn < review.knockedTurn
+                  ? `You could have knocked on turn ${review.couldKnockTurn} — you went out on turn ${review.knockedTurn}.`
+                  : "Good knock timing — you went out as soon as you could."}
+              </p>
+              <div className="gin-review">
+                {review.turns.map((t) => (
+                  <div className={`gin-rev-turn grade-${t.grade}`} key={t.n}>
+                    <span className="gin-rev-n">T{t.n}</span>
+                    <span className="gin-rev-threw">
+                      threw <PlayingCard label={cardLabel(t.discarded)} suitClass={SUIT_CLASS[t.discarded.suit]} mini />
+                    </span>
+                    <span className="gin-rev-note">
+                      <strong className={`grade-${t.grade}`}>{t.grade}</strong>
+                      {t.grade !== "best" && ` · ${t.note}`} · {t.deadwoodAfter} dw
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="modal-actions">
+                <button onClick={() => setShowReview(false)}>Close</button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </main>
