@@ -2892,3 +2892,17 @@ h1 {
 .gin-review strong.grade-good { color: #a3e635; text-transform: capitalize; }
 .gin-review strong.grade-inaccuracy { color: #ffb24a; text-transform: capitalize; }
 .gin-review strong.grade-mistake { color: #ff6b6b; text-transform: capitalize; }
+
+.gin-knock {
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3px solid transparent;
+  font-size: 0.85rem;
+  margin: 0.3rem 0 0.6rem;
+  line-height: 1.35;
+}
+.gin-knock.grade-best { border-left-color: #36c46a; }
+.gin-knock.grade-good { border-left-color: #8fd14f; }
+.gin-knock.grade-mistake { border-left-color: #ff5a5a; }

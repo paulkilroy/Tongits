@@ -6,7 +6,7 @@ import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game"
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { DiscardHistory } from "../ui/DiscardHistory";
-import { reviewGinHand, type GinTurn } from "./review";
+import { reviewGinHand, type GinObs } from "./review";
 
 function Chip({
   c,
@@ -62,27 +62,43 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const [showReview, setShowReview] = useState(false);
   useEffect(() => setSel(null), [g.current, g.phase]);
 
-  // Record my turns this hand (the 8-card hand I held + what I threw) for the
-  // post-hand coach. Resets when a new hand is dealt.
-  const turnsRef = useRef<GinTurn[]>([]);
-  const pendingRef = useRef<{ hand8: Card[]; drewDiscard: boolean } | null>(null);
+  // Record this hand's observations for the post-hand coach: my own turns (hand +
+  // discard) plus what's OBSERVABLE about the opponent — their pickups off the pile
+  // and turn count. We see intermediate states because each draw/discard is its own
+  // update. Resets when a new hand is dealt.
+  const obsRef = useRef<GinObs>({ myTurns: [], oppPickups: 0, oppTurns: 0, oppDiscards: [] });
+  const pendingRef = useRef<Record<number, { drewDiscard: boolean; hand8?: Card[] }>>({});
   const handNoRef = useRef(g.handNo);
   useEffect(() => {
     if (g.handNo !== handNoRef.current) {
       handNoRef.current = g.handNo;
-      turnsRef.current = [];
-      pendingRef.current = null;
+      obsRef.current = { myTurns: [], oppPickups: 0, oppTurns: 0, oppDiscards: [] };
+      pendingRef.current = {};
     }
-    const myHand = g.players[me].hand;
-    if (g.current === me && g.phase === "discard" && myHand.length === 8 && !pendingRef.current) {
-      pendingRef.current = { hand8: myHand.map((c) => ({ rank: c.rank, suit: c.suit })), drewDiscard: g.drewFrom === "discard" };
-    } else if (pendingRef.current && myHand.length === 7) {
-      const disc = pendingRef.current.hand8.find((c) => !myHand.some((x) => cardId(x) === cardId(c)));
-      if (disc) turnsRef.current.push({ hand8: pendingRef.current.hand8, discarded: disc, drewDiscard: pendingRef.current.drewDiscard });
-      pendingRef.current = null;
+    for (let p = 0; p < g.players.length; p++) {
+      const hp = g.players[p].hand;
+      if (g.current === p && g.phase === "discard" && hp.length === 8 && !pendingRef.current[p]) {
+        // just drew, about to discard
+        pendingRef.current[p] = {
+          drewDiscard: g.drewFrom === "discard",
+          hand8: p === me ? hp.map((c) => ({ rank: c.rank, suit: c.suit })) : undefined,
+        };
+      } else if (pendingRef.current[p] && hp.length === 7) {
+        const pend = pendingRef.current[p];
+        const top = g.discard[g.discard.length - 1]; // whatever they just threw
+        if (p === me) {
+          const disc = pend.hand8?.find((c) => !hp.some((x) => cardId(x) === cardId(c)));
+          if (pend.hand8 && disc) obsRef.current.myTurns.push({ hand8: pend.hand8, discarded: disc, drewDiscard: pend.drewDiscard });
+        } else {
+          obsRef.current.oppTurns += 1;
+          if (pend.drewDiscard) obsRef.current.oppPickups += 1;
+          if (top) obsRef.current.oppDiscards.push({ rank: top.rank, suit: top.suit });
+        }
+        delete pendingRef.current[p];
+      }
     }
   }, [g, me]);
-  const review = showReview ? reviewGinHand(turnsRef.current) : null;
+  const review = showReview ? reviewGinHand(obsRef.current) : null;
 
   const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
   const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
@@ -165,7 +181,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
               </div>
             ))}
             <div className="cr-row2">
-              {turnsRef.current.length > 0 && (
+              {obsRef.current.myTurns.length > 0 && (
                 <button className="cr-coach-btn" onClick={() => setShowReview(true)}>
                   🔍 Review my hand
                 </button>
@@ -274,11 +290,29 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
           <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
             <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
               <h2 className="reveal-title">Hand review</h2>
-              <p className="cr-lbl">
-                {review.couldKnockTurn && review.couldKnockTurn < review.knockedTurn
-                  ? `You could have knocked on turn ${review.couldKnockTurn} — you went out on turn ${review.knockedTurn}.`
-                  : "Good knock timing — you went out as soon as you could."}
-              </p>
+              {review.knock && (
+                <div
+                  className={`gin-knock grade-${
+                    review.knock.verdict === "gin" || review.knock.verdict === "strong"
+                      ? "best"
+                      : review.knock.verdict === "fair"
+                        ? "good"
+                        : "mistake"
+                  }`}
+                >
+                  <strong className={`grade-${review.knock.verdict === "risky" ? "mistake" : review.knock.verdict === "fair" ? "good" : "best"}`}>
+                    {review.knock.verdict === "gin"
+                      ? "Gin"
+                      : review.knock.verdict === "strong"
+                        ? "Strong knock"
+                        : review.knock.verdict === "fair"
+                          ? "Fair knock"
+                          : "Risky knock"}
+                  </strong>{" "}
+                  · {review.knock.note}
+                </div>
+              )}
+              <p className="cr-lbl">per-turn discards</p>
               <div className="gin-review">
                 {review.turns.map((t) => (
                   <div className={`gin-rev-turn grade-${t.grade}`} key={t.n}>
