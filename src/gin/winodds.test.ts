@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { card } from "../engine/cards";
 import { makeRng } from "../engine/deck";
 import { newGame, type GinState } from "./game";
-import { estimateGinWinOdds } from "./winodds";
+import { estimateGinWinOdds, ginGame } from "./winodds";
+import { chooseByMC } from "../game/cardGame";
 
 const base = newGame(["You", "Bot"], [false, true]);
 
@@ -46,5 +47,27 @@ describe("gin monte-carlo win odds", () => {
     const bad = estimateGinWinOdds(pos(weak), 0, 150, makeRng(7));
     expect(good).toBeGreaterThan(bad);
     expect(good).toBeGreaterThan(0.6);
+  });
+});
+
+describe("generic config-driven AI (chooseByMC) on Gin", () => {
+  // Seat 0 at a discard decision, gin-ready after throwing the loose K.
+  function discardPos(): GinState {
+    const s = structuredClone(base);
+    s.players[0].hand = [...strong, card("K", "spades")];
+    s.players[1].hand = base.players[1].hand.slice(0, 7);
+    s.current = 0;
+    s.phase = "discard";
+    s.discard = [card("Q", "clubs")];
+    s.deck = [];
+    s.round = null;
+    s.result = null;
+    return s;
+  }
+
+  it("picks the knock that wins the hand", () => {
+    const move = chooseByMC(ginGame, discardPos(), 0, { samples: 40 }, makeRng(3));
+    expect(move).not.toBeNull();
+    expect(move!.id.startsWith("knock:")).toBe(true);
   });
 });
