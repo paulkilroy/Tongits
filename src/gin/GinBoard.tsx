@@ -6,6 +6,7 @@ import { sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewModal } from "../ui/ReviewModal";
+import { WinGraph } from "../ui/WinGraph";
 import { reviewGinHand, type GinObs } from "./review";
 import { analyzeGinTurns, ginReviewToText } from "./analysis";
 
@@ -285,6 +286,16 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
             toText={() => ginReviewToText(reviewTurns, knockReview)}
             onClose={() => setShowReview(false)}
             discardTitle="If you discard… · chance of success"
+            header={(step, setStep) => (
+              <>
+                <div className="wg-caption">
+                  Chance of success · {reviewTurns[0].yourPct}% →{" "}
+                  <strong>{reviewTurns[reviewTurns.length - 1].yourPct}%</strong>
+                  <span className="wg-legend"> · dot colour = play grade</span>
+                </div>
+                <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
+              </>
+            )}
             extra={(_t, i) =>
               knockReview && i === reviewTurns.length - 1 ? (
                 <div className="rp-section">

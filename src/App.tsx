@@ -39,6 +39,7 @@ import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/L
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewModal } from "./ui/ReviewModal";
+import { WinGraph } from "./ui/WinGraph";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
 import { DiscardPiles } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
@@ -385,46 +386,6 @@ const GRADE_LABEL: Record<Grade, string> = {
   blunder: "Blunder",
 };
 
-function WinGraph({
-  grades,
-  current,
-  onSelect,
-}: {
-  grades: TurnGrade[];
-  current?: number;
-  onSelect?: (i: number) => void;
-}) {
-  const W = 520;
-  const H = 130;
-  const pad = 8;
-  const n = grades.length;
-  const x = (i: number) => (n === 1 ? W / 2 : pad + (i / (n - 1)) * (W - 2 * pad));
-  const y = (pct: number) => pad + (1 - pct / 100) * (H - 2 * pad);
-  const line = grades.map((g, i) => `${x(i)},${y(g.yourPct)}`).join(" ");
-  const area =
-    `M ${x(0)},${H - pad} ` +
-    grades.map((g, i) => `L ${x(i)},${y(g.yourPct)}`).join(" ") +
-    ` L ${x(n - 1)},${H - pad} Z`;
-  return (
-    <svg className="wingraph" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label="win odds graph">
-      <line className="wg-mid" x1={pad} x2={W - pad} y1={y(50)} y2={y(50)} />
-      <path className="wg-area" d={area} />
-      <polyline className="wg-line" points={line} />
-      {current != null && <line className="wg-cursor" x1={x(current)} x2={x(current)} y1={pad} y2={H - pad} />}
-      {grades.map((g, i) => (
-        <circle
-          key={i}
-          cx={x(i)}
-          cy={y(g.yourPct)}
-          r={current === i ? 5.5 : 3.6}
-          className={`wg-dot grade-${g.grade} ${current === i ? "active" : ""} ${onSelect ? "clickable" : ""}`}
-          onClick={onSelect ? () => onSelect(i) : undefined}
-        />
-      ))}
-    </svg>
-  );
-}
-
 function reviewToText(result: ReturnType<typeof reviewRound>, grades: TurnGrade[] | null): string {
   const out: string[] = ["Tongits — Game Review", ""];
   if (grades && grades.length) {
@@ -728,7 +689,7 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
               Win odds · {grades[0].yourPct}% → <strong>{grades[grades.length - 1].yourPct}%</strong>
               <span className="wg-legend"> · dot colour = play grade</span>
             </div>
-            <WinGraph grades={grades} current={Math.min(step, grades.length - 1)} onSelect={setStep} />
+            <WinGraph turns={turns} current={Math.min(step, turns.length - 1)} onSelect={setStep} />
           </>
         ) : null
       ) : (
