@@ -727,8 +727,9 @@ h1 {
 /* Stock + discard */
 .center {
   display: flex;
-  gap: 1rem;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0.9rem 0;
 }
 .pile {
@@ -2766,7 +2767,33 @@ h1 {
   cursor: pointer;
 }
 .sf-pile:disabled { opacity: 0.5; cursor: default; }
+/* Yellow "your move" edge on a pile you can act on this turn. */
+.sf-pile.hot {
+  border-color: #ffd65a;
+  box-shadow: 0 0 0 2px #ffd65a66, 0 0 12px #ffd65a44;
+  animation: pile-glow 1.6s ease-in-out infinite;
+}
+@keyframes pile-glow {
+  0%, 100% { box-shadow: 0 0 0 2px #ffd65a55, 0 0 8px #ffd65a33; }
+  50% { box-shadow: 0 0 0 2px #ffd65a99, 0 0 16px #ffd65a66; }
+}
 .sf-pile-back { font-size: 2rem; }
+
+/* subtle toggle — the discard history stays hidden until you tap it open */
+.disc-fan-toggle {
+  align-self: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.74rem;
+  padding: 0.2rem 0.8rem;
+  cursor: pointer;
+}
+.disc-fan-toggle.open {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
 .sf-analyzer {
   background: rgba(0, 0, 0, 0.22);
   border-radius: 10px;

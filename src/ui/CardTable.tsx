@@ -67,14 +67,18 @@ export function ScoreRow({ players }: { players: ScorePlayer[] }) {
   );
 }
 
-/** Draw pile + discard pile + the "fan out every discard" graphic and its inline
- *  animated fan. `renderCard(card, mini)` lets the game draw its own card visual. */
+/** Draw pile + discard pile, with the whole discard history hidden behind a subtle
+ *  toggle that fans every card out in place (nothing shown until you tap it). The
+ *  two piles glow a yellow "your move" edge while they're actionable.
+ *  `renderCard(card, mini)` lets the game draw its own card visual. */
 export function DiscardPiles<T>({
   stockCount,
+  stockLabel = "stock",
   canDrawStock,
   onDrawStock,
   discard,
   topCard,
+  takeLabel = "take discard",
   canTakeDiscard,
   onTakeDiscard,
   renderCard,
@@ -82,10 +86,12 @@ export function DiscardPiles<T>({
   setFanned,
 }: {
   stockCount: number;
+  stockLabel?: string;
   canDrawStock: boolean;
   onDrawStock: () => void;
   discard: T[];
   topCard: T | null;
+  takeLabel?: string;
   canTakeDiscard: boolean;
   onTakeDiscard: () => void;
   renderCard: (card: T, mini: boolean) => ReactNode;
@@ -95,27 +101,23 @@ export function DiscardPiles<T>({
   return (
     <>
       <div className="sf-piles">
-        <button className="sf-pile" disabled={!canDrawStock} onClick={onDrawStock}>
+        <button className={`sf-pile ${canDrawStock ? "hot" : ""}`} disabled={!canDrawStock} onClick={onDrawStock}>
           <span className="sf-pile-back">🂠</span>
-          <span className="cr-lbl">stock {stockCount}</span>
+          <span className="cr-lbl">
+            {stockLabel} {stockCount}
+          </span>
         </button>
-        <button className="sf-pile" disabled={!canTakeDiscard} onClick={onTakeDiscard}>
+        <button className={`sf-pile ${canTakeDiscard ? "hot" : ""}`} disabled={!canTakeDiscard} onClick={onTakeDiscard}>
           {topCard ? renderCard(topCard, false) : <span className="cr-lbl">—</span>}
-          <span className="cr-lbl">take discard</span>
+          <span className="cr-lbl">{takeLabel}</span>
         </button>
-        {discard.length > 1 && (
-          <button className={`sf-histfan ${fanned ? "open" : ""}`} onClick={() => setFanned(!fanned)} title="fan out all discards">
-            <span className="histfan-cards">
-              {discard.slice(0, -1).slice(-3).map((c, i) => (
-                <span className="histfan-card" key={i}>
-                  {renderCard(c, true)}
-                </span>
-              ))}
-            </span>
-            <span className="cr-lbl">all {discard.length}</span>
-          </button>
-        )}
       </div>
+
+      {discard.length > 1 && (
+        <button className={`disc-fan-toggle ${fanned ? "open" : ""}`} onClick={() => setFanned(!fanned)}>
+          {fanned ? "▲ hide discards" : `▾ all ${discard.length} discards`}
+        </button>
+      )}
 
       {fanned && discard.length > 1 && (
         <div className="disc-fanout" onClick={() => setFanned(false)}>

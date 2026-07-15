@@ -40,6 +40,7 @@ import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewReplay } from "./ui/ReviewReplay";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
+import { DiscardPiles } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -921,7 +922,6 @@ function Table({
   const canDiscard = inAction && selected.length === 1 && !mustPlay;
   const canBaba = inAction && (selectedMeld !== null || sapawTarget !== null);
   const canCall = inDraw && canCallFight(state);
-  const canTake = inDraw && canTakeDiscard(state);
 
   function buklad() {
     if (selectedMeld) act(layMeld(state, selected));
@@ -1053,60 +1053,21 @@ function Table({
       </section>
 
       <section className="center">
-        <button
-          type="button"
-          className="pile stock"
-          disabled={!inDraw}
-          onClick={() => act(draw(state, "stock"))}
-        >
-          <span className="pile-label">Bulit</span>
-          <span className="pile-count">{state.stock.length}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`pile discard ${canTake ? "takeable" : inDraw ? "notyet" : ""}`}
-          disabled={!(inDraw && !!topDiscard(state))}
-          onClick={takeDiscard}
-        >
-          <span className="pile-label">Kawat</span>
-          {topDiscard(state) ? (
-            <span className={`pile-top ${SUIT_CLASS[topDiscard(state)!.suit]}`}>
-              {cardLabel(topDiscard(state)!)}
-            </span>
-          ) : (
-            <span className="pile-top empty">—</span>
-          )}
-        </button>
-
-        {state.discard.length > 1 && (
-          <button
-            type="button"
-            className={`pile histfan ${fanned ? "open" : ""}`}
-            onClick={() => setFanned((f) => !f)}
-            title="fan out all discards"
-          >
-            <span className="pile-label">all {state.discard.length}</span>
-            <span className="histfan-cards">
-              {state.discard.slice(0, -1).slice(-3).map((c, i) => (
-                <span className="histfan-card" key={i}>
-                  <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
-                </span>
-              ))}
-            </span>
-          </button>
-        )}
+        <DiscardPiles
+          stockCount={state.stock.length}
+          stockLabel="Bulit"
+          canDrawStock={inDraw}
+          onDrawStock={() => act(draw(state, "stock"))}
+          discard={state.discard}
+          topCard={topDiscard(state) ?? null}
+          takeLabel="Kawat"
+          canTakeDiscard={inDraw && !!topDiscard(state)}
+          onTakeDiscard={takeDiscard}
+          renderCard={(c, mini) => <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini={mini} />}
+          fanned={fanned}
+          setFanned={setFanned}
+        />
       </section>
-
-      {fanned && state.discard.length > 1 && (
-        <div className="disc-fanout" onClick={() => setFanned(false)}>
-          {[...state.discard].reverse().map((c, i) => (
-            <span className="disc-fanout-card" style={{ animationDelay: `${i * 28}ms` }} key={`${cardId(c)}-${i}`}>
-              <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
-            </span>
-          ))}
-        </div>
-      )}
 
       {meP.melds.length > 0 && (
         <section className="your-melds">
