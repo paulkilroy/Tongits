@@ -926,7 +926,7 @@ function Table({
           discard={state.discard}
           topCard={topDiscard(state) ?? null}
           takeLabel="Kawat"
-          canTakeDiscard={inDraw && !!topDiscard(state)}
+          canTakeDiscard={inDraw && !!topDiscard(state) && canTakeDiscard(state)}
           onTakeDiscard={takeDiscard}
           renderCard={(c, mini) => <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini={mini} />}
           fanned={fanned}
