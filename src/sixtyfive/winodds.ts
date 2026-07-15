@@ -1,6 +1,7 @@
 import { type RCard, buildShoe, deckCount, rlabel } from "./rules";
 import { type SFState, draw, discard, payMe, canPayMe } from "./game";
 import { takeAITurn } from "./ai";
+import { makeRng } from "../engine/deck";
 import { type CardGame, type Option, evaluate } from "../game/cardGame";
 
 // 65 as a CardGame<SFState>. Multi-deck shoe, concealed hands, lowest deadwood wins
@@ -64,4 +65,42 @@ export const sixtyfiveGame: CardGame<SFState> = {
 /** Win % (lowest-hand) for `seat` from this position, 0-1, over `samples` playouts. */
 export function estimateSixtyFiveWinOdds(state: SFState, seat: number, samples: number, rng: () => number): number {
   return evaluate(sixtyfiveGame, state, seat, samples, rng);
+}
+
+export interface SixtyFiveOutcome {
+  youOut: number; // you went out (Pay Me) and won
+  youLow: number; // you had the lowest hand without going out
+  oppOut: number; // an opponent went out
+  youHigh: number; // you finished with a higher hand
+  winPct: number;
+  samples: number;
+}
+
+/** Full outcome breakdown for the deep-dive panel. */
+export function sixtyFiveAutopsy(state: SFState, seat: number, samples: number, seed: number): SixtyFiveOutcome {
+  const rng = makeRng(seed);
+  const b = { youOut: 0, youLow: 0, oppOut: 0, youHigh: 0 };
+  let resolved = 0;
+  for (let i = 0; i < samples; i++) {
+    let s = sixtyfiveGame.determinize(state, seat, rng);
+    for (let guard = 0; guard < 400 && !sixtyfiveGame.isTerminal(s); guard++) s = sixtyfiveGame.step(s, rng);
+    if (!s.reveals) continue;
+    resolved++;
+    const min = Math.min(...s.reveals.map((r) => r.points));
+    const won = s.reveals[seat].points === min;
+    const wentOut = s.paidBy === seat;
+    if (won && wentOut) b.youOut++;
+    else if (won) b.youLow++;
+    else if (s.paidBy != null && s.paidBy !== seat) b.oppOut++;
+    else b.youHigh++;
+  }
+  const f = (n: number) => (resolved ? n / resolved : 0);
+  return {
+    youOut: f(b.youOut),
+    youLow: f(b.youLow),
+    oppOut: f(b.oppOut),
+    youHigh: f(b.youHigh),
+    winPct: f(b.youOut + b.youLow),
+    samples: resolved,
+  };
 }

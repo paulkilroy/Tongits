@@ -3,6 +3,7 @@ import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/
 import { bestMelds } from "../engine/meldFinder";
 import { type GinState, discard, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
 import { ginAutopsy, type GinOutcome } from "./winodds";
+import { DeepDivePanel, type DeepRow } from "../ui/DeepDivePanel";
 import { sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
@@ -64,7 +65,7 @@ const SAMPLES = 300;
 // Runs on the main thread after a paint tick — a couple seconds' work behind a
 // "running…" label. (A worker is the proper fix for a fully smooth spinner.)
 function GinDeepDive({ state, me, yourDiscardId }: { state?: GinState; me: number; yourDiscardId: string }) {
-  const [rows, setRows] = useState<{ label: string; isYours: boolean; o: GinOutcome }[] | null>(null);
+  const [rows, setRows] = useState<DeepRow[] | null>(null);
   const [running, setRunning] = useState(false);
   if (!state) return null;
   const decision = state;
@@ -81,12 +82,25 @@ function GinDeepDive({ state, me, yourDiscardId }: { state?: GinState; me: numbe
       for (const { c } of byDw.slice(0, 2)) chosen.set(cardId(c), c); // the two lowest-deadwood throws
       const yourC = hand.find((c) => cardId(c) === yourDiscardId);
       if (yourC) chosen.set(yourDiscardId, yourC); // always include what you actually threw
-      const results = [...chosen.values()].map((c, i) => ({
-        label: cardLabel(c),
-        isYours: cardId(c) === yourDiscardId,
-        o: ginAutopsy(discard(decision, cardId(c)), me, SAMPLES, ((i + 1) * 0x9e3779b1) >>> 0),
-      }));
-      results.sort((a, b) => b.o.winPct - a.o.winPct);
+      const results: DeepRow[] = [...chosen.values()]
+        .map((c, i) => {
+          const o = ginAutopsy(discard(decision, cardId(c)), me, SAMPLES, ((i + 1) * 0x9e3779b1) >>> 0);
+          return {
+            label: `Discard ${cardLabel(c)}`,
+            isYours: cardId(c) === yourDiscardId,
+            pct: Math.round(o.winPct * 100),
+            segs: GIN_SEGMENTS.map((s) => ({ cls: s.cls, frac: o[s.key] as number, label: s.label })),
+            legend: (
+              <>
+                wins — Gin {Math.round(o.youGin * 100)}% · knock {Math.round(o.youKnock * 100)}% · undercut{" "}
+                {Math.round(o.youUndercut * 100)}%
+                <br />
+                losses — opp {Math.round(o.oppKnock * 100)}% · got undercut {Math.round(o.youUndercutLoss * 100)}%
+              </>
+            ),
+          };
+        })
+        .sort((a, b) => b.pct - a.pct);
       setRows(results);
       setRunning(false);
     }, 20);
@@ -105,34 +119,7 @@ function GinDeepDive({ state, me, yourDiscardId }: { state?: GinState; me: numbe
           Play this turn's top discards out {SAMPLES}× each — see how the hands actually end.
         </div>
       )}
-      {rows && (
-        <div className="dd-panel">
-          {rows.map((r, i) => (
-            <div className={`dd-row ${r.isYours ? "you" : ""}`} key={i}>
-              <div className="dd-head">
-                <strong>Discard {r.label}</strong>
-                <span className="dd-pct">{Math.round(r.o.winPct * 100)}% win</span>
-                {i === 0 && <span className="rp-disc-tag best">best</span>}
-                {r.isYours && <span className="rp-disc-tag you">you</span>}
-              </div>
-              <div className="dd-bar">
-                {GIN_SEGMENTS.map((s) => {
-                  const frac = r.o[s.key] as number;
-                  return frac > 0 ? (
-                    <div key={s.cls} className={`dd-seg ${s.cls}`} style={{ width: `${frac * 100}%` }} title={`${s.label}: ${Math.round(frac * 100)}%`} />
-                  ) : null;
-                })}
-              </div>
-              <div className="dd-legend">
-                wins — Gin {Math.round(r.o.youGin * 100)}% · knock {Math.round(r.o.youKnock * 100)}% · undercut{" "}
-                {Math.round(r.o.youUndercut * 100)}%
-                <br />
-                losses — opp {Math.round(r.o.oppKnock * 100)}% · got undercut {Math.round(r.o.youUndercutLoss * 100)}%
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {rows && <DeepDivePanel rows={rows} />}
     </div>
   );
 }

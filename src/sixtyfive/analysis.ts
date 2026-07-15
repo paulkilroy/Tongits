@@ -1,6 +1,7 @@
 import { type Suit, SUITS, SUIT_CLASS } from "../engine/cards";
 import { type RCard, type Rank, isWild, isJoker, rlabel, ord, pointOf } from "./rules";
 import { analyze } from "./meld";
+import { type SFState } from "./game";
 import { type ReviewTurn, GRADE_LABEL } from "../ui/reviewModel";
 import { analyzeRummyTurns, type RummyRules } from "../engine/reviewEngine";
 
@@ -12,6 +13,8 @@ import { analyzeRummyTurns, type RummyRules } from "../engine/reviewEngine";
 export interface SFTurn {
   hand: RCard[]; // your hand right after drawing, before the discard
   discarded: RCard;
+  /** The full decision-point state, for the Monte-Carlo deep dive. */
+  state?: SFState;
 }
 export interface SFObs {
   myTurns: SFTurn[];

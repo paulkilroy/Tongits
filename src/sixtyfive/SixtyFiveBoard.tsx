@@ -2,13 +2,81 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type Suit, SUITS, SUIT_CLASS } from "../engine/cards";
 import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
 import { analyze } from "./meld";
-import { type SFState } from "./game";
+import { type SFState, discard as sfDiscard } from "./game";
 import { type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewModal } from "../ui/ReviewModal";
 import { WinGraph } from "../ui/WinGraph";
+import { DeepDivePanel, type DeepRow } from "../ui/DeepDivePanel";
 import { analyzeSixtyFiveTurns, sixtyFiveReviewToText, type SFObs } from "./analysis";
+import { sixtyFiveAutopsy, type SixtyFiveOutcome } from "./winodds";
+
+// Outcome buckets for the 65 deep-dive bar, wins (green) then losses (red).
+const SF_SEGMENTS: { key: keyof SixtyFiveOutcome; label: string; cls: string }[] = [
+  { key: "youOut", label: "you go out", cls: "w1" },
+  { key: "youLow", label: "you're lowest", cls: "w2" },
+  { key: "oppOut", label: "opponent out", cls: "l1" },
+  { key: "youHigh", label: "you're higher", cls: "l2" },
+];
+const SF_SAMPLES = 250;
+
+// On-demand Monte-Carlo autopsy for one 65 turn (top discards + your actual).
+function SixtyFiveDeepDive({ state, me, yourDiscardId }: { state?: SFState; me: number; yourDiscardId: string }) {
+  const [rows, setRows] = useState<DeepRow[] | null>(null);
+  const [running, setRunning] = useState(false);
+  if (!state) return null;
+  const decision = state;
+  function run() {
+    setRunning(true);
+    setRows(null);
+    setTimeout(() => {
+      const hand = decision.players[me].hand;
+      const wildR = decision.wildRank;
+      const byDw = hand
+        .map((c) => ({ c, dw: analyze(hand.filter((x) => x.id !== c.id), wildR).points }))
+        .sort((a, b) => a.dw - b.dw);
+      const chosen = new Map<string, RCard>();
+      for (const { c } of byDw.slice(0, 2)) chosen.set(c.id, c);
+      const yourC = hand.find((c) => c.id === yourDiscardId);
+      if (yourC) chosen.set(yourDiscardId, yourC);
+      const results: DeepRow[] = [...chosen.values()]
+        .map((c, i) => {
+          const o = sixtyFiveAutopsy(sfDiscard(decision, c.id), me, SF_SAMPLES, ((i + 1) * 0x9e3779b1) >>> 0);
+          return {
+            label: `Discard ${rlabel(c)}`,
+            isYours: c.id === yourDiscardId,
+            pct: Math.round(o.winPct * 100),
+            segs: SF_SEGMENTS.map((s) => ({ cls: s.cls, frac: o[s.key] as number, label: s.label })),
+            legend: (
+              <>
+                wins — go out {Math.round(o.youOut * 100)}% · lowest {Math.round(o.youLow * 100)}%
+                <br />
+                losses — opp out {Math.round(o.oppOut * 100)}% · higher {Math.round(o.youHigh * 100)}%
+              </>
+            ),
+          };
+        })
+        .sort((a, b) => b.pct - a.pct);
+      setRows(results);
+      setRunning(false);
+    }, 20);
+  }
+  return (
+    <div className="rp-section">
+      <div className="rp-label">
+        Deep dive
+        <button className="dd-run" onClick={run} disabled={running}>
+          {running ? "running…" : `run ${SF_SAMPLES} sims`}
+        </button>
+      </div>
+      {!rows && !running && (
+        <div className="rp-disc-more">Play this turn's top discards out {SF_SAMPLES}× each — see how the hands end.</div>
+      )}
+      {rows && <DeepDivePanel rows={rows} />}
+    </div>
+  );
+}
 
 /** Sort a "65" hand (jokers/wilds trail the end). */
 function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {
@@ -96,7 +164,7 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
   // Record my turns this hand for the post-hand review (pre-discard hand + the card
   // I threw). Resets each hand (handSize increments 3→13).
   const obsRef = useRef<SFObs>({ myTurns: [], wildRank: wild });
-  const pendRef = useRef<RCard[] | null>(null);
+  const pendRef = useRef<{ hand: RCard[]; state: SFState } | null>(null);
   const handRef = useRef(g.handSize);
   useEffect(() => {
     if (g.handSize !== handRef.current) {
@@ -106,10 +174,11 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
     }
     const hp = g.players[me].hand;
     if (g.current === me && g.phase === "discard" && hp.length === g.handSize + 1 && !pendRef.current) {
-      pendRef.current = hp.map((c) => ({ ...c })); // snapshot before the discard
+      pendRef.current = { hand: hp.map((c) => ({ ...c })), state: structuredClone(g) }; // snapshot before the discard
     } else if (pendRef.current && hp.length === g.handSize) {
-      const disc = pendRef.current.find((c) => !hp.some((x) => x.id === c.id));
-      if (disc) obsRef.current.myTurns.push({ hand: pendRef.current, discarded: disc });
+      const { hand: snap, state } = pendRef.current;
+      const disc = snap.find((c) => !hp.some((x) => x.id === c.id));
+      if (disc) obsRef.current.myTurns.push({ hand: snap, discarded: disc, state });
       pendRef.current = null;
     }
   }, [g, me, wild]);
@@ -275,6 +344,9 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                 <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
               ) : null
             }
+            extra={(t, i) => (
+              <SixtyFiveDeepDive state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
+            )}
           />
         )}
     </GameScreen>

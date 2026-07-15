@@ -40,6 +40,7 @@ import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewModal } from "./ui/ReviewModal";
 import { WinGraph } from "./ui/WinGraph";
+import { DeepDivePanel, type DeepRow } from "./ui/DeepDivePanel";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
 import { DiscardPiles, HandPanel } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
@@ -442,42 +443,24 @@ const DEEP_SEGMENTS: { key: keyof DeepOutcome; label: string; cls: string; win: 
   { key: "youStockLoss", label: "lose on stock-out", cls: "l3", win: false },
 ];
 
-function DeepDivePanel({ outcomes }: { outcomes: DeepOutcome[] }) {
-  return (
-    <div className="dd-panel">
-      {outcomes.map((o, i) => (
-        <div className={`dd-row ${o.isYours ? "you" : ""}`} key={i}>
-          <div className="dd-head">
-            <strong>{o.steps.length ? o.steps.join(" › ") : `Discard ${o.label}`}</strong>
-            <span className="dd-pct">{o.pct}% win</span>
-            {i === 0 && <span className="rp-disc-tag best">best</span>}
-            {o.isYours && <span className="rp-disc-tag you">you</span>}
-          </div>
-          <div className="dd-bar">
-            {DEEP_SEGMENTS.map((s) => {
-              const frac = o[s.key] as number;
-              return frac > 0 ? (
-                <div
-                  key={s.cls}
-                  className={`dd-seg ${s.cls}`}
-                  style={{ width: `${frac * 100}%` }}
-                  title={`${s.label}: ${Math.round(frac * 100)}%`}
-                />
-              ) : null;
-            })}
-          </div>
-          <div className="dd-legend">
-            wins — go out {Math.round(o.youTongits * 100)}% · Laban {Math.round(o.youShowdownWin * 100)}% · stock{" "}
-            {Math.round(o.youStockWin * 100)}%
-            <br />
-            losses — opp out {Math.round(o.oppTongits * 100)}% · Laban {Math.round(o.youShowdownLoss * 100)}% · stock{" "}
-            {Math.round(o.youStockLoss * 100)}%
-            {o.avgLossMargin > 0 && <> · lost Labans by ~{o.avgLossMargin} pts avg</>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+/** Map Tongits' Monte-Carlo autopsy onto the shared deep-dive rows. */
+function tongitsDeepRows(outcomes: DeepOutcome[]): DeepRow[] {
+  return outcomes.map((o) => ({
+    label: o.steps.length ? o.steps.join(" › ") : `Discard ${o.label}`,
+    isYours: o.isYours,
+    pct: o.pct,
+    segs: DEEP_SEGMENTS.map((s) => ({ cls: s.cls, frac: o[s.key] as number, label: s.label })),
+    legend: (
+      <>
+        wins — go out {Math.round(o.youTongits * 100)}% · Laban {Math.round(o.youShowdownWin * 100)}% · stock{" "}
+        {Math.round(o.youStockWin * 100)}%
+        <br />
+        losses — opp out {Math.round(o.oppTongits * 100)}% · Laban {Math.round(o.youShowdownLoss * 100)}% · stock{" "}
+        {Math.round(o.youStockLoss * 100)}%
+        {o.avgLossMargin > 0 && <> · lost Labans by ~{o.avgLossMargin} pts avg</>}
+      </>
+    ),
+  }));
 }
 
 function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
@@ -571,7 +554,7 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
             </div>
           </div>
         )}
-        {ddHere?.outcomes && <DeepDivePanel outcomes={ddHere.outcomes} />}
+        {ddHere?.outcomes && <DeepDivePanel rows={tongitsDeepRows(ddHere.outcomes)} />}
       </div>
 
       <div className="rp-section">
