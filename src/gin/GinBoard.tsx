@@ -60,6 +60,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [showDiscards, setShowDiscards] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [reviewStep, setReviewStep] = useState(0);
   useEffect(() => setSel(null), [g.current, g.phase]);
 
   // Record this hand's observations for the post-hand coach: my own turns (hand +
@@ -182,7 +183,13 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
             ))}
             <div className="cr-row2">
               {obsRef.current.myTurns.length > 0 && (
-                <button className="cr-coach-btn" onClick={() => setShowReview(true)}>
+                <button
+                  className="cr-coach-btn"
+                  onClick={() => {
+                    setReviewStep(0);
+                    setShowReview(true);
+                  }}
+                >
                   🔍 Review my hand
                 </button>
               )}
@@ -220,10 +227,10 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 {discardTop ? <Chip c={discardTop} /> : <span className="cr-lbl">—</span>}
                 <span className="cr-lbl">take discard</span>
               </button>
-              {g.discard.length > 0 && (
+              {g.discard.length > 1 && (
                 <button className="sf-histfan" onClick={() => setShowDiscards(true)} title="see all discards">
                   <span className="histfan-cards">
-                    {g.discard.slice(-3).map((c, i) => (
+                    {g.discard.slice(0, -1).slice(-3).map((c, i) => (
                       <span className="histfan-card" key={i}>
                         <Chip c={c} mini />
                       </span>
@@ -286,53 +293,71 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
           </>
         )}
 
-        {review && (
-          <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
-            <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-              <h2 className="reveal-title">Hand review</h2>
-              {review.knock && (
-                <div
-                  className={`gin-knock grade-${
-                    review.knock.verdict === "gin" || review.knock.verdict === "strong"
-                      ? "best"
-                      : review.knock.verdict === "fair"
-                        ? "good"
-                        : "mistake"
-                  }`}
-                >
-                  <strong className={`grade-${review.knock.verdict === "risky" ? "mistake" : review.knock.verdict === "fair" ? "good" : "best"}`}>
-                    {review.knock.verdict === "gin"
-                      ? "Gin"
-                      : review.knock.verdict === "strong"
-                        ? "Strong knock"
-                        : review.knock.verdict === "fair"
-                          ? "Fair knock"
-                          : "Risky knock"}
-                  </strong>{" "}
-                  · {review.knock.note}
-                </div>
-              )}
-              <p className="cr-lbl">per-turn discards</p>
-              <div className="gin-review">
-                {review.turns.map((t) => (
-                  <div className={`gin-rev-turn grade-${t.grade}`} key={t.n}>
-                    <span className="gin-rev-n">T{t.n}</span>
-                    <span className="gin-rev-threw">
-                      threw <PlayingCard label={cardLabel(t.discarded)} suitClass={SUIT_CLASS[t.discarded.suit]} mini />
-                    </span>
-                    <span className="gin-rev-note">
-                      <strong className={`grade-${t.grade}`}>{t.grade}</strong>
-                      {t.grade !== "best" && ` · ${t.note}`} · {t.deadwoodAfter} dw
-                    </span>
+        {review &&
+          (() => {
+            const t = review.turns[Math.min(reviewStep, review.turns.length - 1)];
+            const n = review.turns.length;
+            const label = { best: "Best", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake" }[t.grade];
+            const kv = review.knock?.verdict;
+            const kGrade = kv === "risky" ? "mistake" : kv === "fair" ? "good" : "best";
+            return (
+              <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
+                <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+                  <h2 className="reveal-title">Hand review</h2>
+
+                  {review.knock && (
+                    <div className="replay">
+                      <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
+                        <span className={`rv-grade grade-${kGrade}`}>
+                          {kv === "gin" ? "Gin" : kv === "strong" ? "Strong knock" : kv === "fair" ? "Fair knock" : "Risky knock"}
+                        </span>
+                      </div>
+                      <div className="rv-reason">{review.knock.note}</div>
+                    </div>
+                  )}
+
+                  {/* per-turn stepper, Tongits-style */}
+                  <div className="replay">
+                    <div className="rp-nav">
+                      <button className="rp-arrow" disabled={reviewStep === 0} onClick={() => setReviewStep((s) => s - 1)}>
+                        ‹
+                      </button>
+                      <div className="rp-nav-mid">
+                        <span className={`rv-grade grade-${t.grade}`}>{label}</span>
+                        <span className="rp-turn">
+                          Turn {t.n} / {n}
+                        </span>
+                        <strong>{t.deadwoodAfter} dw</strong>
+                        {t.bestDeadwood < t.deadwoodAfter && <span className="rv-best"> best {t.bestDeadwood}</span>}
+                      </div>
+                      <button
+                        className="rp-arrow"
+                        disabled={reviewStep >= n - 1}
+                        onClick={() => setReviewStep((s) => s + 1)}
+                      >
+                        ›
+                      </button>
+                    </div>
+                    <div className="rp-bestline">
+                      <span className="rp-bestline-tag">threw</span>
+                      <PlayingCard label={cardLabel(t.discarded)} suitClass={SUIT_CLASS[t.discarded.suit]} mini />
+                      {t.grade !== "best" && (
+                        <>
+                          <span className="rp-step-arrow">best</span>
+                          <PlayingCard label={cardLabel(t.best)} suitClass={SUIT_CLASS[t.best.suit]} mini />
+                        </>
+                      )}
+                    </div>
+                    {t.grade !== "best" && <div className="rv-reason">{t.note}</div>}
                   </div>
-                ))}
+
+                  <div className="modal-actions">
+                    <button onClick={() => setShowReview(false)}>Close</button>
+                  </div>
+                </div>
               </div>
-              <div className="modal-actions">
-                <button onClick={() => setShowReview(false)}>Close</button>
-              </div>
-            </div>
-          </div>
-        )}
+            );
+          })()}
       </div>
     </main>
   );

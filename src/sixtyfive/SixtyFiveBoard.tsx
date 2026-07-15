@@ -183,10 +183,10 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                 {discardTop ? <Chip c={discardTop} wild={isWild(discardTop, wild)} /> : <span className="cr-lbl">—</span>}
                 <span className="cr-lbl">take discard</span>
               </button>
-              {g.discard.length > 0 && (
+              {g.discard.length > 1 && (
                 <button className="sf-histfan" onClick={() => setShowDiscards(true)} title="see all discards">
                   <span className="histfan-cards">
-                    {g.discard.slice(-3).map((c, i) => (
+                    {g.discard.slice(0, -1).slice(-3).map((c, i) => (
                       <span className="histfan-card" key={i}>
                         <Chip c={c} wild={isWild(c, wild)} mini />
                       </span>

@@ -1126,11 +1126,11 @@ function Table({
           )}
         </button>
 
-        {state.discard.length > 0 && (
+        {state.discard.length > 1 && (
           <button type="button" className="pile histfan" onClick={() => setShowDiscards(true)} title="see all discards">
             <span className="pile-label">all {state.discard.length}</span>
             <span className="histfan-cards">
-              {state.discard.slice(-3).map((c, i) => (
+              {state.discard.slice(0, -1).slice(-3).map((c, i) => (
                 <span className="histfan-card" key={i}>
                   <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
                 </span>
