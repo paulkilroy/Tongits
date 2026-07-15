@@ -1,8 +1,8 @@
 import { type Card, type Suit, cardId, cardLabel, cardPoints, SUIT_CLASS, RANKS, rankOrder } from "../engine/cards";
 import { bestMelds, deadwood } from "../engine/meldFinder";
 import { KNOCK_MAX } from "./game";
-import { estimateOppDeadwood, type GinObs } from "./review";
-import { type ReviewTurn, type DiscardChoice, type ReviewHandCard, gradeOf } from "../ui/reviewModel";
+import { estimateOppDeadwood, type GinObs, type KnockReview } from "./review";
+import { type ReviewTurn, type DiscardChoice, type ReviewHandCard, gradeOf, GRADE_LABEL } from "../ui/reviewModel";
 
 // Gin's analysis engine, emitting the shared `ReviewTurn[]` so the review renders
 // identically to Tongits. Where Tongits runs a Monte-Carlo playout, Gin scores each
@@ -143,4 +143,23 @@ export function analyzeGinTurns(obs: GinObs): ReviewTurn[] {
       melds,
     };
   });
+}
+
+/** A plain-text version of the Gin hand review, for the Copy button. */
+export function ginReviewToText(turns: ReviewTurn[], knock: KnockReview | null): string {
+  const out: string[] = ["Gin — Hand review", ""];
+  out.push("Chance of success: " + turns.map((t) => `T${t.turn} ${t.yourPct}%`).join("  "), "");
+  for (const t of turns) {
+    out.push(`Turn ${t.turn} — ${GRADE_LABEL[t.grade]} · ${t.yourPct}% (best ${t.bestPct}%)`);
+    if (t.reason) out.push(`  → ${t.reason}`);
+    out.push("  if you discard:");
+    for (const d of t.discards)
+      out.push(`    ${d.card.label} ${d.pct}%${d.cardId === t.yourDiscard ? " (you)" : ""}${d.note ? ` — ${d.note}` : ""}`);
+  }
+  if (knock) {
+    const verdict =
+      knock.verdict === "gin" ? "Gin" : knock.verdict === "strong" ? "Strong knock" : knock.verdict === "fair" ? "Fair knock" : "Risky knock";
+    out.push("", `Knock: ${verdict} — ${knock.note}`);
+  }
+  return out.join("\n");
 }

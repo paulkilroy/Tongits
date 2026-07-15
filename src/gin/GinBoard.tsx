@@ -7,7 +7,7 @@ import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewReplay } from "../ui/ReviewReplay";
 import { reviewGinHand, type GinObs } from "./review";
-import { analyzeGinTurns } from "./analysis";
+import { analyzeGinTurns, ginReviewToText } from "./analysis";
 
 function Chip({
   c,
@@ -68,6 +68,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const [fanned, setFanned] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [reviewStep, setReviewStep] = useState(0);
+  const [copied, setCopied] = useState(false);
   useEffect(() => setSel(null), [g.current, g.phase]);
   // The discard fan stays open until your turn ends, then folds away on its own.
   useEffect(() => {
@@ -318,6 +319,16 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 }
               />
               <div className="modal-actions">
+                <button
+                  className="reveal-secondary"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(ginReviewToText(reviewTurns, knockReview));
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
                 <button onClick={() => setShowReview(false)}>Close</button>
               </div>
             </div>
