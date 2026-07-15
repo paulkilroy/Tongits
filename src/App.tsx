@@ -38,6 +38,8 @@ import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/Lobby";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
+import { ReviewReplay } from "./ui/ReviewReplay";
+import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -548,124 +550,66 @@ function ReplayBoard({
   setStep: (i: number) => void;
 }) {
   const segments = useMemo(() => roundSegments(history, me), [history, me]);
-  const n = Math.min(segments.length, grades.length);
-  const i = Math.max(0, Math.min(n - 1, step));
-  const seg = segments[i];
-  const g = grades[i];
-  const t = result.turns.find((x) => x.turn === g.turn);
-  const meP = seg.first.players[me];
-  const handIds = meldCardIds(meP.hand);
-  const hand = [...meP.hand].sort(
-    (a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
-  );
-  const handById = new Map(meP.hand.map((c) => [cardId(c), c] as const));
-  const opponents = seg.first.players.map((p, pi) => ({ p, pi })).filter((x) => x.pi !== me);
   const [showMath, setShowMath] = useState(false);
   const deep = useDeepDive(history, me);
-  const ddHere = deep.state && deep.state.turn === g.turn ? deep.state : null;
 
-  return (
-    <div className="replay">
-      <div className="rp-nav">
-        <button className="rp-arrow" onClick={() => setStep(i - 1)} disabled={i === 0} aria-label="Previous play">
-          ‹
-        </button>
-        <div className="rp-nav-mid">
-          <span className={`rv-grade grade-${g.grade}`}>{GRADE_LABEL[g.grade]}</span>
-          <span className="rp-turn">
-            Turn {g.turn} / {n}
-          </span>
-          <strong>{g.yourPct}%</strong>
-          {g.bestPct > g.yourPct && <span className="rv-best"> best {g.bestPct}%</span>}
-        </div>
-        <button
-          className="rp-arrow"
-          onClick={() => setStep(i + 1)}
-          disabled={i === n - 1}
-          aria-label="Next play"
-        >
-          ›
-        </button>
-      </div>
+  // Map Tongits' engine grades onto the shared review model so the board is the
+  // exact same component every other game uses; Tongits' own sims/draws/opponent
+  // panels come in through ReviewReplay's `extra` slot.
+  const turns = useMemo<ReviewTurn[]>(() => {
+    const n = Math.min(segments.length, grades.length);
+    return grades.slice(0, n).map((g, idx) => {
+      const meP = segments[idx].first.players[me];
+      const meldIds = meldCardIds(meP.hand);
+      const handById = new Map(meP.hand.map((c) => [cardId(c), c] as const));
+      const sortedHand = [...meP.hand].sort(
+        (a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
+      );
+      const rc = (c: Card): ReviewCard => ({ label: cardLabel(c), suitClass: SUIT_CLASS[c.suit] });
+      return {
+        turn: g.turn,
+        grade: g.grade,
+        yourPct: g.yourPct,
+        bestPct: g.bestPct,
+        reason: g.reason,
+        bestLine: g.bestLine,
+        hand: sortedHand.map((c) => ({
+          card: rc(c),
+          loose: !meldIds.has(cardId(c)),
+          mark: cardId(c) === g.yourDiscard ? "discarded" : cardId(c) === g.bestDiscard ? "shoulda" : "",
+        })),
+        discards: g.discards.map((d) => {
+          const c = handById.get(d.cardId);
+          return {
+            cardId: d.cardId,
+            card: { label: d.label, suitClass: c ? SUIT_CLASS[c.suit] : "" },
+            pct: d.pct,
+            laidMeld: d.laidMeld,
+            note: d.note,
+          };
+        }),
+        moreDiscards: g.moreDiscards,
+        yourDiscard: g.yourDiscard,
+        bestDiscard: g.bestDiscard,
+        melds: meP.melds.map((m) => m.cards.map(rc)),
+      };
+    });
+  }, [segments, grades, me]);
 
-      {g.reason && <div className="rv-reason">{g.reason}</div>}
-
-      {g.bestLine && (
-        <div className="rp-bestline">
-          <span className="rp-bestline-tag">Best line</span>
-          {g.bestLine.map((step, i) => (
-            <span key={i} className="rp-step">
-              {i > 0 && <span className="rp-step-arrow">›</span>}
-              {step}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="rp-section">
-        <div className="rp-label">
-          Your hand · {meP.hand.length} cards
-          <span className="rp-legend">
-            <span className="rp-key discarded">▦ discarded</span>
-            {g.bestDiscard && <span className="rp-key shoulda">▦ should’ve</span>}
-          </span>
-        </div>
-        <div className="rp-hand">
-          {hand.map((c) => {
-            const id = cardId(c);
-            const mark =
-              id === g.yourDiscard ? "discarded" : id === g.bestDiscard ? "shoulda" : "";
-            return (
-              <span
-                key={id}
-                className={`mc ${SUIT_CLASS[c.suit]} ${handIds.has(id) ? "" : "loose"} ${mark}`}
-              >
-                {cardLabel(c)}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-
-      {g.discards.length > 1 && (
-        <div className="rp-section">
-          <div className="rp-label">If you discard… · projected win %</div>
-          <div className="rp-discards">
-            {g.discards.map((d) => {
-              const c = handById.get(d.cardId);
-              const isYou = d.cardId === g.yourDiscard;
-              const isBest = d.cardId === g.discards[0].cardId;
-              return (
-                <div className={`rp-disc ${isYou ? "you" : ""}`} key={d.cardId}>
-                  <div className="rp-disc-main">
-                    {c && <span className={`mc ${SUIT_CLASS[c.suit]}`}>{cardLabel(c)}</span>}
-                    <div className="rp-disc-bar">
-                      <div
-                        className={`rp-disc-fill ${isBest ? "best" : ""}`}
-                        style={{ width: `${Math.max(2, d.pct)}%` }}
-                      />
-                    </div>
-                    <span className="rp-disc-pct">{d.pct}%</span>
-                    {isBest && <span className="rp-disc-tag best">best</span>}
-                    {isYou && <span className="rp-disc-tag you">you</span>}
-                  </div>
-                  {d.note && <div className="rp-disc-note">{d.note}</div>}
-                </div>
-              );
-            })}
-          </div>
-          {g.moreDiscards > 0 && (
-            <div className="rp-disc-more">+{g.moreDiscards} weaker discard{g.moreDiscards > 1 ? "s" : ""}</div>
-          )}
-        </div>
-      )}
-
+  const extra = (turn: ReviewTurn, index: number) => {
+    const seg = segments[index];
+    const meP = seg.first.players[me];
+    const t = result.turns.find((x) => x.turn === turn.turn);
+    const opponents = seg.first.players.map((p, pi) => ({ p, pi })).filter((x) => x.pi !== me);
+    const ddHere = deep.state && deep.state.turn === turn.turn ? deep.state : null;
+    return (
+      <>
       <div className="rp-section">
         <div className="rp-label">
           Deep dive
           <button
             className="dd-run"
-            onClick={() => deep.run(g.turn)}
+            onClick={() => deep.run(turn.turn)}
             disabled={!!ddHere && !ddHere.outcomes}
           >
             {ddHere && !ddHere.outcomes ? "running…" : "run 2000 sims"}
@@ -772,7 +716,12 @@ function ReplayBoard({
           </div>
         ))}
       </div>
-    </div>
+      </>
+    );
+  };
+
+  return (
+    <ReviewReplay turns={turns} step={step} setStep={setStep} extra={extra} hideMelds />
   );
 }
 

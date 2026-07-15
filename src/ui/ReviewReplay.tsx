@@ -12,6 +12,7 @@ export function ReviewReplay({
   discardTitle = "If you discard… · projected win %",
   headlineUnit = "%",
   extra,
+  hideMelds = false,
 }: {
   turns: ReviewTurn[];
   step: number;
@@ -22,6 +23,8 @@ export function ReviewReplay({
   headlineUnit?: string;
   /** Game-specific sections rendered below the shared core for the current turn. */
   extra?: (turn: ReviewTurn, index: number) => ReactNode;
+  /** Let a game render its own melds section (inside `extra`) instead of the built-in one. */
+  hideMelds?: boolean;
 }) {
   const n = turns.length;
   const i = Math.max(0, Math.min(n - 1, step));
@@ -123,6 +126,7 @@ export function ReviewReplay({
 
       {extra?.(g, i)}
 
+      {!hideMelds && (
       <div className="rp-section">
         <div className="rp-label">Your melds</div>
         {g.melds.length ? (
@@ -141,6 +145,7 @@ export function ReviewReplay({
           <div className="rp-empty">— none down yet —</div>
         )}
       </div>
+      )}
     </div>
   );
 }
