@@ -1,19 +1,11 @@
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { BackButton } from "../ui/Icon";
+import { useEffect, useMemo, useState } from "react";
 import { type Suit, SUITS, SUIT_CLASS } from "../engine/cards";
 import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
 import { analyze } from "./meld";
 import { type SFState } from "./game";
-import { SortToggle, type SortMode } from "../ui/handSort";
+import { type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
-import { useHandDrag } from "../ui/useHandDrag";
-
-type DragProps = {
-  "data-card-id": string;
-  onPointerDown: (e: ReactPointerEvent) => void;
-  onPointerMove: (e: ReactPointerEvent) => void;
-  onPointerUp: () => void;
-};
+import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 
 /** Sort a "65" hand (jokers/wilds trail the end). */
 function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {
@@ -47,7 +39,7 @@ function Chip({
   isNew?: boolean;
   inMeld?: boolean;
   mini?: boolean;
-  drag?: DragProps;
+  drag?: CardDragProps;
 }) {
   return (
     <PlayingCard
@@ -101,9 +93,6 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
   const meldedIds = useMemo(() => new Set(analysis.melds.flat().map((c) => c.id)), [analysis]);
   const sorted = useMemo(() => sortRHand(hand, sortMode, wild), [hand, sortMode, wild]);
   const canDiscard = myTurn && g.phase === "discard";
-  const { handOrder, customOrder, resetOrder, cardHandlers } = useHandDrag(hand, sorted, (c) => c.id, (c) => {
-    if (canDiscard) setSel((s) => (s === c.id ? null : c.id));
-  });
   // A card we could discard to go out (all remaining melded) — prefer the selected one.
   const payMeCard = useMemo(() => {
     if (!canDiscard || hand.length - 1 !== g.handSize) return null;
@@ -115,25 +104,15 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
   const discardTop = g.discard[g.discard.length - 1];
 
   return (
-    <main className="app screen sixtyfive">
-      <div className="screen-head">
-        <BackButton onClick={onExit} />
-        <h1>{title}</h1>
-        <span />
-      </div>
-
-      <div className="screen-body">
-        <div className="cr-scores">
-          {g.players.map((p, i) => (
-            <div className={`cr-score ${g.current === i && !g.result ? "active" : ""}`} key={i}>
-              <div className="cr-score-top">
-                <span>{i === me ? "You" : p.name}</span>
-                <strong>{p.total}</strong>
-              </div>
-              {g.reveals && <div className="cr-lbl">+{g.reveals[i].points} this hand</div>}
-            </div>
-          ))}
-        </div>
+    <GameScreen title={title} onExit={onExit}>
+        <ScoreRow
+          players={g.players.map((p, i) => ({
+            name: i === me ? "You" : p.name,
+            score: p.total,
+            active: g.current === i && !g.result,
+            sub: g.reveals ? <div className="cr-lbl">+{g.reveals[i].points} this hand</div> : undefined,
+          }))}
+        />
         <div className="cr-lbl sf-round">
           Hand {g.handSize} of 13 · wild: joker{wild ? ` + ${wild}s` : ""} · lowest wins
         </div>
@@ -185,86 +164,46 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
           </div>
         ) : (
           <>
-            {/* draw / discard piles */}
-            <div className="sf-piles">
-              <button
-                className="sf-pile"
-                disabled={!(myTurn && g.phase === "draw")}
-                onClick={() => onDraw("deck")}
-              >
-                <span className="sf-pile-back">🂠</span>
-                <span className="cr-lbl">stock {g.deck.length}</span>
-              </button>
-              <button
-                className="sf-pile"
-                disabled={!(myTurn && g.phase === "draw") || !discardTop}
-                onClick={() => onDraw("discard")}
-              >
-                {discardTop ? <Chip c={discardTop} wild={isWild(discardTop, wild)} /> : <span className="cr-lbl">—</span>}
-                <span className="cr-lbl">take discard</span>
-              </button>
-              {g.discard.length > 1 && (
-                <button
-                  className={`sf-histfan ${fanned ? "open" : ""}`}
-                  onClick={() => setFanned((f) => !f)}
-                  title="fan out all discards"
-                >
-                  <span className="histfan-cards">
-                    {g.discard.slice(0, -1).slice(-3).map((c, i) => (
-                      <span className="histfan-card" key={i}>
-                        <Chip c={c} wild={isWild(c, wild)} mini />
-                      </span>
-                    ))}
-                  </span>
-                  <span className="cr-lbl">all {g.discard.length}</span>
-                </button>
-              )}
-            </div>
+            <DiscardPiles
+              stockCount={g.deck.length}
+              canDrawStock={myTurn && g.phase === "draw"}
+              onDrawStock={() => onDraw("deck")}
+              discard={g.discard}
+              topCard={discardTop ?? null}
+              canTakeDiscard={myTurn && g.phase === "draw" && !!discardTop}
+              onTakeDiscard={() => onDraw("discard")}
+              renderCard={(c, mini) => <Chip c={c} wild={isWild(c, wild)} mini={mini} />}
+              fanned={fanned}
+              setFanned={setFanned}
+            />
 
-            {fanned && g.discard.length > 1 && (
-              <div className="disc-fanout" onClick={() => setFanned(false)}>
-                {[...g.discard].reverse().map((c, i) => (
-                  <span className="disc-fanout-card" style={{ animationDelay: `${i * 28}ms` }} key={`${c.id}-${i}`}>
-                    <Chip c={c} wild={isWild(c, wild)} mini />
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* the live hand analyzer — green cards are melded */}
-            <div className="sf-analyzer">
-              <div className="sf-a-head">
-                Your hand · deadwood <strong>{analysis.points}</strong> · <span className="legend">green = meld</span>
-                {analysis.points === 0 && hand.length >= g.handSize && <span className="fk-good"> · ready to Pay Me!</span>}
-              </div>
-              <div className="sf-sortrow">
-                <SortToggle
-                  mode={sortMode}
-                  onChange={(m) => {
-                    setSortMode(m);
-                    resetOrder();
-                  }}
+            <HandPanel
+              cards={hand}
+              sorted={sorted}
+              idOf={(c) => c.id}
+              sortMode={sortMode}
+              onSortChange={setSortMode}
+              onTapCard={(c) => {
+                if (canDiscard) setSel((s) => (s === c.id ? null : c.id));
+              }}
+              header={
+                <>
+                  Your hand · deadwood <strong>{analysis.points}</strong> · <span className="legend">green = meld</span>
+                  {analysis.points === 0 && hand.length >= g.handSize && <span className="fk-good"> · ready to Pay Me!</span>}
+                </>
+              }
+              renderCard={(c, drag) => (
+                <Chip
+                  key={c.id}
+                  c={c}
+                  wild={isWild(c, wild)}
+                  inMeld={meldedIds.has(c.id)}
+                  selected={sel === c.id}
+                  isNew={g.drawnId === c.id}
+                  drag={drag}
                 />
-                {customOrder && (
-                  <button className="sf-reset" onClick={resetOrder}>
-                    reset order
-                  </button>
-                )}
-              </div>
-              <div className="sf-hand">
-                {handOrder.map((c) => (
-                  <Chip
-                    key={c.id}
-                    c={c}
-                    wild={isWild(c, wild)}
-                    inMeld={meldedIds.has(c.id)}
-                    selected={sel === c.id}
-                    isNew={g.drawnId === c.id}
-                    drag={cardHandlers(c)}
-                  />
-                ))}
-              </div>
-            </div>
+              )}
+            />
 
             <div className="sf-actions">
               {!myTurn ? (
@@ -289,7 +228,6 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
             </div>
           </>
         )}
-      </div>
-    </main>
+    </GameScreen>
   );
 }

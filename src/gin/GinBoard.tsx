@@ -1,21 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { BackButton } from "../ui/Icon";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
 import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
-import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
+import { sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
-import { useHandDrag } from "../ui/useHandDrag";
+import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewReplay } from "../ui/ReviewReplay";
 import { reviewGinHand, type GinObs } from "./review";
 import { analyzeGinTurns } from "./analysis";
-
-type DragProps = {
-  "data-card-id": string;
-  onPointerDown: (e: ReactPointerEvent) => void;
-  onPointerMove: (e: ReactPointerEvent) => void;
-  onPointerUp: () => void;
-};
 
 function Chip({
   c,
@@ -34,7 +26,7 @@ function Chip({
   isNew?: boolean;
   inMeld?: boolean;
   mini?: boolean;
-  drag?: DragProps;
+  drag?: CardDragProps;
 }) {
   return (
     <PlayingCard
@@ -125,9 +117,6 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
   const deadPts = deadwoodPts(hand);
   const canDiscard = myTurn && g.phase === "discard";
-  const { handOrder, customOrder, resetOrder, cardHandlers } = useHandDrag(hand, sorted, cardId, (c) => {
-    if (canDiscard) setSel((s) => (s === cardId(c) ? null : cardId(c)));
-  });
   // A card we can knock/gin with — prefer the selected one.
   const knockCardId = useMemo(() => {
     if (!canDiscard) return null;
@@ -140,27 +129,19 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const discardTop = g.discard[g.discard.length - 1];
 
   return (
-    <main className="app screen sixtyfive">
-      <div className="screen-head">
-        <BackButton onClick={onExit} />
-        <h1>{title}</h1>
-        <span />
-      </div>
-
-      <div className="screen-body">
-        <div className="cr-scores">
-          {g.players.map((p, i) => (
-            <div className={`cr-score ${g.current === i && !g.result ? "active" : ""}`} key={i}>
-              <div className="cr-score-top">
-                <span>{i === me ? "You" : p.name}</span>
-                <strong>{p.score}</strong>
-              </div>
+    <GameScreen title={title} onExit={onExit}>
+        <ScoreRow
+          players={g.players.map((p, i) => ({
+            name: i === me ? "You" : p.name,
+            score: p.score,
+            active: g.current === i && !g.result,
+            sub: (
               <div className="cr-track">
                 <div className="cr-track-fill" style={{ width: `${Math.min(100, (p.score / TARGET) * 100)}%` }} />
               </div>
-            </div>
-          ))}
-        </div>
+            ),
+          }))}
+        />
         <div className="cr-lbl sf-round">Gin · knock at ≤{KNOCK_MAX} · first to {TARGET}</div>
         {waiting && <div className="cr-waiting">{waiting}</div>}
         {g.log.length > 0 && <div className="cr-flash">{g.log[g.log.length - 1]}</div>}
@@ -237,79 +218,45 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
           </div>
         ) : (
           <>
-            <div className="sf-piles">
-              <button className="sf-pile" disabled={!(myTurn && g.phase === "draw")} onClick={() => onDraw("deck")}>
-                <span className="sf-pile-back">🂠</span>
-                <span className="cr-lbl">stock {g.deck.length}</span>
-              </button>
-              <button
-                className="sf-pile"
-                disabled={!(myTurn && g.phase === "draw") || !discardTop}
-                onClick={() => onDraw("discard")}
-              >
-                {discardTop ? <Chip c={discardTop} /> : <span className="cr-lbl">—</span>}
-                <span className="cr-lbl">take discard</span>
-              </button>
-              {g.discard.length > 1 && (
-                <button
-                  className={`sf-histfan ${fanned ? "open" : ""}`}
-                  onClick={() => setFanned((f) => !f)}
-                  title="fan out all discards"
-                >
-                  <span className="histfan-cards">
-                    {g.discard.slice(0, -1).slice(-3).map((c, i) => (
-                      <span className="histfan-card" key={i}>
-                        <Chip c={c} mini />
-                      </span>
-                    ))}
-                  </span>
-                  <span className="cr-lbl">all {g.discard.length}</span>
-                </button>
-              )}
-            </div>
+            <DiscardPiles
+              stockCount={g.deck.length}
+              canDrawStock={myTurn && g.phase === "draw"}
+              onDrawStock={() => onDraw("deck")}
+              discard={g.discard}
+              topCard={discardTop ?? null}
+              canTakeDiscard={myTurn && g.phase === "draw" && !!discardTop}
+              onTakeDiscard={() => onDraw("discard")}
+              renderCard={(c, mini) => <Chip c={c} mini={mini} />}
+              fanned={fanned}
+              setFanned={setFanned}
+            />
 
-            {fanned && g.discard.length > 1 && (
-              <div className="disc-fanout" onClick={() => setFanned(false)}>
-                {[...g.discard].reverse().map((c, i) => (
-                  <span className="disc-fanout-card" style={{ animationDelay: `${i * 28}ms` }} key={`${cardId(c)}-${i}`}>
-                    <Chip c={c} mini />
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="sf-analyzer">
-              <div className="sf-a-head">
-                Your hand · deadwood <strong>{deadPts}</strong> · <span className="legend">green = meld</span>
-                {deadPts === 0 && hand.length >= 7 && <span className="fk-good"> · Gin!</span>}
-              </div>
-              <div className="sf-sortrow">
-                <SortToggle
-                  mode={sortMode}
-                  onChange={(m) => {
-                    setSortMode(m);
-                    resetOrder();
-                  }}
+            <HandPanel
+              cards={hand}
+              sorted={sorted}
+              idOf={cardId}
+              sortMode={sortMode}
+              onSortChange={setSortMode}
+              onTapCard={(c) => {
+                if (canDiscard) setSel((s) => (s === cardId(c) ? null : cardId(c)));
+              }}
+              header={
+                <>
+                  Your hand · deadwood <strong>{deadPts}</strong> · <span className="legend">green = meld</span>
+                  {deadPts === 0 && hand.length >= 7 && <span className="fk-good"> · Gin!</span>}
+                </>
+              }
+              renderCard={(c, drag) => (
+                <Chip
+                  key={cardId(c)}
+                  c={c}
+                  inMeld={meldedIds.has(cardId(c))}
+                  selected={sel === cardId(c)}
+                  isNew={g.drawnId === cardId(c)}
+                  drag={drag}
                 />
-                {customOrder && (
-                  <button className="sf-reset" onClick={resetOrder}>
-                    reset order
-                  </button>
-                )}
-              </div>
-              <div className="sf-hand">
-                {handOrder.map((c) => (
-                  <Chip
-                    key={cardId(c)}
-                    c={c}
-                    inMeld={meldedIds.has(cardId(c))}
-                    selected={sel === cardId(c)}
-                    isNew={g.drawnId === cardId(c)}
-                    drag={cardHandlers(c)}
-                  />
-                ))}
-              </div>
-            </div>
+              )}
+            />
 
             <div className="sf-actions">
               {!myTurn ? (
@@ -376,7 +323,6 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
             </div>
           </div>
         )}
-      </div>
-    </main>
+    </GameScreen>
   );
 }

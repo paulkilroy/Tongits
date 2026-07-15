@@ -48,48 +48,85 @@ function beep(): void {
   });
 }
 
-/** Beep + flash the tab title (and notify, if permitted) when it becomes the
- *  player's turn while the window is unfocused. `myTurn` is a level; the alert
- *  fires on its rising edge only. */
-export function useTurnAlert(myTurn: boolean, message: string): void {
+/** Buzz the phone, if it supports it and hasn't muted vibration. */
+function vibrate(pattern: number | number[]): void {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* not supported — ignore */
+  }
+}
+
+/** Flash the tab title (and fire a system notification, if permitted). Returns a
+ *  stop() that restores the title and detaches its focus/visibility listeners. */
+function flashTitle(message: string): () => void {
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try {
+      new Notification(message);
+    } catch {
+      /* some browsers only allow notifications from a service worker — ignore */
+    }
+  }
+  const original = document.title;
+  let on = false;
+  const flash = window.setInterval(() => {
+    document.title = on ? original : `🎲 ${message}`;
+    on = !on;
+  }, 1000);
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    window.clearInterval(flash);
+    document.title = original;
+    window.removeEventListener("focus", stop);
+    document.removeEventListener("visibilitychange", onVis);
+  };
+  const onVis = () => {
+    if (!document.hidden) stop();
+  };
+  window.addEventListener("focus", stop);
+  document.addEventListener("visibilitychange", onVis);
+  return stop;
+}
+
+const REMIND_AFTER_MS = 10_000;
+
+/** Nudge a player when it's their move. Two triggers, each fires once per turn:
+ *  1. The turn arrives while the window is unfocused → beep + buzz + flashing title.
+ *  2. The turn has been sitting for >10s (you're taking a while) → beep + buzz.
+ *  `myTurn` is a level; alerts fire on its rising edge. */
+export function useTurnAlert(myTurn: boolean, message: string, remindAfterMs = REMIND_AFTER_MS): void {
   const prev = useRef(myTurn);
+  const turnRef = useRef(myTurn);
+  turnRef.current = myTurn;
   useEffect(() => {
     const became = myTurn && !prev.current;
     prev.current = myTurn;
     if (!became) return;
-    if (typeof document === "undefined" || document.hasFocus()) return; // already watching
 
-    beep();
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      try {
-        new Notification(message);
-      } catch {
-        /* some browsers only allow notifications from a service worker — ignore */
-      }
+    const cleanups: (() => void)[] = [];
+
+    // 1) It became your turn while you're looking elsewhere.
+    if (typeof document !== "undefined" && !document.hasFocus()) {
+      beep();
+      vibrate([120, 60, 120]);
+      cleanups.push(flashTitle(message));
     }
 
-    const original = document.title;
-    let on = false;
-    const flash = window.setInterval(() => {
-      document.title = on ? original : `🎲 ${message}`;
-      on = !on;
-    }, 1000);
-    let stopped = false;
-    const stop = () => {
-      if (stopped) return;
-      stopped = true;
-      window.clearInterval(flash);
-      document.title = original;
-      window.removeEventListener("focus", stop);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-    const onVis = () => {
-      if (!document.hidden) stop();
-    };
-    window.addEventListener("focus", stop);
-    document.addEventListener("visibilitychange", onVis);
-    return stop;
-  }, [myTurn, message]);
+    // 2) Still your move after the reminder window — a gentle "your turn" buzz,
+    //    whether or not the window is focused. Cancelled if you act (myTurn falls)
+    //    or the component unmounts before it fires.
+    const timer = window.setTimeout(() => {
+      if (turnRef.current) {
+        beep();
+        vibrate(200);
+      }
+    }, remindAfterMs);
+    cleanups.push(() => window.clearTimeout(timer));
+
+    return () => cleanups.forEach((c) => c());
+  }, [myTurn, message, remindAfterMs]);
 }
 
 /** Ask for system-notification permission (best-effort; call from a user gesture). */
