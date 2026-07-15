@@ -1,6 +1,6 @@
 import { type Card, cardId, cardLabel, cardPoints } from "../engine/cards";
 import { deadwood } from "../engine/meldFinder";
-import { KNOCK_MAX } from "./game";
+import { KNOCK_MAX, type GinState } from "./game";
 
 // A post-hand coach for Gin. It grades each discard against the deadwood-minimising
 // one, and — crucially — judges your KNOCK timing against an estimate of the
@@ -14,6 +14,8 @@ export interface GinTurn {
   hand8: Card[]; // your hand right after drawing (8 cards), before the discard
   discarded: Card;
   drewDiscard: boolean;
+  /** The full decision-point state (8 cards, your turn), for the Monte-Carlo deep dive. */
+  state?: GinState;
 }
 
 /** What we could observe about the opponent over the hand. */

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
-import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
+import { type GinState, discard, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
+import { ginAutopsy, type GinOutcome } from "./winodds";
 import { sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
@@ -47,6 +48,95 @@ function Chip({
   );
 }
 
+// Outcome buckets for the deep-dive bar, wins first (green) then losses (red).
+const GIN_SEGMENTS: { key: keyof GinOutcome; label: string; cls: string }[] = [
+  { key: "youGin", label: "you go Gin", cls: "w1" },
+  { key: "youKnock", label: "you knock & win", cls: "w2" },
+  { key: "youUndercut", label: "you undercut", cls: "w3" },
+  { key: "oppKnock", label: "opponent wins", cls: "l1" },
+  { key: "youUndercutLoss", label: "you get undercut", cls: "l2" },
+];
+
+const SAMPLES = 300;
+
+// On-demand Monte-Carlo autopsy for one turn: play this turn's top discards out many
+// times (re-dealing the hidden opponent hand) and show how the hands actually end.
+// Runs on the main thread after a paint tick — a couple seconds' work behind a
+// "running…" label. (A worker is the proper fix for a fully smooth spinner.)
+function GinDeepDive({ state, me, yourDiscardId }: { state?: GinState; me: number; yourDiscardId: string }) {
+  const [rows, setRows] = useState<{ label: string; isYours: boolean; o: GinOutcome }[] | null>(null);
+  const [running, setRunning] = useState(false);
+  if (!state) return null;
+  const decision = state;
+
+  function run() {
+    setRunning(true);
+    setRows(null);
+    setTimeout(() => {
+      const hand = decision.players[me].hand;
+      const byDw = hand
+        .map((c) => ({ c, dw: deadwoodPts(hand.filter((x) => cardId(x) !== cardId(c))) }))
+        .sort((a, b) => a.dw - b.dw);
+      const chosen = new Map<string, Card>();
+      for (const { c } of byDw.slice(0, 2)) chosen.set(cardId(c), c); // the two lowest-deadwood throws
+      const yourC = hand.find((c) => cardId(c) === yourDiscardId);
+      if (yourC) chosen.set(yourDiscardId, yourC); // always include what you actually threw
+      const results = [...chosen.values()].map((c, i) => ({
+        label: cardLabel(c),
+        isYours: cardId(c) === yourDiscardId,
+        o: ginAutopsy(discard(decision, cardId(c)), me, SAMPLES, ((i + 1) * 0x9e3779b1) >>> 0),
+      }));
+      results.sort((a, b) => b.o.winPct - a.o.winPct);
+      setRows(results);
+      setRunning(false);
+    }, 20);
+  }
+
+  return (
+    <div className="rp-section">
+      <div className="rp-label">
+        Deep dive
+        <button className="dd-run" onClick={run} disabled={running}>
+          {running ? "running…" : `run ${SAMPLES} sims`}
+        </button>
+      </div>
+      {!rows && !running && (
+        <div className="rp-disc-more">
+          Play this turn's top discards out {SAMPLES}× each — see how the hands actually end.
+        </div>
+      )}
+      {rows && (
+        <div className="dd-panel">
+          {rows.map((r, i) => (
+            <div className={`dd-row ${r.isYours ? "you" : ""}`} key={i}>
+              <div className="dd-head">
+                <strong>Discard {r.label}</strong>
+                <span className="dd-pct">{Math.round(r.o.winPct * 100)}% win</span>
+                {i === 0 && <span className="rp-disc-tag best">best</span>}
+                {r.isYours && <span className="rp-disc-tag you">you</span>}
+              </div>
+              <div className="dd-bar">
+                {GIN_SEGMENTS.map((s) => {
+                  const frac = r.o[s.key] as number;
+                  return frac > 0 ? (
+                    <div key={s.cls} className={`dd-seg ${s.cls}`} style={{ width: `${frac * 100}%` }} title={`${s.label}: ${Math.round(frac * 100)}%`} />
+                  ) : null;
+                })}
+              </div>
+              <div className="dd-legend">
+                wins — Gin {Math.round(r.o.youGin * 100)}% · knock {Math.round(r.o.youKnock * 100)}% · undercut{" "}
+                {Math.round(r.o.youUndercut * 100)}%
+                <br />
+                losses — opp {Math.round(r.o.oppKnock * 100)}% · got undercut {Math.round(r.o.youUndercutLoss * 100)}%
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export interface GinBoardProps {
   g: GinState;
   me: number;
@@ -79,7 +169,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   // and turn count. We see intermediate states because each draw/discard is its own
   // update. Resets when a new hand is dealt.
   const obsRef = useRef<GinObs>({ myTurns: [], oppPickups: 0, oppTurns: 0, oppDiscards: [] });
-  const pendingRef = useRef<Record<number, { drewDiscard: boolean; hand8?: Card[] }>>({});
+  const pendingRef = useRef<Record<number, { drewDiscard: boolean; hand8?: Card[]; state?: GinState }>>({});
   const handNoRef = useRef(g.handNo);
   useEffect(() => {
     if (g.handNo !== handNoRef.current) {
@@ -90,17 +180,20 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
     for (let p = 0; p < g.players.length; p++) {
       const hp = g.players[p].hand;
       if (g.current === p && g.phase === "discard" && hp.length === 8 && !pendingRef.current[p]) {
-        // just drew, about to discard
+        // just drew, about to discard — snapshot my decision state so the deep-dive
+        // can play each candidate discard out from here.
         pendingRef.current[p] = {
           drewDiscard: g.drewFrom === "discard",
           hand8: p === me ? hp.map((c) => ({ rank: c.rank, suit: c.suit })) : undefined,
+          state: p === me ? structuredClone(g) : undefined,
         };
       } else if (pendingRef.current[p] && hp.length === 7) {
         const pend = pendingRef.current[p];
         const top = g.discard[g.discard.length - 1]; // whatever they just threw
         if (p === me) {
           const disc = pend.hand8?.find((c) => !hp.some((x) => cardId(x) === cardId(c)));
-          if (pend.hand8 && disc) obsRef.current.myTurns.push({ hand8: pend.hand8, discarded: disc, drewDiscard: pend.drewDiscard });
+          if (pend.hand8 && disc)
+            obsRef.current.myTurns.push({ hand8: pend.hand8, discarded: disc, drewDiscard: pend.drewDiscard, state: pend.state });
         } else {
           obsRef.current.oppTurns += 1;
           if (pend.drewDiscard) obsRef.current.oppPickups += 1;
@@ -296,31 +389,34 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
               </>
             )}
-            extra={(_t, i) =>
-              knockReview && i === reviewTurns.length - 1 ? (
-                <div className="rp-section">
-                  <div className="rp-label">Your knock</div>
-                  <div className="replay">
-                    <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
-                      <span
-                        className={`rv-grade grade-${
-                          knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
-                        }`}
-                      >
-                        {knockReview.verdict === "gin"
-                          ? "Gin"
-                          : knockReview.verdict === "strong"
-                            ? "Strong knock"
-                            : knockReview.verdict === "fair"
-                              ? "Fair knock"
-                              : "Risky knock"}
-                      </span>
+            extra={(t, i) => (
+              <>
+                <GinDeepDive state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
+                {knockReview && i === reviewTurns.length - 1 && (
+                  <div className="rp-section">
+                    <div className="rp-label">Your knock</div>
+                    <div className="replay">
+                      <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
+                        <span
+                          className={`rv-grade grade-${
+                            knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
+                          }`}
+                        >
+                          {knockReview.verdict === "gin"
+                            ? "Gin"
+                            : knockReview.verdict === "strong"
+                              ? "Strong knock"
+                              : knockReview.verdict === "fair"
+                                ? "Fair knock"
+                                : "Risky knock"}
+                        </span>
+                      </div>
+                      <div className="rv-reason">{knockReview.note}</div>
                     </div>
-                    <div className="rv-reason">{knockReview.note}</div>
                   </div>
-                </div>
-              ) : null
-            }
+                )}
+              </>
+            )}
           />
         )}
     </GameScreen>
