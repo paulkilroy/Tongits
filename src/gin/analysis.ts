@@ -2,13 +2,15 @@ import { type Card, type Suit, cardId, cardLabel, cardPoints, SUIT_CLASS, RANKS,
 import { bestMelds, deadwood } from "../engine/meldFinder";
 import { KNOCK_MAX } from "./game";
 import { estimateOppDeadwood, type GinObs, type KnockReview } from "./review";
-import { type ReviewTurn, type DiscardChoice, type ReviewHandCard, gradeOf, GRADE_LABEL } from "../ui/reviewModel";
+import { type ReviewTurn, GRADE_LABEL } from "../ui/reviewModel";
+import { analyzeRummyTurns, type RummyRules } from "../engine/reviewEngine";
 
-// Gin's analysis engine, emitting the shared `ReviewTurn[]` so the review renders
-// identically to Tongits. Where Tongits runs a Monte-Carlo playout, Gin scores each
-// possible discard by a "chance of success": how the resulting hand (its deadwood and
-// its flexibility to improve) stacks up against an ESTIMATE of the opponent's hand,
-// read off their observable play. Same review UI, Gin-specific probability logic.
+// Gin's analysis is now just a rules object handed to the shared analyzer. It says
+// how a Gin card is worth/displayed, how a hand melds, and — the Gin-specific part —
+// how good a resulting hand is ("score"): its deadwood and flexibility to improve
+// against an ESTIMATE of the opponent's hand, read off their observable play. The
+// harness does the enumerate-rank-grade. (Swapping `score` for a Monte-Carlo playout
+// — gin/winodds — is a one-function change once it runs off the main thread.)
 
 const dwCards = (h: Card[]): Card[] => deadwood(h);
 const dwPts = (h: Card[]): number => dwCards(h).reduce((a, c) => a + cardPoints(c), 0);
@@ -77,72 +79,31 @@ function discardNote(c: Card, hand8: Card[]): string {
   return `${breaksDraw ? "breaks a draw" : "loose"} · ${tail}`;
 }
 
+const SUIT_ORDER = ["clubs", "diamonds", "hearts", "spades"];
+
 export function analyzeGinTurns(obs: GinObs): ReviewTurn[] {
-  const T = obs.myTurns.length;
-  return obs.myTurns.map((t, idx) => {
-    const hand8 = t.hand8;
-    // Opponent estimate as of THIS turn: pickups/turns scale up as the hand runs.
-    const frac = T > 1 ? (idx + 1) / T : 1;
-    const oppEst = estimateOppDeadwood(Math.round(obs.oppPickups * frac), Math.round(obs.oppTurns * frac));
-
-    // Score every possible discard.
-    const scored = hand8.map((c) => {
-      const hand7 = hand8.filter((x) => cardId(x) !== cardId(c));
-      const dw = dwPts(hand7);
-      const outs = improvementOuts(hand7);
-      const pct = Math.round(successChance(dw, outs, oppEst) * 100);
-      return { c, pct, note: discardNote(c, hand8) };
-    });
-    // One row per distinct card, best→worst.
-    const rows = [...scored].sort((a, b) => b.pct - a.pct);
-    const discards: DiscardChoice[] = rows.map((s) => ({
-      cardId: cardId(s.c),
-      card: rc(s.c),
-      pct: s.pct,
-      note: s.note,
-    }));
-
-    const yourId = cardId(t.discarded);
-    const yourPct = scored.find((s) => cardId(s.c) === yourId)?.pct ?? 0;
-    const best = rows[0];
-    const bestPct = Math.max(best.pct, yourPct);
-    const grade = gradeOf(bestPct - yourPct);
-    const corrected = grade !== "best" && grade !== "good";
-    const bestDiffers = corrected && cardId(best.c) !== yourId;
-    const reason = bestDiffers ? `Discard ${cardLabel(best.c)} instead of ${cardLabel(t.discarded)}.` : "";
-
-    // Hand shown = your 8 cards before the discard, melded vs loose, marked.
-    const melded = new Set(bestMelds(hand8).flatMap((m) => m.cards.map(cardId)));
-    const sorted = [...hand8].sort(
-      (a, b) =>
-        ["clubs", "diamonds", "hearts", "spades"].indexOf(a.suit) -
-          ["clubs", "diamonds", "hearts", "spades"].indexOf(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
-    );
-    const hand: ReviewHandCard[] = sorted.map((c) => ({
-      card: rc(c),
-      loose: !melded.has(cardId(c)),
-      mark: cardId(c) === yourId ? "discarded" : bestDiffers && cardId(c) === cardId(best.c) ? "shoulda" : "",
-    }));
-
-    // Your melds = the melds left after your actual discard.
-    const hand7 = hand8.filter((x) => cardId(x) !== yourId);
-    const melds = bestMelds(hand7).map((m) => m.cards.map(rc));
-
-    return {
-      turn: idx + 1,
-      grade,
-      yourPct,
-      bestPct,
-      reason,
-      bestLine: null,
-      hand,
-      discards,
-      moreDiscards: 0,
-      yourDiscard: yourId,
-      bestDiscard: bestDiffers ? cardId(best.c) : null,
-      melds,
-    };
-  });
+  const total = obs.myTurns.length;
+  const rules: RummyRules<Card> = {
+    id: cardId,
+    view: rc,
+    meldedIds: (hand) => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))),
+    melds: (hand) => bestMelds(hand).map((m) => [...m.cards]),
+    sort: (hand) =>
+      [...hand].sort(
+        (a, b) => SUIT_ORDER.indexOf(a.suit) - SUIT_ORDER.indexOf(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
+      ),
+    note: (c, hand) => discardNote(c, hand),
+    score: (handAfter, i) => {
+      // Opponent estimate as of this turn: their pickups/turns scale up as the hand runs.
+      const frac = total > 1 ? (i + 1) / total : 1;
+      const oppEst = estimateOppDeadwood(Math.round(obs.oppPickups * frac), Math.round(obs.oppTurns * frac));
+      return successChance(dwPts(handAfter), improvementOuts(handAfter), oppEst);
+    },
+  };
+  return analyzeRummyTurns(
+    obs.myTurns.map((t) => ({ hand: t.hand8, discarded: t.discarded })),
+    rules,
+  );
 }
 
 /** A plain-text version of the Gin hand review, for the Copy button. */
