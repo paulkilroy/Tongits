@@ -3,7 +3,8 @@ import { bestMelds, deadwood } from "../engine/meldFinder";
 import { KNOCK_MAX } from "./game";
 import { estimateOppDeadwood, type GinObs, type KnockReview } from "./review";
 import { type ReviewTurn, GRADE_LABEL } from "../ui/reviewModel";
-import { analyzeRummyTurns, type RummyRules } from "../engine/reviewEngine";
+import { analyzeRummyTurns, analyzeRummyMC, type RummyRules } from "../engine/reviewEngine";
+import { ginGame } from "./winodds";
 
 // Gin's analysis is now just a rules object handed to the shared analyzer. It says
 // how a Gin card is worth/displayed, how a hand melds, and — the Gin-specific part —
@@ -81,9 +82,9 @@ function discardNote(c: Card, hand8: Card[]): string {
 
 const SUIT_ORDER = ["clubs", "diamonds", "hearts", "spades"];
 
-export function analyzeGinTurns(obs: GinObs): ReviewTurn[] {
+function ginRules(obs: GinObs): RummyRules<Card> {
   const total = obs.myTurns.length;
-  const rules: RummyRules<Card> = {
+  return {
     id: cardId,
     view: rc,
     meldedIds: (hand) => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))),
@@ -100,10 +101,22 @@ export function analyzeGinTurns(obs: GinObs): ReviewTurn[] {
       return successChance(dwPts(handAfter), improvementOuts(handAfter), oppEst);
     },
   };
+}
+
+/** Instant heuristic review (main thread). */
+export function analyzeGinTurns(obs: GinObs): ReviewTurn[] {
   return analyzeRummyTurns(
     obs.myTurns.map((t) => ({ hand: t.hand8, discarded: t.discarded })),
-    rules,
+    ginRules(obs),
   );
+}
+
+/** Exact Monte-Carlo review (run in a worker) — plays each discard out via ginGame. */
+export function analyzeGinMC(obs: GinObs, samples: number, onProgress?: (f: number) => void): ReviewTurn[] {
+  const turns = obs.myTurns
+    .filter((t) => t.state)
+    .map((t) => ({ state: t.state!, seat: t.state!.current, hand: t.hand8, discarded: t.discarded }));
+  return analyzeRummyMC(ginGame, turns, ginRules(obs), samples, onProgress);
 }
 
 /** A plain-text version of the Gin hand review, for the Copy button. */

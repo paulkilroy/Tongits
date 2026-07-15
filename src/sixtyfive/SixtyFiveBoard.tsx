@@ -11,6 +11,7 @@ import { WinGraph } from "../ui/WinGraph";
 import { DeepDivePanel, type DeepRow } from "../ui/DeepDivePanel";
 import { analyzeSixtyFiveTurns, sixtyFiveReviewToText, type SFObs } from "./analysis";
 import { sixtyFiveAutopsy, type SixtyFiveOutcome } from "./winodds";
+import { useReviewWorker } from "../ui/useReviewWorker";
 
 // Outcome buckets for the 65 deep-dive bar, wins (green) then losses (red).
 const SF_SEGMENTS: { key: keyof SixtyFiveOutcome; label: string; cls: string }[] = [
@@ -182,7 +183,10 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
       pendRef.current = null;
     }
   }, [g, me, wild]);
-  const reviewTurns = useMemo(() => (showReview ? analyzeSixtyFiveTurns(obsRef.current) : []), [showReview]);
+  const heuristicTurns = useMemo(() => (showReview ? analyzeSixtyFiveTurns(obsRef.current) : []), [showReview]);
+  // Refine the odds with real Monte-Carlo off the main thread; show heuristic meanwhile.
+  const mc = useReviewWorker("65", showReview ? obsRef.current : null);
+  const reviewTurns = mc.turns ?? heuristicTurns;
 
   const analysis = useMemo(() => analyze(hand, wild), [hand, wild]);
   const meldedIds = useMemo(() => new Set(analysis.melds.flat().map((c) => c.id)), [analysis]);
@@ -339,11 +343,18 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
             toText={() => sixtyFiveReviewToText(reviewTurns)}
             onClose={() => setShowReview(false)}
             discardTitle="If you discard… · chance of success"
-            header={(step, setStep) =>
-              reviewTurns.length > 1 ? (
-                <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
-              ) : null
-            }
+            header={(step, setStep) => (
+              <>
+                <div className="wg-caption">
+                  <span className="wg-legend">
+                    {mc.turns ? "simulated · dot colour = grade" : `refining with sims… ${Math.round(mc.progress * 100)}%`}
+                  </span>
+                </div>
+                {reviewTurns.length > 1 && (
+                  <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
+                )}
+              </>
+            )}
             extra={(t, i) => (
               <SixtyFiveDeepDive state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
             )}

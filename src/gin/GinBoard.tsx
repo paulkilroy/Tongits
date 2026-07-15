@@ -9,6 +9,7 @@ import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewModal } from "../ui/ReviewModal";
 import { WinGraph } from "../ui/WinGraph";
+import { useReviewWorker } from "../ui/useReviewWorker";
 import { reviewGinHand, type GinObs } from "./review";
 import { analyzeGinTurns, ginReviewToText } from "./analysis";
 
@@ -191,7 +192,10 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
     }
   }, [g, me]);
   const knockReview = showReview ? reviewGinHand(obsRef.current).knock : null;
-  const reviewTurns = useMemo(() => (showReview ? analyzeGinTurns(obsRef.current) : []), [showReview]);
+  const heuristicTurns = useMemo(() => (showReview ? analyzeGinTurns(obsRef.current) : []), [showReview]);
+  // Refine the odds with real Monte-Carlo off the main thread; show heuristic meanwhile.
+  const mc = useReviewWorker("gin", showReview ? obsRef.current : null);
+  const reviewTurns = mc.turns ?? heuristicTurns;
 
   const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
   const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
@@ -371,7 +375,10 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 <div className="wg-caption">
                   Chance of success · {reviewTurns[0].yourPct}% →{" "}
                   <strong>{reviewTurns[reviewTurns.length - 1].yourPct}%</strong>
-                  <span className="wg-legend"> · dot colour = play grade</span>
+                  <span className="wg-legend">
+                    {" "}
+                    · {mc.turns ? "simulated" : `refining with sims… ${Math.round(mc.progress * 100)}%`}
+                  </span>
                 </div>
                 <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
               </>

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { analyzeGinTurns } from "./analysis";
+import { analyzeGinTurns, analyzeGinMC } from "./analysis";
 import { type GinObs } from "./review";
-import { type Card } from "../engine/cards";
+import { type Card, card } from "../engine/cards";
+import { newGame, type GinState } from "./game";
 
 const c = (rank: string, suit: string): Card => ({ rank: rank as never, suit: suit as never });
 const obs = (myTurns: GinObs["myTurns"], oppPickups = 0, oppTurns = 0): GinObs => ({
@@ -46,5 +47,38 @@ describe("gin analysis → shared ReviewTurn", () => {
     expect(t.grade).not.toBe("best");
     expect(t.bestDiscard).toBe("K-spades");
     expect(t.reason).toMatch(/K/);
+  });
+});
+
+describe("gin Monte-Carlo review (analyzeGinMC)", () => {
+  const base = newGame(["You", "Bot"], [false, true]);
+  // Seat 0 at a discard decision, gin-ready after throwing the loose King.
+  const gin7 = [
+    c("4", "hearts"), c("5", "hearts"), c("6", "hearts"), c("7", "hearts"),
+    c("8", "clubs"), c("8", "diamonds"), c("8", "spades"),
+  ];
+  function decision(): GinState {
+    const s = structuredClone(base);
+    s.players[0].hand = [...gin7, card("K", "spades")];
+    s.players[1].hand = base.players[1].hand.slice(0, 7);
+    s.current = 0;
+    s.phase = "discard";
+    s.discard = [card("Q", "clubs")];
+    s.deck = [];
+    s.round = null;
+    s.result = null;
+    return s;
+  }
+
+  it("plays each discard out — knocking to win reads as best", () => {
+    const obsMC: GinObs = {
+      myTurns: [{ hand8: [...gin7, c("K", "spades")], discarded: c("K", "spades"), drewDiscard: false, state: decision() }],
+      oppPickups: 0,
+      oppTurns: 2,
+      oppDiscards: [],
+    };
+    const t = analyzeGinMC(obsMC, 20)[0];
+    expect(t.grade).toBe("best");
+    expect(t.yourPct).toBeGreaterThan(80); // knocking wins the hand outright
   });
 });

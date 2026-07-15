@@ -3,7 +3,8 @@ import { type RCard, type Rank, isWild, isJoker, rlabel, ord, pointOf } from "./
 import { analyze } from "./meld";
 import { type SFState } from "./game";
 import { type ReviewTurn, GRADE_LABEL } from "../ui/reviewModel";
-import { analyzeRummyTurns, type RummyRules } from "../engine/reviewEngine";
+import { analyzeRummyTurns, analyzeRummyMC, type RummyRules } from "../engine/reviewEngine";
+import { sixtyfiveGame } from "./winodds";
 
 // 65's hand review = a rules object handed to the shared analyzer. The only
 // 65-specific parts are its point values (2–8=5, 9–K=10, A=15, wilds=0) and its
@@ -35,9 +36,8 @@ function successChance(deadwoodPts: number): number {
   return Math.max(0.05, Math.min(0.95, 1 / (1 + Math.exp((deadwoodPts - 10) / 7))));
 }
 
-export function analyzeSixtyFiveTurns(obs: SFObs): ReviewTurn[] {
-  const wild = obs.wildRank;
-  const rules: RummyRules<RCard> = {
+function sixtyFiveRules(wild: Rank | null): RummyRules<RCard> {
+  return {
     id: (c) => c.id,
     view: (c) => ({ label: rlabel(c), suitClass: isJoker(c) ? "" : SUIT_CLASS[c.suit as Suit] }),
     meldedIds: (hand) => new Set(analyze(hand, wild).melds.flat().map((c) => c.id)),
@@ -51,10 +51,22 @@ export function analyzeSixtyFiveTurns(obs: SFObs): ReviewTurn[] {
     },
     score: (handAfter) => successChance(analyze(handAfter, wild).points),
   };
+}
+
+/** Instant heuristic review (main thread). */
+export function analyzeSixtyFiveTurns(obs: SFObs): ReviewTurn[] {
   return analyzeRummyTurns(
     obs.myTurns.map((t) => ({ hand: t.hand, discarded: t.discarded })),
-    rules,
+    sixtyFiveRules(obs.wildRank),
   );
+}
+
+/** Exact Monte-Carlo review (run in a worker). */
+export function analyzeSixtyFiveMC(obs: SFObs, samples: number, onProgress?: (f: number) => void): ReviewTurn[] {
+  const turns = obs.myTurns
+    .filter((t) => t.state)
+    .map((t) => ({ state: t.state!, seat: t.state!.current, hand: t.hand, discarded: t.discarded }));
+  return analyzeRummyMC(sixtyfiveGame, turns, sixtyFiveRules(obs.wildRank), samples, onProgress);
 }
 
 /** Plain-text review for the Copy button. */
