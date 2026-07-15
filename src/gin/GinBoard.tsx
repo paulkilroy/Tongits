@@ -5,7 +5,7 @@ import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game"
 import { sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
-import { ReviewReplay } from "../ui/ReviewReplay";
+import { ReviewModal } from "../ui/ReviewModal";
 import { reviewGinHand, type GinObs } from "./review";
 import { analyzeGinTurns, ginReviewToText } from "./analysis";
 
@@ -67,8 +67,6 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [fanned, setFanned] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const [reviewStep, setReviewStep] = useState(0);
-  const [copied, setCopied] = useState(false);
   useEffect(() => setSel(null), [g.current, g.phase]);
   // The discard fan stays open until your turn ends, then folds away on its own.
   useEffect(() => {
@@ -190,10 +188,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
               {obsRef.current.myTurns.length > 0 && (
                 <button
                   className="cr-coach-btn"
-                  onClick={() => {
-                    setReviewStep(0);
-                    setShowReview(true);
-                  }}
+                  onClick={() => setShowReview(true)}
                 >
                   🔍 Review my hand
                 </button>
@@ -284,55 +279,38 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
         )}
 
         {showReview && reviewTurns.length > 0 && (
-          <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
-            <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-              <h2 className="reveal-title">Hand review</h2>
-              <ReviewReplay
-                turns={reviewTurns}
-                step={reviewStep}
-                setStep={setReviewStep}
-                discardTitle="If you discard… · chance of success"
-                extra={(_t, i) =>
-                  knockReview && i === reviewTurns.length - 1 ? (
-                    <div className="rp-section">
-                      <div className="rp-label">Your knock</div>
-                      <div className="replay">
-                        <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
-                          <span
-                            className={`rv-grade grade-${
-                              knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
-                            }`}
-                          >
-                            {knockReview.verdict === "gin"
-                              ? "Gin"
-                              : knockReview.verdict === "strong"
-                                ? "Strong knock"
-                                : knockReview.verdict === "fair"
-                                  ? "Fair knock"
-                                  : "Risky knock"}
-                          </span>
-                        </div>
-                        <div className="rv-reason">{knockReview.note}</div>
-                      </div>
+          <ReviewModal
+            title="Hand review"
+            turns={reviewTurns}
+            toText={() => ginReviewToText(reviewTurns, knockReview)}
+            onClose={() => setShowReview(false)}
+            discardTitle="If you discard… · chance of success"
+            extra={(_t, i) =>
+              knockReview && i === reviewTurns.length - 1 ? (
+                <div className="rp-section">
+                  <div className="rp-label">Your knock</div>
+                  <div className="replay">
+                    <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
+                      <span
+                        className={`rv-grade grade-${
+                          knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
+                        }`}
+                      >
+                        {knockReview.verdict === "gin"
+                          ? "Gin"
+                          : knockReview.verdict === "strong"
+                            ? "Strong knock"
+                            : knockReview.verdict === "fair"
+                              ? "Fair knock"
+                              : "Risky knock"}
+                      </span>
                     </div>
-                  ) : null
-                }
-              />
-              <div className="modal-actions">
-                <button
-                  className="reveal-secondary"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(ginReviewToText(reviewTurns, knockReview));
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  }}
-                >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-                <button onClick={() => setShowReview(false)}>Close</button>
-              </div>
-            </div>
-          </div>
+                    <div className="rv-reason">{knockReview.note}</div>
+                  </div>
+                </div>
+              ) : null
+            }
+          />
         )}
     </GameScreen>
   );

@@ -38,7 +38,7 @@ import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/Lobby";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
-import { ReviewReplay } from "./ui/ReviewReplay";
+import { ReviewModal } from "./ui/ReviewModal";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
 import { DiscardPiles } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
@@ -533,31 +533,27 @@ function DeepDivePanel({ outcomes }: { outcomes: DeepOutcome[] }) {
   );
 }
 
-// Step through your turns: your full hand + melds and each opponent's melds, with
-// the engine's grade/reason for the play you actually made on that turn.
-function ReplayBoard({
-  history,
-  me,
-  grades,
-  result,
-  step,
-  setStep,
-}: {
-  history: GameState[];
-  me: number;
-  grades: TurnGrade[];
-  result: ReturnType<typeof reviewRound>;
-  step: number;
-  setStep: (i: number) => void;
-}) {
+function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
+  const result = useMemo(() => reviewRound(history, me), [history, me]);
+  const { progress, grades } = useAnalysis(history, me);
   const segments = useMemo(() => roundSegments(history, me), [history, me]);
   const [showMath, setShowMath] = useState(false);
   const deep = useDeepDive(history, me);
+  const recorded = useRef(false);
 
-  // Map Tongits' engine grades onto the shared review model so the board is the
-  // exact same component every other game uses; Tongits' own sims/draws/opponent
-  // panels come in through ReviewReplay's `extra` slot.
+  // Once the engine finishes, fold these grades into the cross-game coach (once).
+  useEffect(() => {
+    if (grades && grades.length && !recorded.current) {
+      recorded.current = true;
+      recordAnalysis(grades);
+    }
+  }, [grades]);
+
+  // Map Tongits' engine grades onto the shared review model so the review is the
+  // exact same modal + stepper every other game uses; Tongits' own sims/draws/
+  // opponent panels come in through the `extra` slot.
   const turns = useMemo<ReviewTurn[]>(() => {
+    if (!grades) return [];
     const n = Math.min(segments.length, grades.length);
     return grades.slice(0, n).map((g, idx) => {
       const meP = segments[idx].first.players[me];
@@ -721,89 +717,46 @@ function ReplayBoard({
     );
   };
 
-  return (
-    <ReviewReplay turns={turns} step={step} setStep={setStep} extra={extra} hideMelds />
-  );
-}
-
-function GameReview({ history, me, onClose }: { history: GameState[]; me: number; onClose: () => void }) {
-  const result = useMemo(() => reviewRound(history, me), [history, me]);
-  const { progress, grades } = useAnalysis(history, me);
-  const [copied, setCopied] = useState(false);
-  const [step, setStep] = useState(0);
-  const recorded = useRef(false);
-
-  // Once the engine finishes, fold these grades into the cross-game coach (once).
-  useEffect(() => {
-    if (grades && grades.length && !recorded.current) {
-      recorded.current = true;
-      recordAnalysis(grades);
-    }
-  }, [grades]);
-
-  // ← / → step through the turns.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (!grades || !grades.length) return;
-      if (e.key === "ArrowLeft") {
-        setStep((s) => Math.max(0, s - 1));
-        e.preventDefault();
-      } else if (e.key === "ArrowRight") {
-        setStep((s) => Math.min(grades.length - 1, s + 1));
-        e.preventDefault();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [grades]);
-
-  function copy() {
-    void navigator.clipboard?.writeText(reviewToText(result, grades));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-  return (
-    <div className="reveal-backdrop">
-      <div className="reveal review">
-        <h2 className="reveal-title">Game Review</h2>
-
-        {grades ? (
-          grades.length > 0 && (
-            <>
-              <div className="wg-caption">
-                Win odds · {grades[0].yourPct}% → <strong>{grades[grades.length - 1].yourPct}%</strong>
-                <span className="wg-legend"> · dot colour = play grade</span>
-              </div>
-              <WinGraph grades={grades} current={Math.min(step, grades.length - 1)} onSelect={setStep} />
-            </>
-          )
-        ) : (
-          <div className="wg-progress">
-            <div>Analyzing your play… {Math.round(progress * 100)}%</div>
-            <div className="wg-bar">
-              <div className="wg-bar-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+  // Everything above the stepper: the win-odds graph while ready, or a progress bar
+  // while the engine is still churning, plus the round summary.
+  const header = (step: number, setStep: (i: number) => void) => (
+    <>
+      {grades ? (
+        grades.length > 0 ? (
+          <>
+            <div className="wg-caption">
+              Win odds · {grades[0].yourPct}% → <strong>{grades[grades.length - 1].yourPct}%</strong>
+              <span className="wg-legend"> · dot colour = play grade</span>
             </div>
+            <WinGraph grades={grades} current={Math.min(step, grades.length - 1)} onSelect={setStep} />
+          </>
+        ) : null
+      ) : (
+        <div className="wg-progress">
+          <div>Analyzing your play… {Math.round(progress * 100)}%</div>
+          <div className="wg-bar">
+            <div className="wg-bar-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
           </div>
-        )}
-
-        <div className="review-summary">
-          {result.summary.map((s, i) => (
-            <div key={i}>{s}</div>
-          ))}
         </div>
-        {grades && grades.length > 0 && (
-          <ReplayBoard history={history} me={me} grades={grades} result={result} step={step} setStep={setStep} />
-        )}
-        <div className="review-actions">
-          <button className="reveal-secondary" onClick={copy}>
-            {copied ? "Copied!" : "Copy"}
-          </button>
-          <button className="reveal-replay" onClick={onClose}>
-            Close
-          </button>
-        </div>
+      )}
+      <div className="review-summary">
+        {result.summary.map((s, i) => (
+          <div key={i}>{s}</div>
+        ))}
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <ReviewModal
+      title="Game Review"
+      turns={turns}
+      toText={() => reviewToText(result, grades)}
+      onClose={onClose}
+      extra={extra}
+      hideMelds
+      header={header}
+    />
   );
 }
 
