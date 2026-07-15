@@ -1,12 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BackButton } from "../ui/Icon";
 import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
 import { type GinState, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
 import { SortToggle, sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
-import { DiscardHistory } from "../ui/DiscardHistory";
+import { useHandDrag } from "../ui/useHandDrag";
+import { ReviewReplay } from "../ui/ReviewReplay";
 import { reviewGinHand, type GinObs } from "./review";
+import { analyzeGinTurns } from "./analysis";
+
+type DragProps = {
+  "data-card-id": string;
+  onPointerDown: (e: ReactPointerEvent) => void;
+  onPointerMove: (e: ReactPointerEvent) => void;
+  onPointerUp: () => void;
+};
 
 function Chip({
   c,
@@ -16,6 +25,7 @@ function Chip({
   isNew,
   inMeld,
   mini,
+  drag,
 }: {
   c: Card;
   onClick?: () => void;
@@ -24,6 +34,7 @@ function Chip({
   isNew?: boolean;
   inMeld?: boolean;
   mini?: boolean;
+  drag?: DragProps;
 }) {
   return (
     <PlayingCard
@@ -35,6 +46,10 @@ function Chip({
       isNew={isNew}
       inMeld={inMeld}
       onClick={onClick}
+      dataCardId={drag?.["data-card-id"]}
+      onPointerDown={drag?.onPointerDown}
+      onPointerMove={drag?.onPointerMove}
+      onPointerUp={drag?.onPointerUp}
     />
   );
 }
@@ -58,10 +73,14 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
 
   const [sel, setSel] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
-  const [showDiscards, setShowDiscards] = useState(false);
+  const [fanned, setFanned] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [reviewStep, setReviewStep] = useState(0);
   useEffect(() => setSel(null), [g.current, g.phase]);
+  // The discard fan stays open until your turn ends, then folds away on its own.
+  useEffect(() => {
+    if (!myTurn) setFanned(false);
+  }, [myTurn]);
 
   // Record this hand's observations for the post-hand coach: my own turns (hand +
   // discard) plus what's OBSERVABLE about the opponent — their pickups off the pile
@@ -99,12 +118,16 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
       }
     }
   }, [g, me]);
-  const review = showReview ? reviewGinHand(obsRef.current) : null;
+  const knockReview = showReview ? reviewGinHand(obsRef.current).knock : null;
+  const reviewTurns = useMemo(() => (showReview ? analyzeGinTurns(obsRef.current) : []), [showReview]);
 
   const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
   const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
   const deadPts = deadwoodPts(hand);
   const canDiscard = myTurn && g.phase === "discard";
+  const { handOrder, customOrder, resetOrder, cardHandlers } = useHandDrag(hand, sorted, cardId, (c) => {
+    if (canDiscard) setSel((s) => (s === cardId(c) ? null : cardId(c)));
+  });
   // A card we can knock/gin with — prefer the selected one.
   const knockCardId = useMemo(() => {
     if (!canDiscard) return null;
@@ -228,7 +251,11 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 <span className="cr-lbl">take discard</span>
               </button>
               {g.discard.length > 1 && (
-                <button className="sf-histfan" onClick={() => setShowDiscards(true)} title="see all discards">
+                <button
+                  className={`sf-histfan ${fanned ? "open" : ""}`}
+                  onClick={() => setFanned((f) => !f)}
+                  title="fan out all discards"
+                >
                   <span className="histfan-cards">
                     {g.discard.slice(0, -1).slice(-3).map((c, i) => (
                       <span className="histfan-card" key={i}>
@@ -241,12 +268,14 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
               )}
             </div>
 
-            {showDiscards && (
-              <DiscardHistory count={g.discard.length} onClose={() => setShowDiscards(false)}>
+            {fanned && g.discard.length > 1 && (
+              <div className="disc-fanout" onClick={() => setFanned(false)}>
                 {[...g.discard].reverse().map((c, i) => (
-                  <Chip key={`${cardId(c)}-${i}`} c={c} mini />
+                  <span className="disc-fanout-card" style={{ animationDelay: `${i * 28}ms` }} key={`${cardId(c)}-${i}`}>
+                    <Chip c={c} mini />
+                  </span>
                 ))}
-              </DiscardHistory>
+              </div>
             )}
 
             <div className="sf-analyzer">
@@ -254,16 +283,29 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
                 Your hand · deadwood <strong>{deadPts}</strong> · <span className="legend">green = meld</span>
                 {deadPts === 0 && hand.length >= 7 && <span className="fk-good"> · Gin!</span>}
               </div>
-              <SortToggle mode={sortMode} onChange={setSortMode} />
+              <div className="sf-sortrow">
+                <SortToggle
+                  mode={sortMode}
+                  onChange={(m) => {
+                    setSortMode(m);
+                    resetOrder();
+                  }}
+                />
+                {customOrder && (
+                  <button className="sf-reset" onClick={resetOrder}>
+                    reset order
+                  </button>
+                )}
+              </div>
               <div className="sf-hand">
-                {sorted.map((c) => (
+                {handOrder.map((c) => (
                   <Chip
                     key={cardId(c)}
                     c={c}
                     inMeld={meldedIds.has(cardId(c))}
                     selected={sel === cardId(c)}
                     isNew={g.drawnId === cardId(c)}
-                    onClick={canDiscard ? () => setSel((s) => (s === cardId(c) ? null : cardId(c))) : undefined}
+                    drag={cardHandlers(c)}
                   />
                 ))}
               </div>
@@ -293,71 +335,47 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
           </>
         )}
 
-        {review &&
-          (() => {
-            const t = review.turns[Math.min(reviewStep, review.turns.length - 1)];
-            const n = review.turns.length;
-            const label = { best: "Best", good: "Good", inaccuracy: "Inaccuracy", mistake: "Mistake" }[t.grade];
-            const kv = review.knock?.verdict;
-            const kGrade = kv === "risky" ? "mistake" : kv === "fair" ? "good" : "best";
-            return (
-              <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
-                <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-                  <h2 className="reveal-title">Hand review</h2>
-
-                  {review.knock && (
-                    <div className="replay">
-                      <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
-                        <span className={`rv-grade grade-${kGrade}`}>
-                          {kv === "gin" ? "Gin" : kv === "strong" ? "Strong knock" : kv === "fair" ? "Fair knock" : "Risky knock"}
-                        </span>
+        {showReview && reviewTurns.length > 0 && (
+          <div className="reveal-backdrop" onClick={() => setShowReview(false)}>
+            <div className="reveal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+              <h2 className="reveal-title">Hand review</h2>
+              <ReviewReplay
+                turns={reviewTurns}
+                step={reviewStep}
+                setStep={setReviewStep}
+                discardTitle="If you discard… · chance of success"
+                extra={(_t, i) =>
+                  knockReview && i === reviewTurns.length - 1 ? (
+                    <div className="rp-section">
+                      <div className="rp-label">Your knock</div>
+                      <div className="replay">
+                        <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
+                          <span
+                            className={`rv-grade grade-${
+                              knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
+                            }`}
+                          >
+                            {knockReview.verdict === "gin"
+                              ? "Gin"
+                              : knockReview.verdict === "strong"
+                                ? "Strong knock"
+                                : knockReview.verdict === "fair"
+                                  ? "Fair knock"
+                                  : "Risky knock"}
+                          </span>
+                        </div>
+                        <div className="rv-reason">{knockReview.note}</div>
                       </div>
-                      <div className="rv-reason">{review.knock.note}</div>
                     </div>
-                  )}
-
-                  {/* per-turn stepper, Tongits-style */}
-                  <div className="replay">
-                    <div className="rp-nav">
-                      <button className="rp-arrow" disabled={reviewStep === 0} onClick={() => setReviewStep((s) => s - 1)}>
-                        ‹
-                      </button>
-                      <div className="rp-nav-mid">
-                        <span className={`rv-grade grade-${t.grade}`}>{label}</span>
-                        <span className="rp-turn">
-                          Turn {t.n} / {n}
-                        </span>
-                        <strong>{t.deadwoodAfter} dw</strong>
-                        {t.bestDeadwood < t.deadwoodAfter && <span className="rv-best"> best {t.bestDeadwood}</span>}
-                      </div>
-                      <button
-                        className="rp-arrow"
-                        disabled={reviewStep >= n - 1}
-                        onClick={() => setReviewStep((s) => s + 1)}
-                      >
-                        ›
-                      </button>
-                    </div>
-                    <div className="rp-bestline">
-                      <span className="rp-bestline-tag">threw</span>
-                      <PlayingCard label={cardLabel(t.discarded)} suitClass={SUIT_CLASS[t.discarded.suit]} mini />
-                      {t.grade !== "best" && (
-                        <>
-                          <span className="rp-step-arrow">best</span>
-                          <PlayingCard label={cardLabel(t.best)} suitClass={SUIT_CLASS[t.best.suit]} mini />
-                        </>
-                      )}
-                    </div>
-                    {t.grade !== "best" && <div className="rv-reason">{t.note}</div>}
-                  </div>
-
-                  <div className="modal-actions">
-                    <button onClick={() => setShowReview(false)}>Close</button>
-                  </div>
-                </div>
+                  ) : null
+                }
+              />
+              <div className="modal-actions">
+                <button onClick={() => setShowReview(false)}>Close</button>
               </div>
-            );
-          })()}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

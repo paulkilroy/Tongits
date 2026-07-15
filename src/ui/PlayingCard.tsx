@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 
 // The one card visual, shared by every card game so they all look like Tongits
 // (which we refined well): white card, four-colour suit, and the same state
@@ -20,6 +20,10 @@ export function PlayingCard({
   isNew,
   disabled,
   onClick,
+  dataCardId,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
 }: {
   label: string;
   suitClass: string;
@@ -32,6 +36,11 @@ export function PlayingCard({
   isNew?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  /** Drag-to-reorder: identity + pointer handlers (see useHandDrag). */
+  dataCardId?: string;
+  onPointerDown?: (e: ReactPointerEvent) => void;
+  onPointerMove?: (e: ReactPointerEvent) => void;
+  onPointerUp?: () => void;
 }) {
   const cls = [mini ? "mc" : "card", suitClass];
   if (joker) cls.push("joker");
@@ -46,9 +55,20 @@ export function PlayingCard({
       {isNew && <span className="tag tag-new">new</span>}
     </>
   );
-  if (!onClick && !disabled) return <span className={cls.join(" ")}>{inner}</span>;
+  const draggable = !!onPointerDown;
+  if (!onClick && !disabled && !draggable) return <span className={cls.join(" ")}>{inner}</span>;
   return (
-    <button type="button" className={cls.join(" ")} disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      className={cls.join(" ")}
+      disabled={disabled}
+      onClick={onClick}
+      data-card-id={dataCardId}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      style={draggable ? { touchAction: "none" } : undefined}
+    >
       {inner}
     </button>
   );

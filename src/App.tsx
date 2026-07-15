@@ -38,7 +38,6 @@ import { fetchRoomStatus, type RoomStatus } from "./online/roomSummary";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/Lobby";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
-import { DiscardHistory } from "./ui/DiscardHistory";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -899,13 +898,18 @@ function Table({
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
-  const [showDiscards, setShowDiscards] = useState(false);
+  const [fanned, setFanned] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [event, setEvent] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
   const lastLogLen = useRef(state.log.length);
   const history = useGameHistory(state);
+
+  // The discard fan stays open until your turn ends, then folds away on its own.
+  useEffect(() => {
+    if (state.result || state.current !== me) setFanned(false);
+  }, [state.current, state.result, me]);
 
   function flash(msg: string) {
     setNotice(msg);
@@ -1127,7 +1131,12 @@ function Table({
         </button>
 
         {state.discard.length > 1 && (
-          <button type="button" className="pile histfan" onClick={() => setShowDiscards(true)} title="see all discards">
+          <button
+            type="button"
+            className={`pile histfan ${fanned ? "open" : ""}`}
+            onClick={() => setFanned((f) => !f)}
+            title="fan out all discards"
+          >
             <span className="pile-label">all {state.discard.length}</span>
             <span className="histfan-cards">
               {state.discard.slice(0, -1).slice(-3).map((c, i) => (
@@ -1140,12 +1149,14 @@ function Table({
         )}
       </section>
 
-      {showDiscards && (
-        <DiscardHistory count={state.discard.length} onClose={() => setShowDiscards(false)}>
+      {fanned && state.discard.length > 1 && (
+        <div className="disc-fanout" onClick={() => setFanned(false)}>
           {[...state.discard].reverse().map((c, i) => (
-            <PlayingCard key={`${cardId(c)}-${i}`} label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
+            <span className="disc-fanout-card" style={{ animationDelay: `${i * 28}ms` }} key={`${cardId(c)}-${i}`}>
+              <PlayingCard label={cardLabel(c)} suitClass={SUIT_CLASS[c.suit]} mini />
+            </span>
           ))}
-        </DiscardHistory>
+        </div>
       )}
 
       {meP.melds.length > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { BackButton } from "../ui/Icon";
 import { type Suit, SUITS, SUIT_CLASS } from "../engine/cards";
 import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
@@ -6,7 +6,14 @@ import { analyze } from "./meld";
 import { type SFState } from "./game";
 import { SortToggle, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
-import { DiscardHistory } from "../ui/DiscardHistory";
+import { useHandDrag } from "../ui/useHandDrag";
+
+type DragProps = {
+  "data-card-id": string;
+  onPointerDown: (e: ReactPointerEvent) => void;
+  onPointerMove: (e: ReactPointerEvent) => void;
+  onPointerUp: () => void;
+};
 
 /** Sort a "65" hand (jokers/wilds trail the end). */
 function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {
@@ -30,6 +37,7 @@ function Chip({
   isNew,
   inMeld,
   mini,
+  drag,
 }: {
   c: RCard;
   wild: boolean;
@@ -39,6 +47,7 @@ function Chip({
   isNew?: boolean;
   inMeld?: boolean;
   mini?: boolean;
+  drag?: DragProps;
 }) {
   return (
     <PlayingCard
@@ -52,6 +61,10 @@ function Chip({
       isNew={isNew}
       inMeld={inMeld}
       onClick={onClick}
+      dataCardId={drag?.["data-card-id"]}
+      onPointerDown={drag?.onPointerDown}
+      onPointerMove={drag?.onPointerMove}
+      onPointerUp={drag?.onPointerUp}
     />
   );
 }
@@ -76,14 +89,21 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
 
   const [sel, setSel] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
-  const [showDiscards, setShowDiscards] = useState(false);
+  const [fanned, setFanned] = useState(false);
   // Clear the selection when the turn/phase changes.
   useEffect(() => setSel(null), [g.current, g.phase, g.handSize]);
+  // The discard fan stays open until your turn ends, then folds away on its own.
+  useEffect(() => {
+    if (!myTurn) setFanned(false);
+  }, [myTurn]);
 
   const analysis = useMemo(() => analyze(hand, wild), [hand, wild]);
   const meldedIds = useMemo(() => new Set(analysis.melds.flat().map((c) => c.id)), [analysis]);
   const sorted = useMemo(() => sortRHand(hand, sortMode, wild), [hand, sortMode, wild]);
   const canDiscard = myTurn && g.phase === "discard";
+  const { handOrder, customOrder, resetOrder, cardHandlers } = useHandDrag(hand, sorted, (c) => c.id, (c) => {
+    if (canDiscard) setSel((s) => (s === c.id ? null : c.id));
+  });
   // A card we could discard to go out (all remaining melded) — prefer the selected one.
   const payMeCard = useMemo(() => {
     if (!canDiscard || hand.length - 1 !== g.handSize) return null;
@@ -184,7 +204,11 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                 <span className="cr-lbl">take discard</span>
               </button>
               {g.discard.length > 1 && (
-                <button className="sf-histfan" onClick={() => setShowDiscards(true)} title="see all discards">
+                <button
+                  className={`sf-histfan ${fanned ? "open" : ""}`}
+                  onClick={() => setFanned((f) => !f)}
+                  title="fan out all discards"
+                >
                   <span className="histfan-cards">
                     {g.discard.slice(0, -1).slice(-3).map((c, i) => (
                       <span className="histfan-card" key={i}>
@@ -197,12 +221,14 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
               )}
             </div>
 
-            {showDiscards && (
-              <DiscardHistory count={g.discard.length} onClose={() => setShowDiscards(false)}>
+            {fanned && g.discard.length > 1 && (
+              <div className="disc-fanout" onClick={() => setFanned(false)}>
                 {[...g.discard].reverse().map((c, i) => (
-                  <Chip key={`${c.id}-${i}`} c={c} wild={isWild(c, wild)} mini />
+                  <span className="disc-fanout-card" style={{ animationDelay: `${i * 28}ms` }} key={`${c.id}-${i}`}>
+                    <Chip c={c} wild={isWild(c, wild)} mini />
+                  </span>
                 ))}
-              </DiscardHistory>
+              </div>
             )}
 
             {/* the live hand analyzer — green cards are melded */}
@@ -211,9 +237,22 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                 Your hand · deadwood <strong>{analysis.points}</strong> · <span className="legend">green = meld</span>
                 {analysis.points === 0 && hand.length >= g.handSize && <span className="fk-good"> · ready to Pay Me!</span>}
               </div>
-              <SortToggle mode={sortMode} onChange={setSortMode} />
+              <div className="sf-sortrow">
+                <SortToggle
+                  mode={sortMode}
+                  onChange={(m) => {
+                    setSortMode(m);
+                    resetOrder();
+                  }}
+                />
+                {customOrder && (
+                  <button className="sf-reset" onClick={resetOrder}>
+                    reset order
+                  </button>
+                )}
+              </div>
               <div className="sf-hand">
-                {sorted.map((c) => (
+                {handOrder.map((c) => (
                   <Chip
                     key={c.id}
                     c={c}
@@ -221,7 +260,7 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                     inMeld={meldedIds.has(c.id)}
                     selected={sel === c.id}
                     isNew={g.drawnId === c.id}
-                    onClick={canDiscard ? () => setSel((s) => (s === c.id ? null : c.id)) : undefined}
+                    drag={cardHandlers(c)}
                   />
                 ))}
               </div>
