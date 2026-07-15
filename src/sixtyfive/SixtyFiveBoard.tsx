@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Suit, SUITS, SUIT_CLASS } from "../engine/cards";
 import { type RCard, isWild, rlabel, isJoker, ord, type Rank } from "./rules";
 import { analyze } from "./meld";
@@ -6,6 +6,9 @@ import { type SFState } from "./game";
 import { type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
+import { ReviewModal } from "../ui/ReviewModal";
+import { WinGraph } from "../ui/WinGraph";
+import { analyzeSixtyFiveTurns, sixtyFiveReviewToText, type SFObs } from "./analysis";
 
 /** Sort a "65" hand (jokers/wilds trail the end). */
 function sortRHand(hand: RCard[], mode: SortMode, wild: Rank | null): RCard[] {
@@ -82,12 +85,35 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
   const [sel, setSel] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
   const [fanned, setFanned] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   // Clear the selection when the turn/phase changes.
   useEffect(() => setSel(null), [g.current, g.phase, g.handSize]);
   // The discard fan stays open until your turn ends, then folds away on its own.
   useEffect(() => {
     if (!myTurn) setFanned(false);
   }, [myTurn]);
+
+  // Record my turns this hand for the post-hand review (pre-discard hand + the card
+  // I threw). Resets each hand (handSize increments 3→13).
+  const obsRef = useRef<SFObs>({ myTurns: [], wildRank: wild });
+  const pendRef = useRef<RCard[] | null>(null);
+  const handRef = useRef(g.handSize);
+  useEffect(() => {
+    if (g.handSize !== handRef.current) {
+      handRef.current = g.handSize;
+      obsRef.current = { myTurns: [], wildRank: g.wildRank };
+      pendRef.current = null;
+    }
+    const hp = g.players[me].hand;
+    if (g.current === me && g.phase === "discard" && hp.length === g.handSize + 1 && !pendRef.current) {
+      pendRef.current = hp.map((c) => ({ ...c })); // snapshot before the discard
+    } else if (pendRef.current && hp.length === g.handSize) {
+      const disc = pendRef.current.find((c) => !hp.some((x) => x.id === c.id));
+      if (disc) obsRef.current.myTurns.push({ hand: pendRef.current, discarded: disc });
+      pendRef.current = null;
+    }
+  }, [g, me, wild]);
+  const reviewTurns = useMemo(() => (showReview ? analyzeSixtyFiveTurns(obsRef.current) : []), [showReview]);
 
   const analysis = useMemo(() => analyze(hand, wild), [hand, wild]);
   const meldedIds = useMemo(() => new Set(analysis.melds.flat().map((c) => c.id)), [analysis]);
@@ -145,12 +171,20 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
                 </div>
               </div>
             ))}
-            {onNextRound && (
-              <button className="big play-primary" onClick={onNextRound}>
-                {g.handSize >= 13 ? "Finish" : "Next hand"}
-              </button>
-            )}
-            {!onNextRound && <div className="cr-lbl">waiting for the next hand…</div>}
+            <div className="cr-row2">
+              {obsRef.current.myTurns.length > 0 && (
+                <button className="cr-coach-btn" onClick={() => setShowReview(true)}>
+                  🔍 Review my hand
+                </button>
+              )}
+              {onNextRound ? (
+                <button className="big play-primary" onClick={onNextRound}>
+                  {g.handSize >= 13 ? "Finish" : "Next hand"}
+                </button>
+              ) : (
+                <div className="cr-lbl">waiting for the next hand…</div>
+              )}
+            </div>
           </div>
         ) : g.result ? (
           <div className="cr-phase cr-over">
@@ -227,6 +261,21 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
               )}
             </div>
           </>
+        )}
+
+        {showReview && reviewTurns.length > 0 && (
+          <ReviewModal
+            title="Hand review"
+            turns={reviewTurns}
+            toText={() => sixtyFiveReviewToText(reviewTurns)}
+            onClose={() => setShowReview(false)}
+            discardTitle="If you discard… · chance of success"
+            header={(step, setStep) =>
+              reviewTurns.length > 1 ? (
+                <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
+              ) : null
+            }
+          />
         )}
     </GameScreen>
   );
