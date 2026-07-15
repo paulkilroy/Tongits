@@ -8,7 +8,7 @@ import { bestMelds, deadwood } from "../engine/meldFinder";
 // difference; gin = +25; an undercut = the defender scores the difference + 25.
 // First to 100 wins. Reuses the shared optimal meld-finder (ace low, sets/runs 3+).
 
-export const KNOCK_MAX = 5;
+export const KNOCK_MAX = 10; // standard Gin: you may knock at 10 deadwood or less
 export const GIN_BONUS = 25;
 export const UNDERCUT_BONUS = 25;
 export const TARGET = 100;
