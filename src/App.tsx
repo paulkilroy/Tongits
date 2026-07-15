@@ -488,6 +488,14 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
     return grades.slice(0, n).map((g, idx) => {
       const meP = segments[idx].first.players[me];
       const meldIds = meldCardIds(meP.hand);
+      // Cards in a live draw (a pair/run you're building) aren't dead deadwood —
+      // don't dim them, only truly loose singletons.
+      const liveIds = new Set(
+        result.turns
+          .find((x) => x.turn === g.turn)
+          ?.draws.filter((d) => d.outsLive > 0)
+          .flatMap((d) => d.held.map(cardId)) ?? [],
+      );
       const handById = new Map(meP.hand.map((c) => [cardId(c), c] as const));
       const sortedHand = [...meP.hand].sort(
         (a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankOrder(a.rank) - rankOrder(b.rank),
@@ -502,7 +510,7 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
         bestLine: g.bestLine,
         hand: sortedHand.map((c) => ({
           card: rc(c),
-          loose: !meldIds.has(cardId(c)),
+          loose: !meldIds.has(cardId(c)) && !liveIds.has(cardId(c)),
           mark: cardId(c) === g.yourDiscard ? "discarded" : cardId(c) === g.bestDiscard ? "shoulda" : "",
         })),
         discards: g.discards.map((d) => {
@@ -521,7 +529,7 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
         melds: meP.melds.map((m) => m.cards.map(rc)),
       };
     });
-  }, [segments, grades, me]);
+  }, [segments, grades, me, result]);
 
   const extra = (turn: ReviewTurn, index: number) => {
     const seg = segments[index];
