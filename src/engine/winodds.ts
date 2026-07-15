@@ -3,6 +3,7 @@ import { freshDeck, shuffle } from "./deck";
 import { type GameState, discardFormsMeld } from "./game";
 import { takeAITurn } from "./ai";
 import { roundSegments } from "./review";
+import { type CardGame, evaluate } from "../game/cardGame";
 
 // Monte Carlo win-odds with light opponent modelling. At a decision point the
 // seat knows only their own hand, the laid melds, and the discard pile. We deal
@@ -51,51 +52,55 @@ export function lastDiscards(state: GameState, seat: number): (Card | null)[] {
 
 const MAX_REDEALS = 12;
 
+// Tongits as a CardGame<GameState>: the generic evaluator/AI drive it via these ops.
+// `determinize` is the opponent-modelled re-deal (reject sampled hands that would have
+// made a player's most-recent discard meldable); `step` is the AI policy.
+export const tongitsGame: CardGame<GameState> = {
+  determinize(state, seat, rng) {
+    const lastDisc = lastDiscards(state, seat);
+    let s = structuredClone(state);
+    for (let attempt = 0; attempt < MAX_REDEALS; attempt++) {
+      s = structuredClone(state);
+      const pool = shuffle(unseenCards(state, seat), rng);
+      let i = 0;
+      let consistent = true;
+      for (let p = 0; p < s.players.length; p++) {
+        if (p === seat) continue;
+        const count = s.players[p].hand.length;
+        const hand = pool.slice(i, i + count);
+        i += count;
+        s.players[p].hand = hand;
+        const d = lastDisc[p];
+        if (d && discardFormsMeld(d, hand)) consistent = false; // irrational — they'd have kept it
+      }
+      s.stock = pool.slice(i);
+      if (consistent || attempt === MAX_REDEALS - 1) break; // accept consistent deal (or give up)
+    }
+    s.players.forEach((p) => (p.isAI = true));
+    return s;
+  },
+  step: (state) => takeAITurn(state),
+  isTerminal: (state) => !!state.result,
+  reward: (state, seat) => (state.result?.winner === seat ? 1 : 0),
+};
+
 /** Deal the unseen cards one plausible way and play the round out with the AI;
  *  returns the FINAL state (with .result). Exposed so the deep-dive can inspect
- *  HOW each simulated round ended, not just whether `seat` won. */
+ *  HOW each simulated round ended, not just whether `seat` won. (`_lastDisc` is now
+ *  computed inside `determinize`; the param stays for call-site compatibility.) */
 export function playoutOnce(
   state: GameState,
   seat: number,
-  lastDisc: (Card | null)[],
+  _lastDisc: (Card | null)[],
   rng: () => number,
 ): GameState {
-  let s = structuredClone(state);
-  for (let attempt = 0; attempt < MAX_REDEALS; attempt++) {
-    s = structuredClone(state);
-    const pool = shuffle(unseenCards(state, seat), rng);
-    let i = 0;
-    let consistent = true;
-    for (let p = 0; p < s.players.length; p++) {
-      if (p === seat) continue;
-      const count = s.players[p].hand.length;
-      const hand = pool.slice(i, i + count);
-      i += count;
-      s.players[p].hand = hand;
-      const d = lastDisc[p];
-      if (d && discardFormsMeld(d, hand)) consistent = false; // irrational — they'd have kept it
-    }
-    s.stock = pool.slice(i);
-    if (consistent || attempt === MAX_REDEALS - 1) break; // accept consistent deal (or give up)
-  }
-
-  s.players.forEach((p) => (p.isAI = true));
-  let guard = 0;
-  while (!s.result && guard++ < 400) {
-    const next = takeAITurn(s);
+  let s = tongitsGame.determinize(state, seat, rng);
+  for (let guard = 0; guard < 400 && !tongitsGame.isTerminal(s); guard++) {
+    const next = tongitsGame.step(s, rng);
     if (next === s) break;
     s = next;
   }
   return s;
-}
-
-function rolloutOnce(
-  state: GameState,
-  seat: number,
-  lastDisc: (Card | null)[],
-  rng: () => number,
-): boolean {
-  return playoutOnce(state, seat, lastDisc, rng).result?.winner === seat;
 }
 
 export function estimateWinOdds(
@@ -104,12 +109,7 @@ export function estimateWinOdds(
   samples: number,
   rng: () => number = Math.random,
 ): number {
-  const lastDisc = lastDiscards(state, seat);
-  let wins = 0;
-  for (let i = 0; i < samples; i++) {
-    if (rolloutOnce(state, seat, lastDisc, rng)) wins++;
-  }
-  return wins / samples;
+  return evaluate(tongitsGame, state, seat, samples, rng);
 }
 
 export interface WinPoint {

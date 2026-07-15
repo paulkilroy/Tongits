@@ -26,8 +26,9 @@ export interface CardGame<S> {
   isTerminal(state: S): boolean;
   /** Reward for `seat` in a finished deal — 1/0 for win/loss, or a point score. */
   reward(state: S, seat: number): number;
-  /** The moves `seat` can make at the current decision point (for the AI + analyzer). */
-  options(state: S, seat: number): Option<S>[];
+  /** The moves `seat` can make at the current decision point (for the AI + analyzer).
+   *  Optional: the Monte-Carlo evaluator doesn't need it — only the AI/analyzer do. */
+  options?(state: S, seat: number): Option<S>[];
 }
 
 /** Monte-Carlo value of a position for `seat`: play it out `samples` times from
@@ -60,7 +61,7 @@ export function chooseByMC<S>(
   cfg: AIConfig,
   rng: () => number,
 ): Option<S> | null {
-  const opts = game.options(state, seat);
+  const opts = game.options?.(state, seat) ?? [];
   if (opts.length === 0) return null;
   let best = opts[0];
   let bestVal = -Infinity;
