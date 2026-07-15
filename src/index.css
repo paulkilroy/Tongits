@@ -2766,7 +2766,9 @@ h1 {
   padding: 0.5rem 0.9rem;
   cursor: pointer;
 }
-.sf-pile:disabled { opacity: 0.5; cursor: default; }
+/* Piles you can't act on stay fully visible — the only cue is the yellow "your
+   move" outline on the pile(s) you're actually allowed to pick up from. */
+.sf-pile:disabled { cursor: default; }
 /* Yellow "your move" edge on a pile you can act on this turn. */
 .sf-pile.hot {
   border-color: #ffd65a;
