@@ -41,7 +41,7 @@ import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewModal } from "./ui/ReviewModal";
 import { WinGraph } from "./ui/WinGraph";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
-import { DiscardPiles } from "./ui/CardTable";
+import { DiscardPiles, HandPanel } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -109,20 +109,6 @@ function sortHand(hand: readonly Card[], mode: SortMode): Card[] {
             ? rankOrder(b.rank) - rankOrder(a.rank)
             : suitIndex(a.suit) - suitIndex(b.suit);
   return [...hand].sort(cmp);
-}
-
-function applyCustomOrder(hand: readonly Card[], order: string[]): Card[] {
-  const byId = new Map(hand.map((c) => [cardId(c), c] as const));
-  const out: Card[] = [];
-  for (const id of order) {
-    const c = byId.get(id);
-    if (c) {
-      out.push(c);
-      byId.delete(id);
-    }
-  }
-  out.push(...sortHand([...byId.values()], "suit"));
-  return out;
 }
 
 /* --------------------------------- icons --------------------------------- */
@@ -761,12 +747,10 @@ function Table({
 }) {
   const [selected, setSelected] = useState<Card[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("suit");
-  const [customOrder, setCustomOrder] = useState<string[] | null>(null);
   const [fanned, setFanned] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [event, setEvent] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
-  const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
   const lastLogLen = useRef(state.log.length);
   const history = useGameHistory(state);
 
@@ -877,44 +861,11 @@ function Table({
           : "Buklad what you can, then Labyog one card.";
 
   const meldIds = meldCardIds(meP.hand);
-  const handOrder = customOrder ? applyCustomOrder(meP.hand, customOrder) : sortHand(meP.hand, sortMode);
+  const sortedHand = sortHand(meP.hand, sortMode);
   const unmatched = handPoints(deadwood(meP.hand));
   const isMustPlay = (c: Card) => mustPlay != null && cardId(c) === cardId(mustPlay);
   const isNew = (c: Card) => state.lastDrawn != null && cardId(c) === cardId(state.lastDrawn);
   const inMeld = (c: Card) => meldIds.has(cardId(c));
-
-  function onCardDown(e: ReactPointerEvent, card: Card) {
-    drag.current = { id: cardId(card), x: e.clientX, y: e.clientY, moved: false };
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  }
-  function onCardMove(e: ReactPointerEvent) {
-    const d = drag.current;
-    if (!d) return;
-    if (!d.moved) {
-      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 8) return;
-      d.moved = true;
-      setCustomOrder(handOrder.map(cardId));
-    }
-    const over = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(
-      "[data-card-id]",
-    );
-    const overId = over?.getAttribute("data-card-id");
-    if (overId && overId !== d.id) {
-      setCustomOrder((prev) => {
-        const base = prev ?? handOrder.map(cardId);
-        const arr = base.filter((x) => x !== d.id);
-        const idx = arr.indexOf(overId);
-        if (idx < 0) return base;
-        arr.splice(idx, 0, d.id);
-        return arr;
-      });
-    }
-  }
-  function onCardUp(card: Card) {
-    const d = drag.current;
-    drag.current = null;
-    if (d && !d.moved) toggle(card);
-  }
 
   const opponents = state.players.map((p, i) => ({ p, i })).filter(({ i }) => i !== me);
 
@@ -1000,36 +951,22 @@ function Table({
       )}
 
       <section className="hand-area">
-        <div className="section-label">
-          Your hand · <strong>{unmatched}</strong> unmatched pts
-          {isBurned(me) && <span className="fire" title="your meld was sapaw'd — Laban locked">🔥</span>}
-          <span className="legend"> · green = meld · drag to reorder</span>
-        </div>
-        <div className="hand-controls">
-          <span className="sort-label">Sort</span>
-          <button
-            className={!customOrder && sortMode === "suit" ? "on" : ""}
-            onClick={() => {
-              setCustomOrder(null);
-              setSortMode("suit");
-            }}
-          >
-            Suit
-          </button>
-          <button
-            className={!customOrder && sortMode === "rank" ? "on" : ""}
-            onClick={() => {
-              setCustomOrder(null);
-              setSortMode("rank");
-            }}
-          >
-            Rank
-          </button>
-          {customOrder && <button onClick={() => setCustomOrder(null)}>Reset</button>}
-        </div>
         <div className="instruction">{instruction}</div>
-        <div className="hand">
-          {handOrder.map((c) => (
+        <HandPanel
+          cards={meP.hand}
+          sorted={sortedHand}
+          idOf={cardId}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+          onTapCard={toggle}
+          header={
+            <>
+              Your hand · <strong>{unmatched}</strong> unmatched pts
+              {isBurned(me) && <span className="fire" title="your meld was sapaw'd — Laban locked">🔥</span>}
+              <span className="legend"> · green = meld · drag to reorder</span>
+            </>
+          }
+          renderCard={(c, drag) => (
             <CardView
               key={cardId(c)}
               card={c}
@@ -1038,12 +975,12 @@ function Table({
               mustPlay={isMustPlay(c)}
               inMeld={inMeld(c)}
               interactive
-              onPointerDown={(e) => onCardDown(e, c)}
-              onPointerMove={onCardMove}
-              onPointerUp={() => onCardUp(c)}
+              onPointerDown={drag.onPointerDown}
+              onPointerMove={drag.onPointerMove}
+              onPointerUp={drag.onPointerUp}
             />
-          ))}
-        </div>
+          )}
+        />
       </section>
 
       {notice && <div className="notice">{notice}</div>}
