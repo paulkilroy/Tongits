@@ -41,7 +41,7 @@ import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewModal } from "./ui/ReviewModal";
 import { DeepDivePanel, type DeepRow } from "./ui/DeepDivePanel";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
-import { GameScreen, DiscardPiles, HandPanel } from "./ui/CardTable";
+import { GameScreen, ScoreRow, DiscardPiles, HandPanel } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -856,15 +856,15 @@ function Table({
     <GameScreen title="Tongits" onExit={onBack ?? onExit} headerExtra={headerExtra}>
       {event && <div className="event-toast">🔥 {event}</div>}
 
-      <section className="scoreboard">
-        <span className="sb-label">Games to {target}</span>
-        {state.players.map((p, i) => (
-          <span key={p.id} className="sb-player">
-            {p.avatar} {i === me ? "You" : p.name} <strong>{wins[i]}</strong>
-          </span>
-        ))}
-        {balance != null && <span className="sb-money">₱{balance}</span>}
-      </section>
+      <ScoreRow
+        label={`Games to ${target}`}
+        players={state.players.map((p, i) => ({
+          name: `${p.avatar} ${i === me ? "You" : p.name}`,
+          score: wins[i],
+          active: state.current === i && !state.result,
+        }))}
+        trailing={balance != null ? <span className="cr-money">₱{balance}</span> : undefined}
+      />
 
       {banner}
 

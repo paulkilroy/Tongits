@@ -1777,6 +1777,27 @@ h1 {
   min-height: 4rem;
 }
 
+/* Shared score strip (ScoreRow) — a row of per-player boxes, optional leading
+   label and a trailing chip (₱ balance). */
+.cr-scores {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+.cr-scores-label {
+  align-self: center;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+.cr-money {
+  align-self: center;
+  margin-left: auto;
+  font-weight: 700;
+  color: #ffd65a;
+}
+
 /* ------------------------------ cribbage --------------------------------- */
 .cribbage .cr-scores {
   display: flex;

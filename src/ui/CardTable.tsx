@@ -54,10 +54,20 @@ export interface ScorePlayer {
   sub?: ReactNode;
 }
 
-/** The per-player score strip across the top of the body. */
-export function ScoreRow({ players }: { players: ScorePlayer[] }) {
+/** The per-player score strip across the top of the body. `label` is a leading
+ *  caption ("Games to 5"); `trailing` a right-side chip (e.g. a ₱ balance). */
+export function ScoreRow({
+  players,
+  label,
+  trailing,
+}: {
+  players: ScorePlayer[];
+  label?: ReactNode;
+  trailing?: ReactNode;
+}) {
   return (
     <div className="cr-scores">
+      {label && <span className="cr-scores-label">{label}</span>}
       {players.map((p, i) => (
         <div className={`cr-score ${p.active ? "active" : ""}`} key={i}>
           <div className="cr-score-top">
@@ -67,6 +77,7 @@ export function ScoreRow({ players }: { players: ScorePlayer[] }) {
           {p.sub}
         </div>
       ))}
+      {trailing}
     </div>
   );
 }
