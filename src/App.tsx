@@ -1012,29 +1012,52 @@ function Table({
 
 /* ------------------------------ local game ------------------------------- */
 
+// The fold/fight prompt shown to a Laban responder — one component for local and
+// online (online adds the ₱ stakes). Self-hides unless `me` owes a response.
+function LabanModal({
+  state,
+  me,
+  onRespond,
+  stakes,
+}: {
+  state: GameState;
+  me: number;
+  onRespond: (choice: "fold" | "fight") => void;
+  stakes?: boolean;
+}) {
+  if (!state.pendingLaban || state.pendingLaban.responses[me] !== null) return null;
+  const canFight = canFightLaban(state, me);
+  return (
+    <div className="reveal-backdrop">
+      <div className="reveal" style={{ maxWidth: 340 }}>
+        <h2 className="reveal-title">{state.players[state.pendingLaban.caller].name} called Laban!</h2>
+        <p className="reveal-sub">
+          {canFight
+            ? stakes
+              ? "Fold (pay ₱10) or fight (₱20 vs the caller — lower hand wins)?"
+              : "Fold, or fight (lower unmatched hand wins)?"
+            : stakes
+              ? "You have no meld down, so you can only fold (pay ₱10)."
+              : "No meld down — you can only fold."}
+        </p>
+        <div className="modal-actions">
+          <button onClick={() => onRespond("fold")}>{stakes ? "Fold · ₱10" : "Fold"}</button>
+          {canFight && (
+            <button className="big" onClick={() => onRespond("fight")}>
+              {stakes ? "Fight · ₱20" : "Fight"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LocalGame({ onExit }: { onExit: () => void }) {
   const { state, setState, wins, target, matchOver, nextGame, newMatch } = useGame(1);
-  const iOweLaban = !!state.pendingLaban && state.pendingLaban.responses[0] === null;
   return (
     <>
-      {iOweLaban && (
-        <div className="reveal-backdrop">
-          <div className="reveal" style={{ maxWidth: 340 }}>
-            <h2 className="reveal-title">{state.players[state.pendingLaban!.caller].name} called Laban!</h2>
-            <p className="reveal-sub">
-              {canFightLaban(state, 0) ? "Fold, or fight (lower unmatched hand wins)?" : "No meld down — you can only fold."}
-            </p>
-            <div className="modal-actions">
-              <button onClick={() => setState((s) => respondLaban(s, 0, "fold"))}>Fold</button>
-              {canFightLaban(state, 0) && (
-                <button className="big" onClick={() => setState((s) => respondLaban(s, 0, "fight"))}>
-                  Fight
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <LabanModal state={state} me={0} onRespond={(c) => setState((s) => respondLaban(s, 0, c))} />
       <Table
         state={state}
         me={0}
@@ -1212,29 +1235,9 @@ function OnlineGame({
 
   const otherName = game.players.find((_, i) => i !== me)?.name ?? "opponent";
   const bet = room?.bet;
-  const iOweLaban = !!game.pendingLaban && game.pendingLaban.responses[me] === null;
   const waiting = game.pendingLaban ? "Laban called — fold or fight…" : `Waiting for ${otherName}…`;
 
-  const labanModal = iOweLaban ? (
-    <div className="reveal-backdrop">
-      <div className="reveal" style={{ maxWidth: 340 }}>
-        <h2 className="reveal-title">{game.players[game.pendingLaban!.caller].name} called Laban!</h2>
-        <p className="reveal-sub">
-          {canFightLaban(game, me)
-            ? "Fold (pay ₱10) or fight (₱20 vs the caller — lower hand wins)?"
-            : "You have no meld down, so you can only fold (pay ₱10)."}
-        </p>
-        <div className="modal-actions">
-          <button onClick={() => dispatch(respondLaban(game, me, "fold"))}>Fold · ₱10</button>
-          {canFightLaban(game, me) && (
-            <button className="big" onClick={() => dispatch(respondLaban(game, me, "fight"))}>
-              Fight · ₱20
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  ) : null;
+  const labanModal = <LabanModal state={game} me={me} stakes onRespond={(c) => dispatch(respondLaban(game, me, c))} />;
 
   return (
     <>
