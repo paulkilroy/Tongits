@@ -3,7 +3,7 @@ import { roll, applyMove, newGame } from "./game";
 import { aiStep } from "./ai";
 import { BackgammonBoard } from "./BackgammonBoard";
 import { useOnlineBackgammon, MIN_BG_SEATS, MAX_BG_SEATS } from "./online";
-import { BackButton } from "../ui/Icon";
+import { OnlineConnecting } from "../ui/OnlineConnecting";
 import { useTurnAlert } from "../ui/useTurnAlert";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
 
@@ -57,24 +57,7 @@ export function OnlineBackgammon({
     );
   }
 
-  if (!g) {
-    return (
-      <main className="app screen backgammon">
-        <div className="screen-head">
-          <BackButton onClick={onExit} />
-          <h1>Backgammon · online</h1>
-          <span />
-        </div>
-        <div className="screen-body">
-          <p className="cr-instr">
-            {connected ? "Waiting for the room…" : "Connecting…"}
-            <br />
-            <span className="cr-lbl">Share code: {code}</span>
-          </p>
-        </div>
-      </main>
-    );
-  }
+  if (!g) return <OnlineConnecting title="Backgammon · online" code={code} connected={connected} onExit={onExit} />;
 
   const names = seats.length ? seats.map((s) => s.name) : g.players.map((p) => p.name);
   const ai = seats.length ? seats.map((s) => s.isAI ?? false) : g.players.map((p) => p.isAI);

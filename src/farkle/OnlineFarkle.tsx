@@ -5,6 +5,7 @@ import { FarkleBoard } from "./FarkleBoard";
 import { useOnlineFarkle, MIN_FARKLE_SEATS, MAX_FARKLE_SEATS } from "./online";
 import { Lobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
 import { useTurnAlert } from "../ui/useTurnAlert";
+import { OnlineConnecting } from "../ui/OnlineConnecting";
 
 /** A live 2–6 player Press Your Luck game over a Supabase room. */
 export function OnlineFarkle({
@@ -38,26 +39,7 @@ export function OnlineFarkle({
     return () => clearTimeout(t);
   }, [isHost, g, write]);
 
-  if (!room) {
-    return (
-      <main className="app screen farkle">
-        <div className="screen-head">
-          <button className="back-btn" onClick={onExit} aria-label="Back">
-            ‹
-          </button>
-          <h1>{gameName} · online</h1>
-          <span />
-        </div>
-        <div className="screen-body">
-          <p className="cr-instr">
-            {connected ? "Waiting for the room…" : "Connecting…"}
-            <br />
-            <span className="cr-lbl">Share code: {code}</span>
-          </p>
-        </div>
-      </main>
-    );
-  }
+  if (!room) return <OnlineConnecting title={`${gameName} · online`} variant="farkle" code={code} connected={connected} onExit={onExit} />;
 
   if (!started || !g) {
     return (

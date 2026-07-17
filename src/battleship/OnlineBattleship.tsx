@@ -4,7 +4,7 @@ import { placeShip, autoPlace, setReady, fire, newGame } from "./game";
 import { aiStep } from "./ai";
 import { BattleshipBoard } from "./BattleshipBoard";
 import { useOnlineBattleship, MIN_BS_SEATS, MAX_BS_SEATS } from "./online";
-import { BackButton } from "../ui/Icon";
+import { OnlineConnecting } from "../ui/OnlineConnecting";
 import { useTurnAlert } from "../ui/useTurnAlert";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
 
@@ -62,24 +62,7 @@ export function OnlineBattleship({
     );
   }
 
-  if (!g) {
-    return (
-      <main className="app screen battleship">
-        <div className="screen-head">
-          <BackButton onClick={onExit} />
-          <h1>Battleship · online</h1>
-          <span />
-        </div>
-        <div className="screen-body">
-          <p className="cr-instr">
-            {connected ? "Waiting for the room…" : "Connecting…"}
-            <br />
-            <span className="cr-lbl">Share code: {code}</span>
-          </p>
-        </div>
-      </main>
-    );
-  }
+  if (!g) return <OnlineConnecting title="Battleship · online" code={code} connected={connected} onExit={onExit} />;
 
   let waiting: string | null = null;
   if (!connected) waiting = "Reconnecting…";

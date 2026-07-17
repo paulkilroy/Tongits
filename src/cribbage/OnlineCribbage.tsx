@@ -4,7 +4,7 @@ import { newRound, playCard, go, nextShow, roundComplete, STANDARD_CRIB_RULES } 
 import { takeAITurn } from "./ai";
 import { CribbageBoard } from "./CribbageBoard";
 import { useOnlineCribbage, MIN_CRIB_SEATS, MAX_CRIB_SEATS } from "./online";
-import { BackButton } from "../ui/Icon";
+import { OnlineConnecting } from "../ui/OnlineConnecting";
 import { useTurnAlert } from "../ui/useTurnAlert";
 import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "../online/Lobby";
 
@@ -72,24 +72,7 @@ export function OnlineCribbage({
     );
   }
 
-  if (!g) {
-    return (
-      <main className="app screen cribbage">
-        <div className="screen-head">
-          <BackButton onClick={onExit} />
-          <h1>Cribbage · online</h1>
-          <span />
-        </div>
-        <div className="screen-body">
-          <p className="cr-instr">
-            {connected ? "Waiting for the room…" : "Connecting…"}
-            <br />
-            <span className="cr-lbl">Share code: {code}</span>
-          </p>
-        </div>
-      </main>
-    );
-  }
+  if (!g) return <OnlineConnecting title="Cribbage · online" code={code} connected={connected} onExit={onExit} />;
 
   const myTurn = g.phase === "play" && g.current === me;
 
