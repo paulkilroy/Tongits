@@ -41,7 +41,7 @@ import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewModal } from "./ui/ReviewModal";
 import { DeepDivePanel, type DeepRow } from "./ui/DeepDivePanel";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
-import { DiscardPiles, HandPanel } from "./ui/CardTable";
+import { GameScreen, DiscardPiles, HandPanel } from "./ui/CardTable";
 import { Icon, BackButton } from "./ui/Icon";
 import { classifyMeld, canLayOffMany, type Meld } from "./engine/melds";
 import { handPoints } from "./engine/scoring";
@@ -845,16 +845,8 @@ function Table({
   const opponents = state.players.map((p, i) => ({ p, i })).filter(({ i }) => i !== me);
 
   return (
-    <main className="app">
+    <GameScreen title="Tongits" onExit={onBack ?? onExit} headerExtra={headerExtra}>
       {event && <div className="event-toast">🔥 {event}</div>}
-
-      <header className="top">
-        <div className="top-left">
-          <BackButton onClick={onBack ?? onExit} label="Leave game" />
-          <h1>Tongits</h1>
-        </div>
-        <div className="newgame">{headerExtra}</div>
-      </header>
 
       <section className="scoreboard">
         <span className="sb-label">Games to {target}</span>
@@ -997,7 +989,7 @@ function Table({
           <div key={i}>{line}</div>
         ))}
       </section>
-    </main>
+    </GameScreen>
   );
 }
 

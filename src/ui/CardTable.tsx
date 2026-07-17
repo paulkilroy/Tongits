@@ -18,25 +18,29 @@ export type CardDragProps = {
   onPointerUp: () => void;
 };
 
-/** Full-screen board scaffold: back button + title, then the game body. */
+/** Full-screen board scaffold shared by every card game (Tongits look): back button
+ *  + title, an optional right-side `headerExtra` slot, then the game body. */
 export function GameScreen({
   title,
   onExit,
-  variant = "sixtyfive",
+  headerExtra,
   children,
 }: {
   title: string;
   onExit: () => void;
-  variant?: string;
+  /** Right-side header content (e.g. Tongits' "1 bot / 2 bots", pot/heater chip). */
+  headerExtra?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <main className={`app screen ${variant}`}>
-      <div className="screen-head">
-        <BackButton onClick={onExit} />
-        <h1>{title}</h1>
-        <span />
-      </div>
+    <main className="app">
+      <header className="top">
+        <div className="top-left">
+          <BackButton onClick={onExit} label="Leave game" />
+          <h1>{title}</h1>
+        </div>
+        {headerExtra && <div className="newgame">{headerExtra}</div>}
+      </header>
       <div className="screen-body">{children}</div>
     </main>
   );
