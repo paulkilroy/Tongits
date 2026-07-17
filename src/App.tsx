@@ -844,6 +844,14 @@ function Table({
 
   const opponents = state.players.map((p, i) => ({ p, i })).filter(({ i }) => i !== me);
 
+  // Laban in flight: someone called and responders are still choosing fold/fight.
+  const pendingLaban = state.pendingLaban;
+  const iOweLaban = !!pendingLaban && pendingLaban.responses[me] === null;
+  const isDeciding = (i: number) =>
+    !!pendingLaban && i !== pendingLaban.caller && pendingLaban.responses[i] === null;
+  const labanDeciders = pendingLaban ? opponents.filter(({ i }) => isDeciding(i)) : [];
+  const labanWaiting = !!pendingLaban && !iOweLaban && labanDeciders.length > 0;
+
   return (
     <GameScreen title="Tongits" onExit={onBack ?? onExit} headerExtra={headerExtra}>
       {event && <div className="event-toast">🔥 {event}</div>}
@@ -860,13 +868,22 @@ function Table({
 
       {banner}
 
+      {labanWaiting && (
+        <div className="laban-wait" role="status">
+          <span className="laban-wait-scale">⚖️</span>
+          {pendingLaban!.caller === me ? "You called Laban" : `${state.players[pendingLaban!.caller].name} called Laban`} —
+          waiting for {labanDeciders.map(({ p }) => p.name).join(" & ")} to fold or fight…
+        </div>
+      )}
+
       <section className="opponents">
         {opponents.map(({ p, i }) => (
-          <div key={p.id} className={`opp ${state.current === i ? "turn" : ""}`}>
+          <div key={p.id} className={`opp ${state.current === i ? "turn" : ""} ${isDeciding(i) ? "deciding" : ""}`}>
             <div className="opp-head">
               <strong>
                 {p.avatar} {p.name}
                 {isBurned(i) && <span className="fire" title="sapaw'd — can't Laban">🔥</span>}
+                {isDeciding(i) && <span className="deciding-tag">deciding…</span>}
               </strong>
               <span className="count">{p.hand.length} cards</span>
             </div>

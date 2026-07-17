@@ -714,6 +714,49 @@ h1 {
   border-color: #ffd65a;
   box-shadow: 0 0 0 1px #ffd65a55;
 }
+/* An opponent still choosing fold/fight on a called Laban. */
+.opp.deciding {
+  border-color: #ff9a3d;
+  box-shadow: 0 0 0 1px #ff9a3d66, 0 0 14px #ff9a3d44;
+  animation: laban-pulse 1.1s ease-in-out infinite;
+}
+.deciding-tag {
+  margin-left: 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ff9a3d;
+  opacity: 0.9;
+}
+@keyframes laban-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px #ff9a3d55, 0 0 8px #ff9a3d33; }
+  50% { box-shadow: 0 0 0 1px #ff9a3d99, 0 0 18px #ff9a3d66; }
+}
+/* "Laban called — opponents deciding" banner shown to the caller / already-answered. */
+.laban-wait {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(90deg, #ff9a3d22, #ff9a3d11);
+  border: 1px solid #ff9a3d55;
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.9rem;
+  color: #ffd8b0;
+}
+.laban-wait-scale {
+  font-size: 1.15rem;
+  animation: laban-tip 1.4s ease-in-out infinite;
+  transform-origin: 50% 70%;
+}
+@keyframes laban-tip {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opp.deciding, .laban-wait-scale { animation: none; }
+}
 .opp-head {
   display: flex;
   justify-content: space-between;
@@ -792,6 +835,8 @@ h1 {
 .meld {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap; /* long runs (7+ cards from sapaw) wrap inside the box instead of overflowing */
+  max-width: 100%;
   gap: 0.25rem;
   font: inherit;
   background: rgba(255, 255, 255, 0.1);
