@@ -105,8 +105,15 @@ export interface MCTurn<S, C> {
   discarded: C;
 }
 
+/** How many top discards to re-simulate at high resolution before grading. */
+const CONFIRM_TOP = 4;
+
 /** Monte-Carlo review: score every discard by playing the position out with the
- *  CardGame spine. Exact but heavy — run in a worker. */
+ *  CardGame spine. Exact but heavy — run in a worker. Uses the same two-stage trick
+ *  as Tongits so noise doesn't invent blunders: SCREEN every discard cheaply with
+ *  COMMON RANDOM NUMBERS (the same seeded deals, so a comparison reflects the play,
+ *  not lucky draws), then CONFIRM the top few + your actual play at high resolution,
+ *  and grade only off those. `samples` is the screen budget; confirm is 4×. */
 export function analyzeRummyMC<S, C>(
   game: CardGame<S>,
   turns: MCTurn<S, C>[],
@@ -114,24 +121,52 @@ export function analyzeRummyMC<S, C>(
   samples: number,
   onProgress?: (fraction: number) => void,
 ): ReviewTurn[] {
-  const total = Math.max(1, turns.reduce((a, t) => a + t.hand.length, 0));
+  const screen = samples;
+  const confirm = Math.max(samples * 4, 220);
   let done = 0;
+  const total = Math.max(1, turns.reduce((a, t) => a + t.hand.length + CONFIRM_TOP + 1, 0));
+  const tick = () => onProgress?.(Math.min(1, ++done / total));
+
   return turns.map((t, idx) => {
-    // Each end-of-turn option (a discard or a knock/pay-me), scored by playout; keep
-    // the best result per discarded card.
-    const byCard = new Map<string, Scored<C>>();
+    const yourId = rules.id(t.discarded);
+    const seedScreen = ((idx + 1) * 0x9e3779b1) >>> 0;
+    const seedConfirm = ((idx + 1) * 0x85ebca77) >>> 0;
+
+    // One end-of-turn option per discarded card (a discard, or a knock/pay-me).
+    const opts: { cardId: string; card: C; end: S; frac: number }[] = [];
+    const seen = new Set<string>();
     for (const o of game.options?.(t.state, t.seat) ?? []) {
       const sep = o.id.indexOf(":");
       if (sep < 0 || o.id.startsWith("draw")) continue;
       const cid = o.id.slice(sep + 1);
+      if (seen.has(cid)) continue;
       const card = t.hand.find((c) => rules.id(c) === cid);
       if (!card) continue;
-      const seed = ((idx * 131 + byCard.size + 1) * 2654435761) >>> 0;
-      const pct = Math.round(evaluate(game, o.end, t.seat, samples, makeRng(seed)) * 100);
-      const prev = byCard.get(cid);
-      if (!prev || pct > prev.pct) byCard.set(cid, { card, pct, note: rules.note(card, t.hand) });
-      onProgress?.(Math.min(1, ++done / total));
+      seen.add(cid);
+      opts.push({ cardId: cid, card, end: o.end, frac: 0 });
     }
-    return assemble(idx, t.hand, t.discarded, [...byCard.values()], rules);
+
+    // Stage 1 — screen every discard against the SAME seeded deals.
+    for (const o of opts) {
+      o.frac = evaluate(game, o.end, t.seat, screen, makeRng(seedScreen));
+      tick();
+    }
+
+    // Stage 2 — confirm the top few + your actual play at high resolution.
+    const confirmIds = new Set([...opts].sort((a, b) => b.frac - a.frac).slice(0, CONFIRM_TOP).map((o) => o.cardId));
+    confirmIds.add(yourId);
+    for (const o of opts) {
+      if (confirmIds.has(o.cardId)) {
+        o.frac = evaluate(game, o.end, t.seat, confirm, makeRng(seedConfirm));
+        tick();
+      }
+    }
+
+    const scored: Scored<C>[] = opts.map((o) => ({
+      card: o.card,
+      pct: Math.round(o.frac * 100),
+      note: rules.note(o.card, t.hand),
+    }));
+    return assemble(idx, t.hand, t.discarded, scored, rules);
   });
 }
