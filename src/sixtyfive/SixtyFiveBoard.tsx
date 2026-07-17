@@ -9,7 +9,7 @@ import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } fro
 import { ReviewModal } from "../ui/ReviewModal";
 import { WinGraph } from "../ui/WinGraph";
 import { DeepDivePanel, type DeepRow } from "../ui/DeepDivePanel";
-import { analyzeSixtyFiveTurns, sixtyFiveReviewToText, type SFObs } from "./analysis";
+import { sixtyFiveReviewToText, type SFObs } from "./analysis";
 import { sixtyFiveAutopsy, type SixtyFiveOutcome } from "./winodds";
 import { useReviewWorker } from "../ui/useReviewWorker";
 
@@ -183,10 +183,11 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
       pendRef.current = null;
     }
   }, [g, me, wild]);
-  const heuristicTurns = useMemo(() => (showReview ? analyzeSixtyFiveTurns(obsRef.current) : []), [showReview]);
-  // Refine the odds with real Monte-Carlo off the main thread; show heuristic meanwhile.
+  const hasHand = showReview && obsRef.current.myTurns.length > 0;
+  // Like Tongits: the review is real Monte-Carlo off the main thread — show a progress
+  // bar until it's done, then the graph + numbers (never provisional/heuristic ones).
   const mc = useReviewWorker("65", showReview ? obsRef.current : null);
-  const reviewTurns = mc.turns ?? heuristicTurns;
+  const reviewTurns = mc.turns ?? [];
 
   const analysis = useMemo(() => analyze(hand, wild), [hand, wild]);
   const meldedIds = useMemo(() => new Set(analysis.melds.flat().map((c) => c.id)), [analysis]);
@@ -336,25 +337,32 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
           </>
         )}
 
-        {showReview && reviewTurns.length > 0 && (
+        {hasHand && (
           <ReviewModal
             title="Hand review"
             turns={reviewTurns}
             toText={() => sixtyFiveReviewToText(reviewTurns)}
             onClose={() => setShowReview(false)}
             discardTitle="If you discard… · chance of success"
-            header={(step, setStep) => (
-              <>
-                <div className="wg-caption">
-                  <span className="wg-legend">
-                    {mc.turns ? "simulated · dot colour = grade" : `refining with sims… ${Math.round(mc.progress * 100)}%`}
-                  </span>
+            header={(step, setStep) =>
+              !mc.turns ? (
+                <div className="wg-progress">
+                  <div>Simulating your hand… {Math.round(mc.progress * 100)}%</div>
+                  <div className="wg-bar">
+                    <div className="wg-bar-fill" style={{ width: `${Math.round(mc.progress * 100)}%` }} />
+                  </div>
                 </div>
-                {reviewTurns.length > 1 && (
-                  <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
-                )}
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="wg-caption">
+                    <span className="wg-legend">simulated · dot colour = grade</span>
+                  </div>
+                  {reviewTurns.length > 1 && (
+                    <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
+                  )}
+                </>
+              )
+            }
             extra={(t, i) => (
               <SixtyFiveDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
             )}

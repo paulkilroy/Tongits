@@ -11,7 +11,7 @@ import { ReviewModal } from "../ui/ReviewModal";
 import { WinGraph } from "../ui/WinGraph";
 import { useReviewWorker } from "../ui/useReviewWorker";
 import { reviewGinHand, type GinObs } from "./review";
-import { analyzeGinTurns, ginReviewToText } from "./analysis";
+import { ginReviewToText } from "./analysis";
 
 function Chip({
   c,
@@ -192,10 +192,11 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
     }
   }, [g, me]);
   const knockReview = showReview ? reviewGinHand(obsRef.current).knock : null;
-  const heuristicTurns = useMemo(() => (showReview ? analyzeGinTurns(obsRef.current) : []), [showReview]);
-  // Refine the odds with real Monte-Carlo off the main thread; show heuristic meanwhile.
+  // Whether there's a hand to review at all (drives the modal open + the progress state).
+  const hasHand = showReview && obsRef.current.myTurns.length > 0;
+  // The review is real Monte-Carlo off the main thread; show a progress bar until it's done.
   const mc = useReviewWorker("gin", showReview ? obsRef.current : null);
-  const reviewTurns = mc.turns ?? heuristicTurns;
+  const reviewTurns = mc.turns ?? [];
 
   const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
   const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
@@ -363,26 +364,32 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
           </>
         )}
 
-        {showReview && reviewTurns.length > 0 && (
+        {hasHand && (
           <ReviewModal
             title="Hand review"
             turns={reviewTurns}
             toText={() => ginReviewToText(reviewTurns, knockReview)}
             onClose={() => setShowReview(false)}
             discardTitle="If you discard… · chance of success"
-            header={(step, setStep) => (
+            header={(step, setStep) =>
+              !mc.turns ? (
+                <div className="wg-progress">
+                  <div>Simulating your hand… {Math.round(mc.progress * 100)}%</div>
+                  <div className="wg-bar">
+                    <div className="wg-bar-fill" style={{ width: `${Math.round(mc.progress * 100)}%` }} />
+                  </div>
+                </div>
+              ) : (
               <>
                 <div className="wg-caption">
                   Chance of success · {reviewTurns[0].yourPct}% →{" "}
                   <strong>{reviewTurns[reviewTurns.length - 1].yourPct}%</strong>
-                  <span className="wg-legend">
-                    {" "}
-                    · {mc.turns ? "simulated" : `refining with sims… ${Math.round(mc.progress * 100)}%`}
-                  </span>
+                  <span className="wg-legend"> · simulated · dot colour = grade</span>
                 </div>
                 <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
               </>
-            )}
+              )
+            }
             extra={(t, i) => (
               <>
                 <GinDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
