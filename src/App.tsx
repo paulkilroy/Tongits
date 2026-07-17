@@ -39,7 +39,6 @@ import { Lobby as SeatLobby, type LobbySeat, type LobbyFriend } from "./online/L
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { PlayingCard } from "./ui/PlayingCard";
 import { ReviewModal } from "./ui/ReviewModal";
-import { WinGraph } from "./ui/WinGraph";
 import { DeepDivePanel, type DeepRow } from "./ui/DeepDivePanel";
 import { type ReviewTurn, type ReviewCard } from "./ui/reviewModel";
 import { DiscardPiles, HandPanel } from "./ui/CardTable";
@@ -655,36 +654,6 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
     );
   };
 
-  // Everything above the stepper: the win-odds graph while ready, or a progress bar
-  // while the engine is still churning, plus the round summary.
-  const header = (step: number, setStep: (i: number) => void) => (
-    <>
-      {grades ? (
-        grades.length > 0 ? (
-          <>
-            <div className="wg-caption">
-              Win odds · {grades[0].yourPct}% → <strong>{grades[grades.length - 1].yourPct}%</strong>
-              <span className="wg-legend"> · dot colour = play grade</span>
-            </div>
-            <WinGraph turns={turns} current={Math.min(step, turns.length - 1)} onSelect={setStep} />
-          </>
-        ) : null
-      ) : (
-        <div className="wg-progress">
-          <div>Analyzing your play… {Math.round(progress * 100)}%</div>
-          <div className="wg-bar">
-            <div className="wg-bar-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
-          </div>
-        </div>
-      )}
-      <div className="review-summary">
-        {result.summary.map((s, i) => (
-          <div key={i}>{s}</div>
-        ))}
-      </div>
-    </>
-  );
-
   return (
     <ReviewModal
       title="Game Review"
@@ -693,7 +662,22 @@ function GameReview({ history, me, onClose }: { history: GameState[]; me: number
       onClose={onClose}
       extra={extra}
       hideMelds
-      header={header}
+      progress={progress}
+      progressLabel="Analysing your play"
+      showGraph
+      caption={(t) => (
+        <>
+          Win odds · {t[0].yourPct}% → <strong>{t[t.length - 1].yourPct}%</strong>
+          <span className="wg-legend"> · dot colour = play grade</span>
+        </>
+      )}
+      header={() => (
+        <div className="review-summary">
+          {result.summary.map((s, i) => (
+            <div key={i}>{s}</div>
+          ))}
+        </div>
+      )}
     />
   );
 }

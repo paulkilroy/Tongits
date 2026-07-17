@@ -7,7 +7,6 @@ import { type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewModal } from "../ui/ReviewModal";
-import { WinGraph } from "../ui/WinGraph";
 import { DeepDivePanel, type DeepRow } from "../ui/DeepDivePanel";
 import { sixtyFiveReviewToText, type SFObs } from "./analysis";
 import { sixtyFiveAutopsy, type SixtyFiveOutcome } from "./winodds";
@@ -344,25 +343,10 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
             toText={() => sixtyFiveReviewToText(reviewTurns)}
             onClose={() => setShowReview(false)}
             discardTitle="If you discard… · chance of success"
-            header={(step, setStep) =>
-              !mc.turns ? (
-                <div className="wg-progress">
-                  <div>Simulating your hand… {Math.round(mc.progress * 100)}%</div>
-                  <div className="wg-bar">
-                    <div className="wg-bar-fill" style={{ width: `${Math.round(mc.progress * 100)}%` }} />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="wg-caption">
-                    <span className="wg-legend">simulated · dot colour = grade</span>
-                  </div>
-                  {reviewTurns.length > 1 && (
-                    <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
-                  )}
-                </>
-              )
-            }
+            progress={mc.progress}
+            progressLabel="Simulating your hand"
+            showGraph
+            caption={() => <span className="wg-legend">simulated · dot colour = grade</span>}
             extra={(t, i) => (
               <SixtyFiveDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
             )}

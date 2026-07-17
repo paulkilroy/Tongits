@@ -8,7 +8,6 @@ import { sortHand, type SortMode } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
 import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
 import { ReviewModal } from "../ui/ReviewModal";
-import { WinGraph } from "../ui/WinGraph";
 import { useReviewWorker } from "../ui/useReviewWorker";
 import { reviewGinHand, type GinObs } from "./review";
 import { ginReviewToText } from "./analysis";
@@ -371,25 +370,15 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
             toText={() => ginReviewToText(reviewTurns, knockReview)}
             onClose={() => setShowReview(false)}
             discardTitle="If you discard… · chance of success"
-            header={(step, setStep) =>
-              !mc.turns ? (
-                <div className="wg-progress">
-                  <div>Simulating your hand… {Math.round(mc.progress * 100)}%</div>
-                  <div className="wg-bar">
-                    <div className="wg-bar-fill" style={{ width: `${Math.round(mc.progress * 100)}%` }} />
-                  </div>
-                </div>
-              ) : (
+            progress={mc.progress}
+            progressLabel="Simulating your hand"
+            showGraph
+            caption={(t) => (
               <>
-                <div className="wg-caption">
-                  Chance of success · {reviewTurns[0].yourPct}% →{" "}
-                  <strong>{reviewTurns[reviewTurns.length - 1].yourPct}%</strong>
-                  <span className="wg-legend"> · simulated · dot colour = grade</span>
-                </div>
-                <WinGraph turns={reviewTurns} current={Math.min(step, reviewTurns.length - 1)} onSelect={setStep} />
+                Chance of success · {t[0].yourPct}% → <strong>{t[t.length - 1].yourPct}%</strong>
+                <span className="wg-legend"> · simulated · dot colour = grade</span>
               </>
-              )
-            }
+            )}
             extra={(t, i) => (
               <>
                 <GinDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
