@@ -385,7 +385,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
             )}
             extra={(t, i) => (
               <>
-                <GinDeepDive state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
+                <GinDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
                 {knockReview && i === reviewTurns.length - 1 && (
                   <div className="rp-section">
                     <div className="rp-label">Your knock</div>
