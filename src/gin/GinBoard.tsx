@@ -1,53 +1,41 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type Card, cardId, cardLabel, cardPoints, SUIT_CLASS } from "../engine/cards";
 import { bestMelds } from "../engine/meldFinder";
 import { type GinState, discard, deadwoodPts, canKnock, KNOCK_MAX, TARGET } from "./game";
 import { ginAutopsy, type GinOutcome } from "./winodds";
 import { CardDeepDive, topDiscards, deepRows } from "../ui/CardDeepDive";
-import { sortHand, type SortMode } from "../ui/handSort";
+import { sortHand } from "../ui/handSort";
 import { PlayingCard } from "../ui/PlayingCard";
-import { GameScreen, ScoreRow, DiscardPiles, HandPanel, type CardDragProps } from "../ui/CardTable";
+import { RummyBoard, type Chip, type RummyCard } from "../ui/RummyBoard";
 import { ReviewModal } from "../ui/ReviewModal";
 import { useReviewWorker } from "../ui/useReviewWorker";
 import { reviewGinHand, type GinObs } from "./review";
 import { ginReviewToText } from "./analysis";
 
-function Chip({
-  c,
-  onClick,
-  dim,
-  selected,
-  isNew,
-  inMeld,
-  mini,
-  drag,
-}: {
-  c: Card;
-  onClick?: () => void;
-  dim?: boolean;
-  selected?: boolean;
-  isNew?: boolean;
-  inMeld?: boolean;
-  mini?: boolean;
-  drag?: CardDragProps;
-}) {
-  return (
-    <PlayingCard
-      label={cardLabel(c)}
-      suitClass={SUIT_CLASS[c.suit]}
-      dim={dim}
-      mini={mini}
-      selected={selected}
-      isNew={isNew}
-      inMeld={inMeld}
-      onClick={onClick}
-      dataCardId={drag?.["data-card-id"]}
-      onPointerDown={drag?.onPointerDown}
-      onPointerMove={drag?.onPointerMove}
-      onPointerUp={drag?.onPointerUp}
-    />
-  );
-}
+const chip: Chip<Card> = (c, o) => (
+  <PlayingCard
+    key={cardId(c)}
+    label={cardLabel(c)}
+    suitClass={SUIT_CLASS[c.suit]}
+    dim={o.dim}
+    mini={o.mini}
+    selected={o.selected}
+    isNew={o.isNew}
+    inMeld={o.inMeld}
+    dataCardId={o.drag?.["data-card-id"]}
+    onPointerDown={o.drag?.onPointerDown}
+    onPointerMove={o.drag?.onPointerMove}
+    onPointerUp={o.drag?.onPointerUp}
+  />
+);
+
+const ginCard: RummyCard<Card> = {
+  id: cardId,
+  chip,
+  meldedIds: (h) => new Set(bestMelds(h).flatMap((m) => m.cards.map(cardId))),
+  sort: sortHand,
+  deadwood: deadwoodPts,
+};
 
 // Outcome buckets for the deep-dive bar, wins first (green) then losses (red).
 const GIN_SEGMENTS: { key: keyof GinOutcome; label: string; cls: string }[] = [
@@ -57,11 +45,8 @@ const GIN_SEGMENTS: { key: keyof GinOutcome; label: string; cls: string }[] = [
   { key: "oppKnock", label: "opponent wins", cls: "l1" },
   { key: "youUndercutLoss", label: "you get undercut", cls: "l2" },
 ];
-
 const SAMPLES = 300;
 
-// Gin's deep-dive = the shared CardDeepDive shell + a Gin `compute` (play each
-// candidate discard out via ginAutopsy, map its outcome buckets to a bar).
 function GinDeepDive({ state, me, yourDiscardId }: { state?: GinState; me: number; yourDiscardId: string }) {
   if (!state) return null;
   const decision = state;
@@ -106,22 +91,11 @@ export interface GinBoardProps {
 
 export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound, onNewGame, onExit, waiting }: GinBoardProps) {
   const hand = g.players[me].hand;
-  const myTurn = g.current === me && !g.result && (g.phase === "draw" || g.phase === "discard");
-
-  const [sel, setSel] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<SortMode>("suit");
-  const [fanned, setFanned] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  useEffect(() => setSel(null), [g.current, g.phase]);
-  // The discard fan stays open until your turn ends, then folds away on its own.
-  useEffect(() => {
-    if (!myTurn) setFanned(false);
-  }, [myTurn]);
 
   // Record this hand's observations for the post-hand coach: my own turns (hand +
-  // discard) plus what's OBSERVABLE about the opponent — their pickups off the pile
-  // and turn count. We see intermediate states because each draw/discard is its own
-  // update. Resets when a new hand is dealt.
+  // discard) plus what's OBSERVABLE about the opponent — pickups off the pile and
+  // turn count. Resets when a new hand is dealt.
   const obsRef = useRef<GinObs>({ myTurns: [], oppPickups: 0, oppTurns: 0, oppDiscards: [] });
   const pendingRef = useRef<Record<number, { drewDiscard: boolean; hand8?: Card[]; state?: GinState }>>({});
   const handNoRef = useRef(g.handNo);
@@ -134,8 +108,6 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
     for (let p = 0; p < g.players.length; p++) {
       const hp = g.players[p].hand;
       if (g.current === p && g.phase === "discard" && hp.length === 8 && !pendingRef.current[p]) {
-        // just drew, about to discard — snapshot my decision state so the deep-dive
-        // can play each candidate discard out from here.
         pendingRef.current[p] = {
           drewDiscard: g.drewFrom === "discard",
           hand8: p === me ? hp.map((c) => ({ rank: c.rank, suit: c.suit })) : undefined,
@@ -143,7 +115,7 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
         };
       } else if (pendingRef.current[p] && hp.length === 7) {
         const pend = pendingRef.current[p];
-        const top = g.discard[g.discard.length - 1]; // whatever they just threw
+        const top = g.discard[g.discard.length - 1];
         if (p === me) {
           const disc = pend.hand8?.find((c) => !hp.some((x) => cardId(x) === cardId(c)));
           if (pend.hand8 && disc)
@@ -157,225 +129,139 @@ export function GinBoard({ g, me, title, onDraw, onDiscard, onKnock, onNextRound
       }
     }
   }, [g, me]);
+
   const knockReview = showReview ? reviewGinHand(obsRef.current).knock : null;
-  // Whether there's a hand to review at all (drives the modal open + the progress state).
   const hasHand = showReview && obsRef.current.myTurns.length > 0;
-  // The review is real Monte-Carlo off the main thread; show a progress bar until it's done.
   const mc = useReviewWorker("gin", showReview ? obsRef.current : null);
   const reviewTurns = mc.turns ?? [];
 
-  const meldedIds = useMemo(() => new Set(bestMelds(hand).flatMap((m) => m.cards.map(cardId))), [hand]);
-  const sorted = useMemo(() => sortHand(hand, sortMode), [hand, sortMode]);
   const deadPts = deadwoodPts(hand);
-  const canDiscard = myTurn && g.phase === "discard";
-  // A card we can knock/gin with — prefer the selected one.
-  const knockCardId = useMemo(() => {
-    if (!canDiscard) return null;
-    if (sel && canKnock(g, sel)) return sel;
-    for (const c of hand) if (canKnock(g, cardId(c))) return cardId(c);
-    return null;
-  }, [g, hand, canDiscard, sel]);
-  const knockGin = knockCardId ? deadwoodPts(hand.filter((c) => cardId(c) !== knockCardId)) === 0 : false;
 
-  const discardTop = g.discard[g.discard.length - 1];
+  const reveal =
+    g.phase === "roundEnd" && g.round ? (
+      <div className="cr-phase">
+        <h2 className="sf-h2">
+          {g.players[g.round.knocker].name} {g.round.gin ? "goes Gin!" : "knocks"} ·{" "}
+          {g.players[g.round.scorer].name} +{g.round.points}
+          {g.round.undercut ? " (undercut!)" : ""}
+        </h2>
+        {[
+          { seat: g.round.knocker, melds: g.round.knockerMelds, dead: g.round.knockerDeadwood, tag: "knocks" },
+          { seat: (g.round.knocker + 1) % 2, melds: g.round.defenderMelds, dead: g.round.defenderDeadwood, tag: "defends" },
+        ].map(({ seat, melds, dead, tag }) => (
+          <div className="sf-reveal" key={seat}>
+            <div className="sf-reveal-name">
+              {seat === me ? "You" : g.players[seat].name} · {tag} ·{" "}
+              <strong>{dead.reduce((a, c) => a + cardPoints(c), 0)} deadwood</strong>
+            </div>
+            <div className="sf-melds">
+              {melds.map((m, k) => (
+                <span className="sf-meld" key={k}>
+                  {m.map((c) => chip(c, { mini: true }))}
+                </span>
+              ))}
+              {dead.length > 0 && <span className="sf-dead">{dead.map((c) => chip(c, { dim: true, mini: true }))}</span>}
+            </div>
+          </div>
+        ))}
+        <div className="cr-row2">
+          {obsRef.current.myTurns.length > 0 && (
+            <button className="cr-coach-btn" onClick={() => setShowReview(true)}>
+              🔍 Review my hand
+            </button>
+          )}
+          {onNextRound ? (
+            <button className="big play-primary" onClick={onNextRound}>
+              Next hand
+            </button>
+          ) : (
+            <div className="cr-lbl">waiting for the next hand…</div>
+          )}
+        </div>
+      </div>
+    ) : null;
+
+  const reviewModal = hasHand ? (
+    <ReviewModal
+      title="Hand review"
+      turns={reviewTurns}
+      toText={() => ginReviewToText(reviewTurns, knockReview)}
+      onClose={() => setShowReview(false)}
+      discardTitle="If you discard… · chance of success"
+      progress={mc.progress}
+      progressLabel="Simulating your hand"
+      showGraph
+      caption={(t) => (
+        <>
+          Chance of success · {t[0].yourPct}% → <strong>{t[t.length - 1].yourPct}%</strong>
+          <span className="wg-legend"> · simulated · dot colour = grade</span>
+        </>
+      )}
+      extra={(t, i) => (
+        <>
+          <GinDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
+          {knockReview && i === reviewTurns.length - 1 && (
+            <div className="rp-section">
+              <div className="rp-label">Your knock</div>
+              <div className="replay">
+                <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
+                  <span
+                    className={`rv-grade grade-${
+                      knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
+                    }`}
+                  >
+                    {knockReview.verdict === "gin"
+                      ? "Gin"
+                      : knockReview.verdict === "strong"
+                        ? "Strong knock"
+                        : knockReview.verdict === "fair"
+                          ? "Fair knock"
+                          : "Risky knock"}
+                  </span>
+                </div>
+                <div className="rv-reason">{knockReview.note}</div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    />
+  ) : null;
 
   return (
-    <GameScreen title={title} onExit={onExit}>
-        <ScoreRow
-          players={g.players.map((p, i) => ({
-            name: i === me ? "You" : p.name,
-            score: p.score,
-            active: g.current === i && !g.result,
-            sub: (
-              <div className="cr-track">
-                <div className="cr-track-fill" style={{ width: `${Math.min(100, (p.score / TARGET) * 100)}%` }} />
-              </div>
-            ),
-          }))}
-        />
-        <div className="cr-lbl sf-round">Gin · knock at ≤{KNOCK_MAX} · first to {TARGET}</div>
-        {waiting && <div className="cr-waiting">{waiting}</div>}
-        {g.log.length > 0 && <div className="cr-flash">{g.log[g.log.length - 1]}</div>}
-
-        {g.phase === "roundEnd" && g.round ? (
-          <div className="cr-phase">
-            <h2 className="sf-h2">
-              {g.players[g.round.knocker].name} {g.round.gin ? "goes Gin!" : "knocks"} ·{" "}
-              {g.players[g.round.scorer].name} +{g.round.points}
-              {g.round.undercut ? " (undercut!)" : ""}
-            </h2>
-            {[
-              { seat: g.round.knocker, melds: g.round.knockerMelds, dead: g.round.knockerDeadwood, tag: "knocks" },
-              {
-                seat: (g.round.knocker + 1) % 2,
-                melds: g.round.defenderMelds,
-                dead: g.round.defenderDeadwood,
-                tag: "defends",
-              },
-            ].map(({ seat, melds, dead, tag }) => (
-              <div className="sf-reveal" key={seat}>
-                <div className="sf-reveal-name">
-                  {seat === me ? "You" : g.players[seat].name} · {tag} ·{" "}
-                  <strong>{dead.reduce((a, c) => a + cardPoints(c), 0)} deadwood</strong>
-                </div>
-                <div className="sf-melds">
-                  {melds.map((m, k) => (
-                    <span className="sf-meld" key={k}>
-                      {m.map((c) => (
-                        <Chip key={cardId(c)} c={c} mini />
-                      ))}
-                    </span>
-                  ))}
-                  {dead.length > 0 && (
-                    <span className="sf-dead">
-                      {dead.map((c) => (
-                        <Chip key={cardId(c)} c={c} dim mini />
-                      ))}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div className="cr-row2">
-              {obsRef.current.myTurns.length > 0 && (
-                <button
-                  className="cr-coach-btn"
-                  onClick={() => setShowReview(true)}
-                >
-                  🔍 Review my hand
-                </button>
-              )}
-              {onNextRound ? (
-                <button className="big play-primary" onClick={onNextRound}>
-                  Next hand
-                </button>
-              ) : (
-                <div className="cr-lbl">waiting for the next hand…</div>
-              )}
-            </div>
+    <RummyBoard
+      g={g}
+      me={me}
+      title={title}
+      onExit={onExit}
+      waiting={waiting}
+      flash={g.log.length ? g.log[g.log.length - 1] : null}
+      card={ginCard}
+      roundInfo={`Gin · knock at ≤${KNOCK_MAX} · first to ${TARGET}`}
+      handHint={deadPts === 0 && hand.length >= 7 ? <span className="fk-good"> · Gin!</span> : null}
+      scorePlayers={g.players.map((p, i) => ({
+        name: i === me ? "You" : p.name,
+        score: p.score,
+        active: g.current === i && !g.result,
+        sub: (
+          <div className="cr-track">
+            <div className="cr-track-fill" style={{ width: `${Math.min(100, (p.score / TARGET) * 100)}%` }} />
           </div>
-        ) : g.result ? (
-          <div className="cr-phase cr-over">
-            <h2>{g.result.winner === me ? "You win! 🎉" : `${g.players[g.result.winner].name} wins.`}</h2>
-            <div className="cr-lbl">{g.players.map((p, i) => `${i === me ? "You" : p.name} ${p.score}`).join(" · ")}</div>
-            {onNewGame && (
-              <button className="reveal-replay" onClick={onNewGame}>
-                New game
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            <DiscardPiles
-              stockCount={g.deck.length}
-              canDrawStock={myTurn && g.phase === "draw"}
-              onDrawStock={() => onDraw("deck")}
-              discard={g.discard}
-              topCard={discardTop ?? null}
-              canTakeDiscard={myTurn && g.phase === "draw" && !!discardTop}
-              onTakeDiscard={() => onDraw("discard")}
-              renderCard={(c, mini) => <Chip c={c} mini={mini} />}
-              fanned={fanned}
-              setFanned={setFanned}
-            />
-
-            <HandPanel
-              cards={hand}
-              sorted={sorted}
-              idOf={cardId}
-              sortMode={sortMode}
-              onSortChange={setSortMode}
-              onTapCard={(c) => {
-                if (canDiscard) setSel((s) => (s === cardId(c) ? null : cardId(c)));
-              }}
-              header={
-                <>
-                  Your hand · deadwood <strong>{deadPts}</strong> · <span className="legend">green = meld</span>
-                  {deadPts === 0 && hand.length >= 7 && <span className="fk-good"> · Gin!</span>}
-                </>
-              }
-              renderCard={(c, drag) => (
-                <Chip
-                  key={cardId(c)}
-                  c={c}
-                  inMeld={meldedIds.has(cardId(c))}
-                  selected={sel === cardId(c)}
-                  isNew={g.drawnId === cardId(c)}
-                  drag={drag}
-                />
-              )}
-            />
-
-            <div className="sf-actions">
-              {!myTurn ? (
-                <div className="cr-turn">{g.players[g.current].name}…</div>
-              ) : g.phase === "draw" ? (
-                <div className="cr-lbl">draw from the stock or take the discard</div>
-              ) : (
-                <>
-                  <div className="cr-lbl">{sel ? "discard the selected card, or:" : "tap a card to select"}</div>
-                  <div className="cr-row2">
-                    <button className="reveal-replay cr-discard-btn" disabled={!sel} onClick={() => sel && onDiscard(sel)}>
-                      Discard
-                    </button>
-                    {knockCardId && (
-                      <button className="cr-coach-btn" onClick={() => onKnock(knockCardId)}>
-                        {knockGin ? "✊ Gin!" : "✊ Knock"}
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
-
-        {hasHand && (
-          <ReviewModal
-            title="Hand review"
-            turns={reviewTurns}
-            toText={() => ginReviewToText(reviewTurns, knockReview)}
-            onClose={() => setShowReview(false)}
-            discardTitle="If you discard… · chance of success"
-            progress={mc.progress}
-            progressLabel="Simulating your hand"
-            showGraph
-            caption={(t) => (
-              <>
-                Chance of success · {t[0].yourPct}% → <strong>{t[t.length - 1].yourPct}%</strong>
-                <span className="wg-legend"> · simulated · dot colour = grade</span>
-              </>
-            )}
-            extra={(t, i) => (
-              <>
-                <GinDeepDive key={i} state={obsRef.current.myTurns[i]?.state} me={me} yourDiscardId={t.yourDiscard ?? ""} />
-                {knockReview && i === reviewTurns.length - 1 && (
-                  <div className="rp-section">
-                    <div className="rp-label">Your knock</div>
-                    <div className="replay">
-                      <div className="rp-nav-mid" style={{ justifyContent: "flex-start" }}>
-                        <span
-                          className={`rv-grade grade-${
-                            knockReview.verdict === "risky" ? "mistake" : knockReview.verdict === "fair" ? "good" : "best"
-                          }`}
-                        >
-                          {knockReview.verdict === "gin"
-                            ? "Gin"
-                            : knockReview.verdict === "strong"
-                              ? "Strong knock"
-                              : knockReview.verdict === "fair"
-                                ? "Fair knock"
-                                : "Risky knock"}
-                        </span>
-                      </div>
-                      <div className="rv-reason">{knockReview.note}</div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          />
-        )}
-    </GameScreen>
+        ),
+      }))}
+      onDraw={onDraw}
+      onDiscard={onDiscard}
+      declare={(sel) => {
+        let kid = sel && canKnock(g, sel) ? sel : null;
+        if (!kid) for (const c of hand) if (canKnock(g, cardId(c))) { kid = cardId(c); break; }
+        if (!kid) return null;
+        const knockId = kid;
+        const gin = deadwoodPts(hand.filter((c) => cardId(c) !== knockId)) === 0;
+        return { id: knockId, label: gin ? "✊ Gin!" : "✊ Knock", onClick: () => onKnock(knockId) };
+      }}
+      reveal={reveal}
+      onNewGame={onNewGame}
+      reviewModal={reviewModal}
+    />
   );
 }
