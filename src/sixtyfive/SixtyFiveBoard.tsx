@@ -218,7 +218,7 @@ export function SixtyFiveBoard({ g, me, title, onDraw, onDiscard, onPayMe, onNex
       onDraw={onDraw}
       onDiscard={onDiscard}
       declare={(sel) => {
-        if (hand.length - 1 !== g.handSize) return null;
+        if (g.paidBy != null || hand.length - 1 !== g.handSize) return null;
         let pid = sel && analyze(hand.filter((x) => x.id !== sel), wild).points === 0 ? sel : null;
         if (!pid) for (const c of hand) if (analyze(hand.filter((x) => x.id !== c.id), wild).points === 0) { pid = c.id; break; }
         if (!pid) return null;

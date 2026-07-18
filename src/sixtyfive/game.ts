@@ -167,9 +167,11 @@ export function discard(state: SFState, cardId: string): SFState {
   return s;
 }
 
-/** Whether the current player may declare Pay Me after discarding `cardId`. */
+/** Whether the current player may declare Pay Me after discarding `cardId`. Once
+ *  someone has declared (`paidBy` set), the rest of the lap can only lay off — no one
+ *  else may re-declare (otherwise back-to-back clean hands reset the final lap forever). */
 export function canPayMe(state: SFState, cardId: string): boolean {
-  if (state.phase !== "discard") return false;
+  if (state.phase !== "discard" || state.paidBy != null) return false;
   const hand = state.players[state.current].hand.filter((c) => c.id !== cardId);
   return analyze(hand, state.wildRank).points === 0 && hand.length === state.handSize;
 }

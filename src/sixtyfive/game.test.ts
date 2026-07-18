@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { newGame, draw, discard, nextRound, handAnalysis, type SFState } from "./game";
+import { newGame, draw, discard, nextRound, handAnalysis, canPayMe, type SFState } from "./game";
 import { aiStep } from "./ai";
 
 describe("65 match flow", () => {
@@ -28,6 +28,14 @@ describe("65 match flow", () => {
     const a = handAnalysis(s, 0);
     expect(a.points).toBeGreaterThanOrEqual(0);
     expect(a.melds.flat().length + a.deadwood.length).toBeLessThanOrEqual(3 + a.melds.flat().filter((c) => c.rank === "JOKER").length);
+  });
+
+  it("no re-declaring Pay Me during the final lap (else the lap never ends)", () => {
+    const s = newGame(["A", "B"], [false, false]);
+    s.phase = "discard";
+    s.paidBy = 1; // B already declared
+    // Even with a going-out hand, the current player can't declare again.
+    expect(canPayMe(s, s.players[s.current].hand[0].id)).toBe(false);
   });
 
   it("plays a full AI match to a winner across all 11 hands", () => {
